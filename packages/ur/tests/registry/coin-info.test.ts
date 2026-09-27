@@ -1,5 +1,6 @@
 import { CborError, CborMap, bytesToHex, encodeCbor } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
+
 import {
   CoinType,
   Network,
@@ -9,15 +10,17 @@ import {
   fromUr,
   fromUrString,
   toUrString,
-  type CoinInfo,
 } from "../../src/registry/index.ts";
+import type { CoinInfo } from "../../src/registry/index.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
@@ -67,13 +70,13 @@ test("extra map key is CborType", () => {
   map.set(3, 0);
   const err = errorOf(() => fromUr(Ur.create("coin-info", map), coinInfoCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("WrongType");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "WrongType" });
 });
 
 test("type above uint31 is CborType OutOfRange", () => {
-  const err = errorOf(() => toUrString({ type: 0x8000_0000 }, coinInfoCodec));
+  const err = errorOf(() => toUrString({ type: 0x80_00_00_00 }, coinInfoCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("OutOfRange");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "OutOfRange" });
 });

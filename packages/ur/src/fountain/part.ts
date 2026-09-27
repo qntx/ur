@@ -51,7 +51,8 @@ export class Part {
     maxDataLen = DEFAULT_LIMITS.maxFragmentDataLength,
     maxFragmentCount = DEFAULT_LIMITS.maxFragmentCount,
   ): Part {
-    return decodePart(bytes, maxDataLen, maxFragmentCount);
+    const f = decodePart(bytes, maxDataLen, maxFragmentCount);
+    return Part.fromFields(f.sequence, f.sequenceCount, f.messageLength, f.checksum, f.data);
   }
 
   sequenceId(): string {

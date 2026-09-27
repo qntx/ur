@@ -1,5 +1,6 @@
 import { bytesToHex, decodeCbor, expectBytes, hexToBytes } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
+
 import {
   Ur,
   UrError,
@@ -7,31 +8,27 @@ import {
   fromUrStringWith,
   psbtCodec,
   seedCodec,
-  type Psbt,
-  type Seed,
 } from "../../src/registry/index.ts";
+import type { Psbt, Seed } from "../../src/registry/index.ts";
 import { psbt167, seedC709 } from "./goldens.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
 
 test("duplicate tags[0].name is TypeError not InvalidType", () => {
-  try {
-    codecMap([seedCodec, seedCodec]);
-  } catch (e) {
-    expect(e instanceof TypeError).toBe(true);
-    expect(e instanceof UrError).toBe(false);
-    if (e instanceof TypeError) expect(e.message).toBe("duplicate codec for UR type seed");
-    return;
-  }
-  throw new Error("expected TypeError");
+  const call = () => codecMap([seedCodec, seedCodec]);
+  expect(call).toThrow(TypeError);
+  expect(call).not.toThrow(UrError);
+  expect(call).toThrow("duplicate codec for UR type seed");
 });
 
 test("fromUrStringWith unknown type is UnexpectedType", () => {
@@ -44,7 +41,7 @@ test("fromUrStringWith unknown type is UnexpectedType", () => {
 
 test("codecMap seed+psbt dispatch", () => {
   const map = codecMap([seedCodec, psbtCodec]);
-  expect([...map.keys()]).toEqual(["seed", "psbt"]);
+  expect([...map.keys()]).toStrictEqual(["seed", "psbt"]);
 
   const seed = fromUrStringWith(seedC709.ur, map);
   expect(seed.type).toBe("seed");

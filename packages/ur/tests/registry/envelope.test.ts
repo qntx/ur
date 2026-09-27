@@ -6,9 +6,10 @@ import {
   cborEquals,
   encodeCbor,
   taggedValue,
-  type Cbor,
 } from "@blockchaincommons/dcbor";
+import type { Cbor } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
+
 import {
   ENVELOPE_MAX_DEPTH,
   TAG_COMPRESSED,
@@ -30,9 +31,11 @@ import { envelopeAlice, envelopeNode } from "./goldens.ts";
 function urErrorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
@@ -40,9 +43,11 @@ function urErrorOf(fn: () => void): UrError {
 function cborErrorOf(fn: () => void): CborError {
   try {
     fn();
-  } catch (e) {
-    if (CborError.isCborError(e)) return e;
-    throw e;
+  } catch (error) {
+    if (CborError.isCborError(error)) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected CborError");
 }
@@ -53,7 +58,9 @@ function leaf(text: string): Cbor {
 
 function wrap(inner: Cbor, n: number): Cbor {
   let value = inner;
-  for (let i = 0; i < n; i++) value = taggedValue(TAG_ENVELOPE, value);
+  for (let i = 0; i < n; i++) {
+    value = taggedValue(TAG_ENVELOPE, value);
+  }
   return value;
 }
 
@@ -105,15 +112,15 @@ test("untagged text node is WrongType", () => {
   expect(cborErrorOf(() => assertEnvelopeContent(value)).code).toBe("WrongType");
   const err = urErrorOf(() => fromUr(Ur.create("envelope", value), envelopeCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("WrongType");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "WrongType" });
 });
 
 test("array of length 1 is CborType WrongType", () => {
   const err = urErrorOf(() => fromUr(Ur.create("envelope", cbor([aliceLeaf()])), envelopeCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("WrongType");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "WrongType" });
 });
 
 test("wrap-chain innermost depth 64 succeeds; 65 is OutOfRange", () => {
@@ -125,8 +132,8 @@ test("wrap-chain innermost depth 64 succeeds; 65 is OutOfRange", () => {
   expect(cborErrorOf(() => assertEnvelopeContent(at65)).code).toBe("OutOfRange");
   const err = urErrorOf(() => toUrString(at65, envelopeCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("OutOfRange");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "OutOfRange" });
 });
 
 test("known-value unsigned stops; non-unsigned is WrongType", () => {
@@ -137,8 +144,10 @@ test("known-value unsigned stops; non-unsigned is WrongType", () => {
 });
 
 test("encrypted and compressed content is opaque", () => {
-  assertEnvelopeContent(taggedValue(TAG_ENCRYPTED, "not-envelope-content"));
-  assertEnvelopeContent(taggedValue(TAG_COMPRESSED, ["Alice"]));
+  expect(() =>
+    assertEnvelopeContent(taggedValue(TAG_ENCRYPTED, "not-envelope-content")),
+  ).not.toThrow();
+  expect(() => assertEnvelopeContent(taggedValue(TAG_COMPRESSED, ["Alice"]))).not.toThrow();
 });
 
 test("elided 32-byte bstr stops; other lengths are WrongType", () => {
@@ -150,5 +159,5 @@ test("elided 32-byte bstr stops; other lengths are WrongType", () => {
 });
 
 test("top-level assertion map size 1", () => {
-  assertEnvelopeContent(assertion(leaf("knows"), leaf("Bob")));
+  expect(() => assertEnvelopeContent(assertion(leaf("knows"), leaf("Bob")))).not.toThrow();
 });

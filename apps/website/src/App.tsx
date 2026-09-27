@@ -1,5 +1,6 @@
-import { type FormEvent, useState } from "react";
-import { Qr } from "./Qr.tsx";
+import { useState } from "react";
+import type { JSX, SubmitEvent } from "react";
+
 import {
   SEED_ENTROPY_BYTES,
   decodePsbt,
@@ -10,12 +11,13 @@ import {
   randomBytes,
   toHex,
 } from "./playground.ts";
+import { Qr } from "./Qr.tsx";
 
 function messageOf(e: unknown): string {
   return e instanceof Error ? e.message : "failed";
 }
 
-export function App() {
+export function App(): JSX.Element {
   return (
     <main>
       <h1>UR playground</h1>
@@ -40,25 +42,25 @@ function SeedPanel() {
     setHex(toHex(randomBytes(SEED_ENTROPY_BYTES)));
   }
 
-  function encode(e: FormEvent) {
+  function encode(e: SubmitEvent) {
     e.preventDefault();
     setError("");
     try {
       setUr(encodeSeed(parseHex(hex)));
-    } catch (err) {
+    } catch (error) {
       setUr("");
-      setError(messageOf(err));
+      setError(messageOf(error));
     }
   }
 
-  function decode(e: FormEvent) {
+  function decode(e: SubmitEvent) {
     e.preventDefault();
     setError("");
     try {
       setDecoded(toHex(decodeSeed(ur)));
-    } catch (err) {
+    } catch (error) {
       setDecoded("");
-      setError(messageOf(err));
+      setError(messageOf(error));
     }
   }
 
@@ -81,12 +83,12 @@ function SeedPanel() {
           <button type="submit">Encode ur:seed</button>
         </div>
       </form>
-      {ur !== "" ? (
+      {ur === "" ? null : (
         <div className="result">
           <Qr value={ur} label="ur:seed" />
           <pre>{ur}</pre>
         </div>
-      ) : null}
+      )}
       <form onSubmit={decode}>
         <label htmlFor="seed-ur">Paste UR</label>
         <textarea
@@ -98,8 +100,8 @@ function SeedPanel() {
         />
         <button type="submit">Decode</button>
       </form>
-      {decoded !== "" ? <pre>{decoded}</pre> : null}
-      {error !== "" ? <p className="error">{error}</p> : null}
+      {decoded === "" ? null : <pre>{decoded}</pre>}
+      {error === "" ? null : <p className="error">{error}</p>}
     </section>
   );
 }
@@ -111,28 +113,28 @@ function PsbtPanel() {
   const [decoded, setDecoded] = useState("");
   const [error, setError] = useState("");
 
-  function encode(e: FormEvent) {
+  function encode(e: SubmitEvent) {
     e.preventDefault();
     setError("");
     try {
       const next = encodePsbtParts(parseHex(hex));
       setParts(next);
       setUrText(next.join("\n"));
-    } catch (err) {
+    } catch (error) {
       setParts([]);
       setUrText("");
-      setError(messageOf(err));
+      setError(messageOf(error));
     }
   }
 
-  function decode(e: FormEvent) {
+  function decode(e: SubmitEvent) {
     e.preventDefault();
     setError("");
     try {
       setDecoded(toHex(decodePsbt(urText)));
-    } catch (err) {
+    } catch (error) {
       setDecoded("");
-      setError(messageOf(err));
+      setError(messageOf(error));
     }
   }
 
@@ -171,8 +173,8 @@ function PsbtPanel() {
         />
         <button type="submit">Decode</button>
       </form>
-      {decoded !== "" ? <pre>{decoded}</pre> : null}
-      {error !== "" ? <p className="error">{error}</p> : null}
+      {decoded === "" ? null : <pre>{decoded}</pre>}
+      {error === "" ? null : <p className="error">{error}</p>}
     </section>
   );
 }

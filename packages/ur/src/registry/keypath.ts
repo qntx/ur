@@ -5,9 +5,9 @@ import {
   expectArray,
   isArray,
   isUnsigned,
-  type Cbor,
-  type CborInput,
 } from "@blockchaincommons/dcbor";
+import type { Cbor, CborInput } from "@blockchaincommons/dcbor";
+
 import type { UrCodec } from "../typed/codec.ts";
 import {
   expectBool,
@@ -35,53 +35,63 @@ export type PathComponent =
       readonly internal: { readonly index: number; readonly hardened: boolean };
     };
 
-export interface Keypath {
-  readonly components: readonly PathComponent[];
+export type Keypath = {
+  readonly components: ReadonlyArray<PathComponent>;
   readonly sourceFingerprint?: number; // uint32 ≠ 0
   readonly depth?: number; // uint8
-}
+};
 
 function assertUint31(n: number): number {
-  if (!Number.isInteger(n) || n < 0 || n > 0x7fff_ffff) throw CborError.outOfRange();
+  if (!Number.isInteger(n) || n < 0 || n > 0x7f_ff_ff_ff) {
+    throw CborError.outOfRange();
+  }
   return n;
 }
 
 function assertUint8(n: number): number {
-  if (!Number.isInteger(n) || n < 0 || n > 0xff) throw CborError.outOfRange();
+  if (!Number.isInteger(n) || n < 0 || n > 0xff) {
+    throw CborError.outOfRange();
+  }
   return n;
 }
 
 function assertUint32Ne0(n: number): number {
-  if (!Number.isInteger(n) || n < 1 || n > 0xffff_ffff) throw CborError.outOfRange();
+  if (!Number.isInteger(n) || n < 1 || n > 0xff_ff_ff_ff) {
+    throw CborError.outOfRange();
+  }
   return n;
 }
 
-function take(items: readonly Cbor[], i: number): Cbor {
+function take(items: ReadonlyArray<Cbor>, i: number): Cbor {
   const item = items[i];
-  if (item === undefined) throw CborError.wrongType();
+  if (item === undefined) {
+    throw CborError.wrongType();
+  }
   return item;
 }
 
 function encodeComponent(c: PathComponent): CborInput[] {
-  switch (c.kind) {
-    case "index":
-      return [assertUint31(c.index), c.hardened];
-    case "wildcard":
-      return [[], c.hardened];
-    case "range":
-      if (c.low >= c.high) throw CborError.outOfRange();
-      return [[assertUint31(c.low), assertUint31(c.high)], c.hardened];
-    case "pair":
-      // Pair packs both hardened flags; no trailing bool after the 4-tuple.
-      return [
-        [
-          assertUint31(c.external.index),
-          c.external.hardened,
-          assertUint31(c.internal.index),
-          c.internal.hardened,
-        ],
-      ];
+  if (c.kind === "index") {
+    return [assertUint31(c.index), c.hardened];
   }
+  if (c.kind === "wildcard") {
+    return [[], c.hardened];
+  }
+  if (c.kind === "range") {
+    if (c.low >= c.high) {
+      throw CborError.outOfRange();
+    }
+    return [[assertUint31(c.low), assertUint31(c.high)], c.hardened];
+  }
+  // Pair packs both hardened flags; no trailing bool after the 4-tuple.
+  return [
+    [
+      assertUint31(c.external.index),
+      c.external.hardened,
+      assertUint31(c.internal.index),
+      c.internal.hardened,
+    ],
+  ];
 }
 
 function decodeComponents(value: Cbor): PathComponent[] {
@@ -107,7 +117,9 @@ function decodeComponents(value: Cbor): PathComponent[] {
       if (inner.length === 2) {
         const low = expectUint31(take(inner, 0));
         const high = expectUint31(take(inner, 1));
-        if (low >= high) throw CborError.outOfRange();
+        if (low >= high) {
+          throw CborError.outOfRange();
+        }
         const hardened = expectBool(take(items, i + 1));
         components.push({ kind: "range", low, high, hardened });
         i += 2;
@@ -135,12 +147,17 @@ export const keypathCodec: UrCodec<Keypath> = {
       throw CborError.wrongType();
     }
     const items: CborInput[] = [];
-    for (const c of keypath.components) items.push(...encodeComponent(c));
+    for (const c of keypath.components) {
+      items.push(...encodeComponent(c));
+    }
     const map = new CborMap();
     map.set(1, items);
-    if (keypath.sourceFingerprint !== undefined)
+    if (keypath.sourceFingerprint !== undefined) {
       map.set(2, assertUint32Ne0(keypath.sourceFingerprint));
-    if (keypath.depth !== undefined) map.set(3, assertUint8(keypath.depth));
+    }
+    if (keypath.depth !== undefined) {
+      map.set(3, assertUint8(keypath.depth));
+    }
     return cbor(map);
   },
   fromUntaggedCbor(value) {
@@ -148,11 +165,13 @@ export const keypathCodec: UrCodec<Keypath> = {
     const components = decodeComponents(map.getOrThrow(1));
     const fingerprint = map.get(2);
     const depth = map.get(3);
-    if (components.length === 0 && fingerprint === undefined) throw CborError.wrongType();
+    if (components.length === 0 && fingerprint === undefined) {
+      throw CborError.wrongType();
+    }
     return Object.freeze({
       components: Object.freeze(components),
-      ...(fingerprint !== undefined ? { sourceFingerprint: expectUint32Ne0(fingerprint) } : {}),
-      ...(depth !== undefined ? { depth: expectUint8(depth) } : {}),
+      ...(fingerprint === undefined ? {} : { sourceFingerprint: expectUint32Ne0(fingerprint) }),
+      ...(depth === undefined ? {} : { depth: expectUint8(depth) }),
     });
   },
 };

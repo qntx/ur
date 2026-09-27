@@ -1,23 +1,28 @@
 import { cbor, cborEquals } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
+
 import { UrError } from "../src/error.ts";
-import { Encoder, UrType } from "../src/ur/index.ts";
 import { MultipartDecoder, MultipartEncoder } from "../src/typed/multipart.ts";
 import { Ur } from "../src/typed/ur.ts";
+import { Encoder, UrType } from "../src/ur/index.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
 
 function largeTestUr(): Ur {
   const bytes = new Uint8Array(256);
-  for (let i = 0; i < bytes.length; i++) bytes[i] = i & 0xff;
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = i & 0xff;
+  }
   return Ur.create("test", bytes);
 }
 
@@ -27,7 +32,7 @@ test("K==1 emits single-part", () => {
   expect(encoder.isSinglePart).toBe(true);
   expect(encoder.fragmentCount).toBe(1);
   const part = encoder.nextPart();
-  expect(part.includes("/1-1/")).toBe(false);
+  expect(part).not.toContain("/1-1/");
   expect(part).toBe("ur:test/lsadaoaxjygonesw");
 });
 
@@ -36,11 +41,9 @@ test("drop-odd-parts roundtrip same Cbor", () => {
   const encoder = MultipartEncoder.create(ur, 30);
   expect(encoder.isSinglePart).toBe(false);
   const decoder = new MultipartDecoder();
-  let skip = false;
   while (!decoder.complete) {
-    const part = encoder.nextPart();
-    if (!skip) decoder.receive(part);
-    skip = !skip;
+    decoder.receive(encoder.nextPart());
+    encoder.nextPart();
   }
   const recovered = decoder.message();
   expect(recovered).toBeDefined();
@@ -68,7 +71,7 @@ test("maxUriLen poisons on a longer URI", () => {
   expect(err.code).toBe("ResourceLimit");
   expect(err.limit).toBe("uri_len");
   expect(decoder.isPoisoned).toBe(true);
-  expect(decoder.poisonState).toEqual({ code: "ResourceLimit", limit: "uri_len" });
+  expect(decoder.poisonState).toStrictEqual({ code: "ResourceLimit", limit: "uri_len" });
 });
 
 test("non-dCBOR complete payload is CborDecode and not poison", () => {

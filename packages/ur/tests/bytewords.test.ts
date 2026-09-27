@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { expect, test } from "vite-plus/test";
+
 import { canonicalizeByteword, decode, encode, encodeRaw } from "../src/bytewords/index.ts";
 import { UrError } from "../src/error.ts";
 
@@ -14,38 +16,34 @@ test("bytewords styles and roundtrip", () => {
   expect(encode(input, "uri")).toBe(BYTEWORDS.uri);
   expect(encode(input, "minimal")).toBe(BYTEWORDS.minimal);
 
-  expect(decode(BYTEWORDS.standard, "standard")).toEqual(input);
-  expect(decode(BYTEWORDS.uri, "uri")).toEqual(input);
-  expect(decode(BYTEWORDS.minimal, "minimal")).toEqual(input);
+  expect(decode(BYTEWORDS.standard, "standard")).toStrictEqual(input);
+  expect(decode(BYTEWORDS.uri, "uri")).toStrictEqual(input);
+  expect(decode(BYTEWORDS.minimal, "minimal")).toStrictEqual(input);
 
-  expect(decode(encode(new Uint8Array(), "minimal"), "minimal")).toEqual(new Uint8Array());
+  expect(decode(encode(new Uint8Array(), "minimal"), "minimal")).toStrictEqual(new Uint8Array());
 });
 
 test("bytewords errors", () => {
-  expect(() => decode("able acid also lava zero jade need echo wolf", "standard")).toThrowError(
-    UrError,
+  expect(() => decode("able acid also lava zero jade need echo wolf", "standard")).toThrow(UrError);
+  expect(() => decode("able acid also lava zero jade need echo wolf", "standard")).toThrow(
+    "invalid bytewords checksum",
   );
-  try {
-    decode("able acid also lava zero jade need echo wolf", "standard");
-  } catch (e) {
-    expect((e as UrError).code).toBe("InvalidBytewordsChecksum");
-  }
-  expect(() => decode("axxe tied also webs lung", "standard")).toThrowError(UrError);
-  expect(() => decode("aea", "minimal")).toThrowError(UrError);
-  expect(() => decode("₿", "standard")).toThrowError(UrError);
+  expect(() => decode("axxe tied also webs lung", "standard")).toThrow(UrError);
+  expect(() => decode("aea", "minimal")).toThrow(UrError);
+  expect(() => decode("₿", "standard")).toThrow(UrError);
 });
 
 test("single zero minimal", () => {
   expect(encode(new Uint8Array([0]), "minimal")).toBe("aetdaowslg");
-  expect(decode("aetdaowslg", "minimal")).toEqual(new Uint8Array([0]));
+  expect(decode("aetdaowslg", "minimal")).toStrictEqual(new Uint8Array([0]));
 });
 
 test("case insensitive decode", () => {
   const input = new Uint8Array([0, 1, 2]);
   const standard = encode(input, "standard");
   const minimal = encode(input, "minimal");
-  expect(decode(standard.toUpperCase(), "standard")).toEqual(input);
-  expect(decode(minimal.toUpperCase(), "minimal")).toEqual(input);
+  expect(decode(standard.toUpperCase(), "standard")).toStrictEqual(input);
+  expect(decode(minimal.toUpperCase(), "minimal")).toStrictEqual(input);
 });
 
 test("encodeRaw and canonicalize", () => {
@@ -70,8 +68,8 @@ test("long vector", () => {
     "yank toys bulb skew when warm free fair tent swan open brag mint noon jury list view tiny brew note body data webs what zinc bald join runs data whiz days keys user diet news ruby whiz zone menu surf flew omit trip pose runs fund part even crux fern math visa tied loud redo silk curl jugs hard beta next cost puma drum acid junk swan free very mint flap warm fact math flap what limp free jugs yell fish epic whiz open numb math city belt glow wave limp fuel grim free zone open love diet gyro cats fizz holy city puff";
   const encodedMinimal =
     "yktsbbswwnwmfefrttsnonbgmtnnjyltvwtybwnebydawswtzcbdjnrsdawzdsksurdtnsrywzzemusffwottppersfdptencxfnmhvatdldroskcljshdbantctpadmadjksnfevymtfpwmftmhfpwtlpfejsylfhecwzonnbmhcybtgwwelpflgmfezeonledtgocsfzhycypf";
-  expect(decode(encoded, "standard")).toEqual(input);
-  expect(decode(encodedMinimal, "minimal")).toEqual(input);
+  expect(decode(encoded, "standard")).toStrictEqual(input);
+  expect(decode(encodedMinimal, "minimal")).toStrictEqual(input);
   expect(encode(input, "standard")).toBe(encoded);
   expect(encode(input, "minimal")).toBe(encodedMinimal);
 });

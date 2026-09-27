@@ -8,6 +8,7 @@ import {
   taggedValue,
 } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
+
 import {
   Network,
   Ur,
@@ -18,18 +19,18 @@ import {
   keypathCodec,
   toUr,
   toUrString,
-  type DerivedHdKey,
-  type HdKey,
-  type MasterHdKey,
 } from "../../src/registry/index.ts";
+import type { DerivedHdKey, HdKey, MasterHdKey } from "../../src/registry/index.ts";
 import { hdkey1, hdkey2 } from "./goldens.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
@@ -65,6 +66,20 @@ function derived2(): DerivedHdKey {
   };
 }
 
+function asMaster(key: HdKey): MasterHdKey {
+  if (key.kind !== "master") {
+    throw new Error("expected master");
+  }
+  return key;
+}
+
+function asDerived(key: HdKey): DerivedHdKey {
+  if (key.kind !== "derived") {
+    throw new Error("expected derived");
+  }
+  return key;
+}
+
 test("hdkey codec tag", () => {
   expect(hdKeyCodec.tags[0]?.name).toBe("hdkey");
   expect(hdKeyCodec.tags[0]?.value).toBe(40_303);
@@ -74,9 +89,8 @@ test("vector 1 master write golden", () => {
   const key = master1();
   expect(cborHex(key)).toBe(hdkey1.cborHex);
   expect(toUrString(key, hdKeyCodec)).toBe(hdkey1.ur);
-  const decoded = fromUrString(hdkey1.ur, hdKeyCodec);
+  const decoded = asMaster(fromUrString(hdkey1.ur, hdKeyCodec));
   expect(decoded.kind).toBe("master");
-  if (decoded.kind !== "master") throw new Error("expected master");
   expect(bytesToHex(decoded.keyData)).toBe(hdkey1.keyDataHex);
   expect(bytesToHex(decoded.chainCode)).toBe(hdkey1.chainCodeHex);
 });
@@ -86,17 +100,16 @@ test("vector 2 nested tags write golden", () => {
   const hex = cborHex(key);
   expect(hex).toBe(hdkey2.cborHex);
   expect(hex.startsWith("d99d6f")).toBe(false);
-  expect(hex.includes("d99d70")).toBe(true);
-  expect(hex.includes("d99d71")).toBe(true);
+  expect(hex).toContain("d99d70");
+  expect(hex).toContain("d99d71");
   expect(toUrString(key, hdKeyCodec)).toBe(hdkey2.ur);
-  const decoded = fromUrString(hdkey2.ur, hdKeyCodec);
+  const decoded = asDerived(fromUrString(hdkey2.ur, hdKeyCodec));
   expect(decoded.kind).toBe("derived");
-  if (decoded.kind !== "derived") throw new Error("expected derived");
   expect(bytesToHex(decoded.keyData)).toBe(hdkey2.keyDataHex);
-  expect(bytesToHex(decoded.chainCode ?? new Uint8Array())).toBe(hdkey2.chainCodeHex);
+  expect(decoded.chainCode).toStrictEqual(hexToBytes(hdkey2.chainCodeHex));
   expect(decoded.useInfo?.type).toBeUndefined();
   expect(decoded.useInfo?.network).toBe(1);
-  expect(decoded.origin?.components).toEqual(key.origin?.components);
+  expect(decoded.origin?.components).toStrictEqual(key.origin?.components);
   expect(decoded.parentFingerprint).toBe(hdkey2.parentFingerprint);
   expect(decoded.isPrivate).toBeUndefined();
 });
@@ -111,9 +124,8 @@ test("vector 2 official UR round-trips", () => {
 });
 
 test("uppercase UR:HDKEY matches vector 1", () => {
-  const decoded = fromUrString(hdkey1.ur.toUpperCase(), hdKeyCodec);
+  const decoded = asMaster(fromUrString(hdkey1.ur.toUpperCase(), hdKeyCodec));
   expect(decoded.kind).toBe("master");
-  if (decoded.kind !== "master") throw new Error("expected master");
   expect(bytesToHex(decoded.keyData)).toBe(hdkey1.keyDataHex);
 });
 
@@ -128,12 +140,10 @@ test("toUr copies caller keyData and chainCode", () => {
 
 test("fromUr copies decoded keyData and chainCode", () => {
   const ur = Ur.fromUrString(hdkey1.ur);
-  const decoded = fromUr(ur, hdKeyCodec);
-  if (decoded.kind !== "master") throw new Error("expected master");
+  const decoded = asMaster(fromUr(ur, hdKeyCodec));
   decoded.keyData[0] = 0;
   decoded.chainCode[0] = 0;
-  const again = fromUr(ur, hdKeyCodec);
-  if (again.kind !== "master") throw new Error("expected master");
+  const again = asMaster(fromUr(ur, hdKeyCodec));
   expect(bytesToHex(again.keyData)).toBe(hdkey1.keyDataHex);
   expect(bytesToHex(again.chainCode)).toBe(hdkey1.chainCodeHex);
 });
@@ -145,8 +155,8 @@ test("is-master false is CborType", () => {
   map.set(4, hexToBytes(hdkey1.chainCodeHex));
   const err = errorOf(() => fromUr(Ur.create("hdkey", map), hdKeyCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("WrongType");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "WrongType" });
 });
 
 test("master with key 2 or 5 is CborType", () => {
@@ -175,8 +185,8 @@ test("nested origin tag 304 is CborType WrongTag", () => {
   map.set(6, taggedValue(304, keypathCodec.untaggedCbor(origin)));
   const err = errorOf(() => fromUr(Ur.create("hdkey", map), hdKeyCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("WrongTag");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "WrongTag" });
 });
 
 test("crypto-hdkey type token is UnexpectedType", () => {
@@ -193,8 +203,8 @@ test("derived extra map key is CborType", () => {
   map.set(11, 0);
   const err = errorOf(() => fromUr(Ur.create("hdkey", map), hdKeyCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("WrongType");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "WrongType" });
 });
 
 test("keyData length 32 is CborType OutOfRange", () => {
@@ -205,8 +215,8 @@ test("keyData length 32 is CborType OutOfRange", () => {
     ),
   );
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("OutOfRange");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "OutOfRange" });
 });
 
 test("is-private false is omitted on write", () => {
@@ -224,8 +234,7 @@ test("parent fingerprint without origin is allowed", () => {
     keyData: hexToBytes(hdkey2.keyDataHex),
     parentFingerprint: hdkey2.parentFingerprint,
   };
-  const decoded = fromUrString(toUrString(key, hdKeyCodec), hdKeyCodec);
-  if (decoded.kind !== "derived") throw new Error("expected derived");
+  const decoded = asDerived(fromUrString(toUrString(key, hdKeyCodec), hdKeyCodec));
   expect(decoded.parentFingerprint).toBe(hdkey2.parentFingerprint);
   expect(decoded.origin).toBeUndefined();
 });

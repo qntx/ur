@@ -1,5 +1,7 @@
-import { cbor, encodeCbor, expectText, Tag, type Cbor } from "@blockchaincommons/dcbor";
+import { cbor, encodeCbor, expectText, Tag } from "@blockchaincommons/dcbor";
+import type { Cbor } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
+
 import {
   Ur,
   UrError,
@@ -8,11 +10,15 @@ import {
   fromUrString,
   toUr,
   toUrString,
-  type UrCodec,
 } from "../src/typed/index.ts";
+import type { UrCodec } from "../src/typed/index.ts";
 
 class Note {
-  constructor(readonly text: string) {}
+  readonly text: string;
+
+  constructor(text: string) {
+    this.text = text;
+  }
 }
 
 const noteCodec: UrCodec<Note> = {
@@ -24,9 +30,11 @@ const noteCodec: UrCodec<Note> = {
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
@@ -36,7 +44,7 @@ test("toUr uses first tag name and untagged text body", () => {
   const ur = toUr(note, noteCodec);
   expect(ur.type.value).toBe("note");
   const body = encodeCbor(ur.cbor);
-  expect(body[0] & 0xe0).toBe(0x60);
+  expect(body[0]! & 0xe0).toBe(0x60);
   expect(body[0]).not.toBe(0xd9);
   expect(fromUr(ur, noteCodec).text).toBe("hi");
 });

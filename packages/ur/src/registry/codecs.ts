@@ -1,13 +1,16 @@
 import { fail } from "../error.ts";
-import { firstTagUrType, fromUr, Ur, type UrCodec } from "../typed/index.ts";
+import { firstTagUrType, fromUr, Ur } from "../typed/index.ts";
+import type { UrCodec } from "../typed/index.ts";
 
 export function codecMap(
-  codecs: readonly UrCodec<unknown>[],
+  codecs: ReadonlyArray<UrCodec<unknown>>,
 ): ReadonlyMap<string, UrCodec<unknown>> {
   const m = new Map<string, UrCodec<unknown>>();
   for (const c of codecs) {
     const token = firstTagUrType(c.tags).value;
-    if (m.has(token)) throw new TypeError(`duplicate codec for UR type ${token}`);
+    if (m.has(token)) {
+      throw new TypeError(`duplicate codec for UR type ${token}`);
+    }
     m.set(token, c);
   }
   return m;

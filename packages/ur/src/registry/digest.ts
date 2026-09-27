@@ -1,5 +1,6 @@
 import { cbor, encodeCbor } from "@blockchaincommons/dcbor";
 import { sha256 } from "@noble/hashes/sha2.js";
+
 import { copyBuf } from "./bytes.ts";
 import type { HdKey } from "./hdkey.ts";
 import type { Seed } from "./seed.ts";

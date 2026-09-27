@@ -1,6 +1,6 @@
 {
   "name": "@qntx/ur",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Uniform Resources (UR) transport for JavaScript/TypeScript — Bytewords, fountain codes, and multi-part UR.",
   "keywords": [
     "blockchain-commons",
@@ -51,8 +51,6 @@
     "build": "vp pack",
     "dev": "vp pack --watch",
     "test": "vp test",
-    "check": "vp check",
-    "lint": "vp check",
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
@@ -60,10 +58,11 @@
   },
   "devDependencies": {
     "@blockchaincommons/dcbor": "1.0.0-beta.3",
+    "@qntx/tsconfig": "^1.0.1",
     "@types/node": "^26.6.2",
     "bumpp": "^12.3.0",
     "typescript": "^7.0.2",
-    "vite-plus": "^0.3.0"
+    "vite-plus": "^0.3.3"
   },
   "peerDependencies": {
     "@blockchaincommons/dcbor": "1.0.0-beta.3"

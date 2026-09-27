@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import {
   PSBT_MAX_FRAGMENT_LENGTH,
   decodePsbt,
@@ -11,7 +12,7 @@ import {
 
 test("16-byte seed encode/decode roundtrip", () => {
   const payload = parseHex("00112233445566778899aabbccddeeff");
-  expect(payload.length).toBe(16);
+  expect(payload).toHaveLength(16);
   const ur = encodeSeed(payload);
   expect(ur.startsWith("ur:seed/")).toBe(true);
   expect(toHex(decodeSeed(ur))).toBe("00112233445566778899aabbccddeeff");

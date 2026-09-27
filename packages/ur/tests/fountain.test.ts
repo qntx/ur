@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { expect, test } from "vite-plus/test";
+
 import { checksum } from "../src/crc32.ts";
 import { UrError } from "../src/error.ts";
 import {
@@ -32,9 +34,11 @@ function hex(bytes: Uint8Array): string {
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
@@ -52,7 +56,7 @@ test("fountain roundtrip", () => {
   while (!decoder.complete) {
     decoder.receive(encoder.nextPart());
   }
-  expect(decoder.message()).toEqual(message);
+  expect(decoder.message()).toStrictEqual(message);
 });
 
 test("fountain encoder first part", () => {
@@ -80,20 +84,18 @@ test("cbor golden", () => {
 });
 
 test("empty encoder", () => {
-  expect(() => FountainEncoder.create(new Uint8Array(), 1)).toThrowError(UrError);
+  expect(() => FountainEncoder.create(new Uint8Array(), 1)).toThrow(UrError);
 });
 
 test("skip fragments", () => {
   const message = makeMessage("Wolf", 32767);
   const encoder = FountainEncoder.create(message, 1000);
   const decoder = new FountainDecoder();
-  let skip = false;
   while (!decoder.complete) {
-    const part = encoder.nextPart();
-    if (!skip) decoder.receive(part);
-    skip = !skip;
+    decoder.receive(encoder.nextPart());
+    encoder.nextPart();
   }
-  expect(decoder.message()).toEqual(message);
+  expect(decoder.message()).toStrictEqual(message);
 });
 
 test("choose_fragments", () => {
@@ -119,10 +121,8 @@ test("choose_fragments", () => {
     [1, 5],
   ];
   for (let i = 0; i < expected.length; i++) {
-    const indexes = chooseFragments(i + 1, fragments.length, cs)
-      .slice()
-      .sort((a, b) => a - b);
-    expect(indexes).toEqual(expected[i]);
+    const indexes = chooseFragments(i + 1, fragments.length, cs).toSorted((a, b) => a - b);
+    expect(indexes).toStrictEqual(expected[i]);
   }
 });
 
@@ -132,7 +132,7 @@ test("inconsistent part rejected", () => {
   const encoderB = FountainEncoder.create(makeMessage("Other", 64), 16);
   const decoder = new FountainDecoder();
   decoder.receive(encoderA.nextPart());
-  expect(() => decoder.receive(encoderB.nextPart())).toThrowError(UrError);
+  expect(() => decoder.receive(encoderB.nextPart())).toThrow(UrError);
 });
 
 test("duplicate part ignored", () => {
@@ -149,9 +149,9 @@ test("resource limit fragment_count poisons", () => {
   const message = makeMessage("Wolf", 64);
   const encoder = FountainEncoder.create(message, 8);
   expect(encoder.fragmentCount).toBeGreaterThan(1);
-  expect(() => decoder.receive(encoder.nextPart())).toThrowError(UrError);
+  expect(() => decoder.receive(encoder.nextPart())).toThrow(UrError);
   expect(decoder.isPoisoned).toBe(true);
-  expect(() => decoder.receive(encoder.nextPart())).toThrowError(UrError);
+  expect(() => decoder.receive(encoder.nextPart())).toThrow(UrError);
 });
 
 test("padding wider than one fragment", () => {

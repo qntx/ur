@@ -1,6 +1,7 @@
-import { sha256 } from "@noble/hashes/sha2.js";
 import { CborDate, bytesToHex, hexToBytes } from "@blockchaincommons/dcbor";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { expect, test } from "vite-plus/test";
+
 import { hdKeyDigest, hdKeyDigestSource, seedDigest } from "../../src/registry/index.ts";
 import { hdkey2, seedC709, seedYinmnFull } from "./goldens.ts";
 

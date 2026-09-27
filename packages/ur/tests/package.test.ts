@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
 import { expect, test } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "..");
@@ -10,10 +11,14 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as {
 };
 
 function exportTarget(value: unknown): string {
-  if (typeof value === "string") return value;
+  if (typeof value === "string") {
+    return value;
+  }
   if (value && typeof value === "object" && "default" in value) {
-    const next = (value as { default: unknown }).default;
-    if (typeof next === "string") return next;
+    const next = value.default;
+    if (typeof next === "string") {
+      return next;
+    }
   }
   throw new Error(`unexpected export entry: ${JSON.stringify(value)}`);
 }
@@ -29,12 +34,12 @@ test("package exports resolve to packed files, not source", () => {
 
 test("packed index.mjs does not mention dcbor", () => {
   const src = readFileSync(resolve(root, "dist/index.mjs"), "utf8");
-  expect(src.includes("@blockchaincommons/dcbor")).toBe(false);
+  expect(src).not.toContain("@blockchaincommons/dcbor");
 });
 
 test("packed registry.mjs imports dcbor as external", () => {
   const registry = readFileSync(resolve(root, "dist/registry.mjs"), "utf8");
-  expect(registry.includes("@blockchaincommons/dcbor")).toBe(true);
+  expect(registry).toContain("@blockchaincommons/dcbor");
   expect(/from\s*["']@blockchaincommons\/dcbor["']/.test(registry)).toBe(true);
 });
 
@@ -72,6 +77,6 @@ test("packed UrError is one class across entries", async () => {
   expect(registry.envelopeCodec).toBeDefined();
   expect(registry.assertEnvelopeContent).toBeDefined();
   expect(registry.ENVELOPE_MAX_DEPTH).toBe(64);
-  expect(typeof registry.codecMap).toBe("function");
-  expect(typeof registry.fromUrStringWith).toBe("function");
+  expect(registry.codecMap).toBeTypeOf("function");
+  expect(registry.fromUrStringWith).toBeTypeOf("function");
 });

@@ -4,15 +4,23 @@ import { chooseFragments, fragmentLength, partition } from "./choose.ts";
 import { Part } from "./part.ts";
 
 function xorInto(target: Uint8Array, src: Uint8Array): void {
-  if (target.length !== src.length) fail("DecoderState");
-  for (let i = 0; i < target.length; i++) {
-    target[i]! ^= src[i]!;
+  if (target.length !== src.length) {
+    fail("DecoderState");
+  }
+  for (const [i, a] of target.entries()) {
+    const b = src[i];
+    if (b === undefined) {
+      fail("DecoderState");
+    }
+    target[i] = a ^ b;
   }
 }
 
 /** Next 1-based fountain seqNum. Does not wrap. */
 export function nextSequence(current: number): number {
-  if (current === 0xffff_ffff) fail("ResourceLimit", { limit: "sequence" });
+  if (current === 0xff_ff_ff_ff) {
+    fail("ResourceLimit", { limit: "sequence" });
+  }
   return current + 1;
 }
 
@@ -37,12 +45,20 @@ export class FountainEncoder {
   }
 
   static create(message: Uint8Array, maxFragmentLength: number): FountainEncoder {
-    if (message.length === 0) fail("EmptyMessage");
-    if (maxFragmentLength === 0) fail("InvalidFragmentLen");
-    if (message.length > 0xffff_ffff) fail("ResourceLimit", { limit: "message_length" });
+    if (message.length === 0) {
+      fail("EmptyMessage");
+    }
+    if (maxFragmentLength === 0) {
+      fail("InvalidFragmentLen");
+    }
+    if (message.length > 0xff_ff_ff_ff) {
+      fail("ResourceLimit", { limit: "message_length" });
+    }
     const fragLen = fragmentLength(message.length, maxFragmentLength);
     const fragments = partition(message, fragLen);
-    if (fragments.length > 0xffff_ffff) fail("ResourceLimit", { limit: "fragment_count" });
+    if (fragments.length > 0xff_ff_ff_ff) {
+      fail("ResourceLimit", { limit: "fragment_count" });
+    }
     return new FountainEncoder(fragments, fragments.length, message.length, checksum(message));
   }
 
@@ -59,13 +75,22 @@ export class FountainEncoder {
   }
 
   nextPart(): Part {
-    if (this.sequenceCount === 1 && this.currentSequence >= 1) fail("SinglePartExhausted");
+    if (this.sequenceCount === 1 && this.currentSequence >= 1) {
+      fail("SinglePartExhausted");
+    }
     this.currentSequence = nextSequence(this.currentSequence);
     const indexes = chooseFragments(this.currentSequence, this.parts.length, this.messageChecksum);
-    const first = this.parts[0]!;
+    const [first] = this.parts;
+    if (first === undefined) {
+      fail("DecoderState");
+    }
     const mixed = new Uint8Array(first.length);
     for (const idx of indexes) {
-      xorInto(mixed, this.parts[idx]!);
+      const fragment = this.parts[idx];
+      if (fragment === undefined) {
+        fail("DecoderState");
+      }
+      xorInto(mixed, fragment);
     }
     return Part.fromFields(
       this.currentSequence,

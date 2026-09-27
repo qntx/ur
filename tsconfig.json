@@ -1,9 +1,7 @@
 {
+  "extends": ["@qntx/tsconfig/configs/strictest.json", "@qntx/tsconfig/configs/node22.json"],
   "compilerOptions": {
-    "noEmit": true,
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "allowImportingTsExtensions": true,
-    "esModuleInterop": true
-  }
+    "noEmit": true
+  },
+  "include": ["vite.config.ts"]
 }

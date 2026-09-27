@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.7.0 - 2026-09-27
+
+### Changed
+
+- Optional peer `@blockchaincommons/dcbor` is `1.0.0-beta.3`.
+- Exported object shapes are `type` aliases instead of `interface`: `UrCodec`, `ParsedUr`, `DecoderLimits`, `Seed`, `Psbt`, `Keypath`, `CoinInfo`, `MasterHdKey`, `DerivedHdKey`, `SskrShare`. Structurally identical; declaration merging is no longer possible.
+- `UrError.expected` / `found` / `limit` are typed `?: string | undefined` (`exactOptionalPropertyTypes`).
+- Tooling: Vite+ `0.3.3`; lint, format, and TS configs come from `@qntx/oxlint`, `@qntx/oxfmt`, and `@qntx/tsconfig` (`strictest`). Lint and format live only in the root `vite.config.ts`.
+
+### Fixed
+
+- Alias sampler keeps ur-rs float evaluation order (`weights[g] += weights[a] - 1.0`) so degree tables stay bit-identical to ur-rs.
+
 ## 1.6.0 - 2026-09-16
 
 ### Added

@@ -23,8 +23,8 @@ export function partition(data: Uint8Array, fragLen: number): Uint8Array[] {
 }
 
 /**
- * Fragment indexes mixed into sequence `sequence` (1-based).
- * Normative: simple if sequence <= K; else degree + remove-shuffle.
+ * Fragment indexes mixed into sequence `sequence` (1-based). Normative: simple if sequence <= K;
+ * else degree + remove-shuffle.
  */
 export function chooseFragments(
   sequence: number,

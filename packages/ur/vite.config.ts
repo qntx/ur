@@ -2,9 +2,7 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   pack: {
-    dts: {
-      tsgo: true,
-    },
+    dts: {},
     // ESM-only sugar flattens to a string; keep types/import/default for pack entries.
     exports: {
       customExports(exports) {
@@ -30,11 +28,4 @@ export default defineConfig({
       neverBundle: ["@blockchaincommons/dcbor"],
     },
   },
-  lint: {
-    options: {
-      typeAware: true,
-      typeCheck: true,
-    },
-  },
-  fmt: {},
 });

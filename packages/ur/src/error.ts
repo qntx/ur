@@ -53,26 +53,35 @@ const MESSAGES: Record<UrErrorCode, string> = {
 /** Structured error thrown by the UR stack. */
 export class UrError extends Error {
   readonly code: UrErrorCode;
-  readonly expected?: string;
-  readonly found?: string;
-  readonly limit?: string;
+  readonly expected?: string | undefined;
+  readonly found?: string | undefined;
+  readonly limit?: string | undefined;
 
   constructor(
     code: UrErrorCode,
     options?: { expected?: string; found?: string; limit?: string; cause?: unknown },
   ) {
+    const expected = options?.expected;
+    const found = options?.found;
+    const limit = options?.limit;
     let message = MESSAGES[code];
-    if (code === "ResourceLimit" && options?.limit) {
-      message = `${message}: ${options.limit}`;
-    } else if (code === "UnexpectedType" && options?.expected && options.found) {
-      message = `${message}: expected ${options.expected}, found ${options.found}`;
+    if (code === "ResourceLimit" && limit !== undefined && limit !== "") {
+      message = `${message}: ${limit}`;
+    } else if (
+      code === "UnexpectedType" &&
+      expected !== undefined &&
+      expected !== "" &&
+      found !== undefined &&
+      found !== ""
+    ) {
+      message = `${message}: expected ${expected}, found ${found}`;
     }
-    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause });
     this.name = "UrError";
     this.code = code;
-    this.expected = options?.expected;
-    this.found = options?.found;
-    this.limit = options?.limit;
+    this.expected = expected;
+    this.found = found;
+    this.limit = limit;
   }
 }
 
@@ -89,6 +98,8 @@ export type DecoderPoison = { code: "ResourceLimit"; limit: string } | { code: "
 
 /** Rethrows the stored poison as a {@link UrError}. */
 export function failPoison(p: DecoderPoison): never {
-  if (p.code === "ResourceLimit") fail("ResourceLimit", { limit: p.limit });
+  if (p.code === "ResourceLimit") {
+    fail("ResourceLimit", { limit: p.limit });
+  }
   fail("DecoderState");
 }

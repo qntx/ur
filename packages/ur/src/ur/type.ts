@@ -10,7 +10,9 @@ export class UrType {
 
   static parse(s: string): UrType {
     const lower = s.toLowerCase();
-    if (lower.length === 0 || !/^[a-z0-9-]+$/.test(lower)) fail("InvalidType");
+    if (lower.length === 0 || !/^[a-z0-9-]+$/.test(lower)) {
+      fail("InvalidType");
+    }
     return new UrType(lower);
   }
 

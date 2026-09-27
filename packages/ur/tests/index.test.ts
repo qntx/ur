@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { encode, decode, UrType } from "../src/index.ts";
 
 test("public api single-part roundtrip", () => {

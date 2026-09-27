@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { UrError } from "../src/error.ts";
 import { FountainDecoder, FountainEncoder, Part } from "../src/fountain/index.ts";
 import { makeMessage } from "../src/rng/index.ts";
@@ -8,8 +9,8 @@ function codeOf(fn: () => void): string {
   try {
     fn();
     return "none";
-  } catch (e) {
-    return e instanceof UrError ? e.code : "other";
+  } catch (error) {
+    return error instanceof UrError ? error.code : "other";
   }
 }
 
@@ -17,17 +18,23 @@ function resourceLimitOf(fn: () => void): string | undefined {
   try {
     fn();
     return "none";
-  } catch (e) {
-    if (!(e instanceof UrError)) return "other";
-    if (e.code !== "ResourceLimit") return e.code;
-    return e.limit;
+  } catch (error) {
+    if (!(error instanceof UrError)) {
+      return "other";
+    }
+    if (error.code !== "ResourceLimit") {
+      return error.code;
+    }
+    return error.limit;
   }
 }
 
 function nextMixedPart(encoder: FountainEncoder): Part {
   for (;;) {
     const part = encoder.nextPart();
-    if (!part.isSimple()) return part;
+    if (!part.isSimple()) {
+      return part;
+    }
   }
 }
 
@@ -70,7 +77,7 @@ test("part cbor rejects non-shortest integer", () => {
   // array(5) with sequence encoded as 0x18 0x01 (non-shortest for 1)
   const hex =
     "851801091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c";
-  const bytes = Uint8Array.from(hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+  const bytes = Uint8Array.from(hex.match(/.{2}/g)!.map((b) => Number.parseInt(b, 16)));
   expect(codeOf(() => Part.fromCbor(bytes))).toBe("InvalidPartCbor");
 });
 
@@ -93,7 +100,7 @@ test("single-part receive completes", () => {
   const decoder = new Decoder();
   decoder.receive("ur:bytes/iehsjyhspmwfwfia");
   expect(decoder.complete).toBe(true);
-  expect(decoder.message()).toEqual(new TextEncoder().encode("data"));
+  expect(decoder.message()).toStrictEqual(new TextEncoder().encode("data"));
 });
 
 test("single-part maxMessageLength poisons", () => {

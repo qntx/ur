@@ -1,5 +1,6 @@
 import { CborError, CborMap, bytesToHex, encodeCbor } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
+
 import {
   Ur,
   UrError,
@@ -8,16 +9,17 @@ import {
   keypathCodec,
   toUr,
   toUrString,
-  type Keypath,
-  type PathComponent,
 } from "../../src/registry/index.ts";
+import type { Keypath, PathComponent } from "../../src/registry/index.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
@@ -37,7 +39,7 @@ test("index component encode hex", () => {
   };
   expect(cborHex(keypath)).toBe("a10182182cf5");
   const decoded = fromUrString(toUrString(keypath, keypathCodec), keypathCodec);
-  expect(decoded.components).toEqual(keypath.components);
+  expect(decoded.components).toStrictEqual(keypath.components);
 });
 
 test("wildcard component encode hex", () => {
@@ -45,7 +47,7 @@ test("wildcard component encode hex", () => {
   const unhardened: Keypath = { components: [{ kind: "wildcard", hardened: false }] };
   expect(cborHex(hardened)).toBe("a1018280f5");
   expect(cborHex(unhardened)).toBe("a1018280f4");
-  expect(fromUrString(toUrString(hardened, keypathCodec), keypathCodec).components).toEqual(
+  expect(fromUrString(toUrString(hardened, keypathCodec), keypathCodec).components).toStrictEqual(
     hardened.components,
   );
 });
@@ -55,7 +57,7 @@ test("range component encode hex", () => {
     components: [{ kind: "range", low: 0, high: 1, hardened: false }],
   };
   expect(cborHex(keypath)).toBe("a10182820001f4");
-  expect(fromUrString(toUrString(keypath, keypathCodec), keypathCodec).components).toEqual(
+  expect(fromUrString(toUrString(keypath, keypathCodec), keypathCodec).components).toStrictEqual(
     keypath.components,
   );
 });
@@ -71,13 +73,13 @@ test("pair component encode hex", () => {
     ],
   };
   expect(cborHex(keypath)).toBe("a101818400f401f5");
-  expect(fromUrString(toUrString(keypath, keypathCodec), keypathCodec).components).toEqual(
+  expect(fromUrString(toUrString(keypath, keypathCodec), keypathCodec).components).toStrictEqual(
     keypath.components,
   );
 });
 
 test("mixed index wildcard range pair walker", () => {
-  const components: readonly PathComponent[] = [
+  const components: ReadonlyArray<PathComponent> = [
     { kind: "index", index: 44, hardened: true },
     { kind: "wildcard", hardened: false },
     { kind: "range", low: 0, high: 1, hardened: true },
@@ -89,7 +91,7 @@ test("mixed index wildcard range pair walker", () => {
   ];
   const keypath: Keypath = { components };
   expect(cborHex(keypath)).toBe("a10187182cf580f4820001f58400f401f4");
-  expect(fromUrString(toUrString(keypath, keypathCodec), keypathCodec).components).toEqual(
+  expect(fromUrString(toUrString(keypath, keypathCodec), keypathCodec).components).toStrictEqual(
     components,
   );
 });
@@ -98,7 +100,7 @@ test("empty components with source fingerprint", () => {
   const keypath: Keypath = { components: [], sourceFingerprint: 0xe9181cf3, depth: 0 };
   expect(cborHex(keypath)).toBe("a30180021ae9181cf30300");
   const decoded = fromUrString(toUrString(keypath, keypathCodec), keypathCodec);
-  expect(decoded.components).toEqual([]);
+  expect(decoded.components).toStrictEqual([]);
   expect(decoded.sourceFingerprint).toBe(0xe9181cf3);
   expect(decoded.depth).toBe(0);
 });
@@ -106,8 +108,8 @@ test("empty components with source fingerprint", () => {
 test("empty components without fingerprint is CborType", () => {
   const encodeErr = errorOf(() => toUrString({ components: [] }, keypathCodec));
   expect(encodeErr.code).toBe("CborType");
-  expect(CborError.isCborError(encodeErr.cause)).toBe(true);
-  if (CborError.isCborError(encodeErr.cause)) expect(encodeErr.cause.code).toBe("WrongType");
+  expect(encodeErr.cause).toBeInstanceOf(CborError);
+  expect(encodeErr.cause).toMatchObject({ code: "WrongType" });
 
   const map = new CborMap();
   map.set(1, []);
@@ -118,8 +120,8 @@ test("empty components without fingerprint is CborType", () => {
 test("missing components is CborType MissingMapKey", () => {
   const err = errorOf(() => fromUr(Ur.create("keypath", new CborMap()), keypathCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("MissingMapKey");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "MissingMapKey" });
 });
 
 test("extra map key is CborType", () => {
@@ -128,8 +130,8 @@ test("extra map key is CborType", () => {
   map.set(4, 0);
   const err = errorOf(() => fromUr(Ur.create("keypath", map), keypathCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("WrongType");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "WrongType" });
 });
 
 test("range low >= high is CborType OutOfRange", () => {
@@ -137,27 +139,27 @@ test("range low >= high is CborType OutOfRange", () => {
     toUrString({ components: [{ kind: "range", low: 1, high: 1, hardened: false }] }, keypathCodec),
   );
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("OutOfRange");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "OutOfRange" });
 });
 
 test("index 0x80000000 is CborType OutOfRange", () => {
   const err = errorOf(() =>
     toUrString(
-      { components: [{ kind: "index", index: 0x8000_0000, hardened: false }] },
+      { components: [{ kind: "index", index: 0x80_00_00_00, hardened: false }] },
       keypathCodec,
     ),
   );
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("OutOfRange");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "OutOfRange" });
 });
 
 test("source fingerprint 0 is CborType OutOfRange", () => {
   const err = errorOf(() => toUrString({ components: [], sourceFingerprint: 0 }, keypathCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("OutOfRange");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "OutOfRange" });
 });
 
 test("index missing trailing bool is CborType", () => {

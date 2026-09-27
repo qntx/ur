@@ -1,6 +1,8 @@
 import { checksum } from "../crc32.ts";
-import { UrError, fail, failPoison, type DecoderPoison } from "../error.ts";
-import { type DecoderLimits, mergeLimits } from "./limits.ts";
+import { UrError, fail, failPoison } from "../error.ts";
+import type { DecoderPoison } from "../error.ts";
+import { mergeLimits } from "./limits.ts";
+import type { DecoderLimits } from "./limits.ts";
 import { Part } from "./part.ts";
 
 function keyOf(indexes: number[]): string {
@@ -8,9 +10,15 @@ function keyOf(indexes: number[]): string {
 }
 
 function xorInto(target: Uint8Array, src: Uint8Array): void {
-  if (target.length !== src.length) fail("DecoderState");
-  for (let i = 0; i < target.length; i++) {
-    target[i]! ^= src[i]!;
+  if (target.length !== src.length) {
+    fail("DecoderState");
+  }
+  for (const [i, a] of target.entries()) {
+    const b = src[i];
+    if (b === undefined) {
+      fail("DecoderState");
+    }
+    target[i] = a ^ b;
   }
 }
 
@@ -19,7 +27,7 @@ export class FountainDecoder {
   private readonly decoded = new Map<number, Part>();
   private readonly received = new Set<string>();
   private readonly buffer = new Map<string, { indexes: number[]; part: Part }>();
-  private readonly queue: { index: number; part: Part }[] = [];
+  private readonly queue: Array<{ index: number; part: Part }> = [];
   private sequenceCount = 0;
   private messageLength = 0;
   private messageChecksum = 0;
@@ -65,16 +73,23 @@ export class FountainDecoder {
 
   /**
    * Receive a fountain part.
-   * @returns whether the part was newly ingested.
+   *
+   * @returns Whether the part was newly ingested.
    */
   receive(part: Part): boolean {
-    if (this.poisoned) failPoison(this.poisoned);
-    if (this.complete) return false;
+    if (this.poisoned) {
+      failPoison(this.poisoned);
+    }
+    if (this.complete) {
+      return false;
+    }
 
     if (part.sequenceCount === 0 || part.data.length === 0 || part.messageLength === 0) {
       fail("EmptyPart");
     }
-    if (part.sequence === 0) fail("InvalidSequence");
+    if (part.sequence === 0) {
+      fail("InvalidSequence");
+    }
     if (part.data.length > this.limits.maxFragmentDataLength) {
       this.poison("fragment_data");
     }
@@ -82,13 +97,21 @@ export class FountainDecoder {
     if (this.received.size === 0) {
       const sc = part.sequenceCount;
       const ml = part.messageLength;
-      if (sc > this.limits.maxFragmentCount) this.poison("fragment_count");
-      if (ml > this.limits.maxMessageLength) this.poison("message_length");
+      if (sc > this.limits.maxFragmentCount) {
+        this.poison("fragment_count");
+      }
+      if (ml > this.limits.maxMessageLength) {
+        this.poison("message_length");
+      }
       const fragLen = part.data.length;
       const product = fragLen * sc;
-      if (!Number.isSafeInteger(product) || product > 0xffff_ffff) this.poison("message_length");
+      if (!Number.isSafeInteger(product) || product > 0xff_ff_ff_ff) {
+        this.poison("message_length");
+      }
       // partition pads with at most fragLen - 1 bytes
-      if (product < ml || product - ml >= fragLen) fail("InconsistentPart");
+      if (product < ml || product - ml >= fragLen) {
+        fail("InconsistentPart");
+      }
       this.sequenceCount = sc;
       this.messageLength = ml;
       this.messageChecksum = part.checksum;
@@ -99,33 +122,51 @@ export class FountainDecoder {
 
     const indexes = part.indexes();
     const key = keyOf(indexes);
-    if (this.received.has(key)) return false;
-    if (this.received.size >= this.limits.maxReceivedParts) this.poison("received_parts");
+    if (this.received.has(key)) {
+      return false;
+    }
+    if (this.received.size >= this.limits.maxReceivedParts) {
+      this.poison("received_parts");
+    }
     this.received.add(key);
 
     try {
-      if (part.isSimple()) this.enqueueSimple(part);
-      else this.processComplex(part);
+      if (part.isSimple()) {
+        this.enqueueSimple(part);
+      } else {
+        this.processComplex(part);
+      }
       this.processQueue();
-    } catch (e) {
-      this.escalate(e);
+    } catch (error) {
+      this.escalate(error);
     }
     return true;
   }
 
   private enqueueSimple(part: Part): void {
-    const index = part.indexes()[0]!;
-    if (this.decoded.has(index)) return;
+    const [index] = part.indexes();
+    if (index === undefined) {
+      fail("DecoderState");
+    }
+    if (this.decoded.has(index)) {
+      return;
+    }
     this.decoded.set(index, part);
     this.queue.push({ index, part });
   }
 
   private processQueue(): void {
     while (this.queue.length > 0) {
-      const { index, part: simple } = this.queue.pop()!;
+      const item = this.queue.pop();
+      if (item === undefined) {
+        fail("DecoderState");
+      }
+      const { index, part: simple } = item;
       const toProcess: string[] = [];
       for (const [k, entry] of this.buffer) {
-        if (entry.indexes.includes(index)) toProcess.push(k);
+        if (entry.indexes.includes(index)) {
+          toProcess.push(k);
+        }
       }
       for (const k of toProcess) {
         this.reduceBufferedPart(k, index, simple);
@@ -135,11 +176,15 @@ export class FountainDecoder {
 
   private reduceBufferedPart(key: string, knownIndex: number, simple: Part): void {
     const entry = this.buffer.get(key);
-    if (!entry) fail("DecoderState");
+    if (!entry) {
+      fail("DecoderState");
+    }
     this.buffer.delete(key);
     const newIndexes = entry.indexes.filter((x) => x !== knownIndex);
-    if (newIndexes.length === entry.indexes.length) fail("DecoderState");
-    const data = entry.part.data.slice();
+    if (newIndexes.length === entry.indexes.length) {
+      fail("DecoderState");
+    }
+    const data = new Uint8Array(entry.part.data);
     xorInto(data, simple.data);
     const reduced = Part.fromFields(
       entry.part.sequence,
@@ -152,13 +197,19 @@ export class FountainDecoder {
   }
 
   private processComplex(part: Part): void {
-    let indexes = part.indexes().slice();
+    let indexes = [...part.indexes()];
     const known = indexes.filter((idx) => this.decoded.has(idx));
-    if (indexes.length === known.length) return;
-    let data = part.data.slice();
+    if (indexes.length === known.length) {
+      return;
+    }
+    const data = new Uint8Array(part.data);
     for (const remove of known) {
       indexes = indexes.filter((x) => x !== remove);
-      xorInto(data, this.decoded.get(remove)!.data);
+      const decoded = this.decoded.get(remove);
+      if (decoded === undefined) {
+        fail("DecoderState");
+      }
+      xorInto(data, decoded.data);
     }
     const reduced = Part.fromFields(
       part.sequence,
@@ -172,8 +223,13 @@ export class FountainDecoder {
 
   private insertReduced(indexes: number[], part: Part): void {
     if (indexes.length === 1) {
-      const idx = indexes[0]!;
-      if (this.decoded.has(idx)) return;
+      const [idx] = indexes;
+      if (idx === undefined) {
+        fail("DecoderState");
+      }
+      if (this.decoded.has(idx)) {
+        return;
+      }
       this.decoded.set(idx, part);
       this.queue.push({ index: idx, part });
       return;
@@ -198,7 +254,9 @@ export class FountainDecoder {
   }
 
   validate(part: Part): boolean {
-    if (this.received.size === 0) return false;
+    if (this.received.size === 0) {
+      return false;
+    }
     return (
       part.sequenceCount === this.sequenceCount &&
       part.messageLength === this.messageLength &&
@@ -209,19 +267,29 @@ export class FountainDecoder {
 
   /** Decoded message if complete; otherwise `undefined`. */
   message(): Uint8Array | undefined {
-    if (this.poisoned) failPoison(this.poisoned);
-    if (!this.complete) return undefined;
+    if (this.poisoned) {
+      failPoison(this.poisoned);
+    }
+    if (!this.complete) {
+      return undefined;
+    }
     const combined = new Uint8Array(this.fragmentLength * this.sequenceCount);
     for (let idx = 0; idx < this.sequenceCount; idx++) {
       const part = this.decoded.get(idx);
-      if (!part) fail("DecoderState");
+      if (!part) {
+        fail("DecoderState");
+      }
       combined.set(part.data, idx * this.fragmentLength);
     }
     for (let i = this.messageLength; i < combined.length; i++) {
-      if (combined[i] !== 0) fail("InvalidPadding");
+      if (combined[i] !== 0) {
+        fail("InvalidPadding");
+      }
     }
     const message = combined.subarray(0, this.messageLength);
-    if (checksum(message) !== this.messageChecksum) fail("InvalidMessageChecksum");
-    return message.slice();
+    if (checksum(message) !== this.messageChecksum) {
+      fail("InvalidMessageChecksum");
+    }
+    return new Uint8Array(message);
   }
 }
