@@ -11,7 +11,7 @@ import {
   toUrString,
 } from "../../src/registry/index.ts";
 import type { SskrShare } from "../../src/registry/index.ts";
-import { sskrShare } from "./goldens.ts";
+import { sskrShare, sskrV1Ur } from "./goldens.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
@@ -124,10 +124,9 @@ test("groupIndex at or above groupCount is CborType OutOfRange", () => {
   expect(encodeErr.cause).toMatchObject({ code: "OutOfRange" });
 });
 
-test("crypto-sskr type token is UnexpectedType", () => {
-  const uri = Ur.create("crypto-sskr", sskrCodec.untaggedCbor(golden())).string();
-  const err = errorOf(() => fromUrString(uri, sskrCodec));
-  expect(err.code).toBe("UnexpectedType");
-  expect(err.expected).toBe("sskr");
-  expect(err.found).toBe("crypto-sskr");
+test("v1 crypto-sskr decodes and re-encodes as v2", () => {
+  const v1 = fromUrString(sskrV1Ur, sskrCodec);
+  expect(v1).toStrictEqual(fromUrString(sskrShare.ur, sskrCodec));
+  expect(fromUrString(sskrV1Ur.toUpperCase(), sskrCodec)).toStrictEqual(v1);
+  expect(toUrString(v1, sskrCodec)).toBe(sskrShare.ur);
 });

@@ -7,7 +7,7 @@ description: L5 v2 UR application types on @qntx/ur/registry.
 
 Requires the optional peer `@blockchaincommons/dcbor@1.0.0-beta.3`. Importing `@qntx/ur/registry` without the peer fails at load. Transport-only hosts that import only `@qntx/ur` may omit it.
 
-v1 `crypto-seed` / `crypto-psbt` and tags 300–311 are not decoded.
+Deprecated BCR-2020-006 v1 tokens decode read-only: `crypto-seed` (300), `crypto-hdkey` (303), `crypto-keypath` (304), `crypto-coin-info` (305), `crypto-sskr` (309), `crypto-psbt` (310). Writes always emit v2. `crypto-output`, `crypto-account`, `crypto-eckey`, and `crypto-address` are not supported. `MultipartDecoder` `expectedType` matches one exact token — omit it or check with `fromUr` when a peer may send either v1 or v2.
 
 ```ts
 import {
@@ -43,9 +43,9 @@ const map = codecMap([seedCodec, psbtCodec]);
 const { type, value } = fromUrStringWith(uri, map);
 ```
 
-Duplicate `tags[0].name` in `codecMap` is `TypeError`, not `InvalidType`. Unknown type is `UnexpectedType`. There is no global registry.
+A token claimed by two codecs in `codecMap` (v1 names included) is `TypeError`, not `InvalidType`. Unknown type is `UnexpectedType`. There is no global registry.
 
-The UR body is untagged dCBOR. Nested HDKey `origin` / `children` / `use-info` are tagged 40304/40305; the top-level UR body is not.
+The UR body is untagged dCBOR. Nested HDKey `origin` / `children` / `use-info` write tags 40304/40305 and accept v1 304/305 on read; the top-level UR body is not tagged.
 
 Seed `creation-date` is BCR-2023-008 tag 1 (`CborDate`) only. The historical BCR-2020-006 example with tag 100 is rejected (`CborType`).
 

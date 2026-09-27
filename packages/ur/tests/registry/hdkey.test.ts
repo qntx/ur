@@ -3,6 +3,7 @@ import {
   CborMap,
   bytesToHex,
   cborEquals,
+  decodeCbor,
   encodeCbor,
   hexToBytes,
   taggedValue,
@@ -21,7 +22,7 @@ import {
   toUrString,
 } from "../../src/registry/index.ts";
 import type { DerivedHdKey, HdKey, MasterHdKey } from "../../src/registry/index.ts";
-import { hdkey1, hdkey2 } from "./goldens.ts";
+import { hdkey1, hdkey1V1Ur, hdkey2, hdkey2V1CborHex, hdkey2V1Ur } from "./goldens.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
@@ -177,24 +178,34 @@ test("master with key 2 or 5 is CborType", () => {
   expect(useInfoErr.code).toBe("CborType");
 });
 
-test("nested origin tag 304 is CborType WrongTag", () => {
-  const origin = derived2().origin!;
+test("v1 crypto-hdkey vector 1 decodes and re-encodes as v2", () => {
+  const v1 = asMaster(fromUrString(hdkey1V1Ur, hdKeyCodec));
+  expect(v1).toStrictEqual(asMaster(fromUrString(hdkey1.ur, hdKeyCodec)));
+  expect(asMaster(fromUrString(hdkey1V1Ur.toUpperCase(), hdKeyCodec))).toStrictEqual(v1);
+  expect(toUrString(v1, hdKeyCodec)).toBe(hdkey1.ur);
+});
+
+test("v1 crypto-hdkey vector 2 nested v1 tags decode, re-encode v2", () => {
+  const v1 = asDerived(fromUrString(hdkey2V1Ur, hdKeyCodec));
+  expect(v1).toStrictEqual(asDerived(fromUrString(hdkey2.ur, hdKeyCodec)));
+  expect(cborHex(v1)).toBe(hdkey2.cborHex);
+  expect(toUrString(v1, hdKeyCodec)).toBe(hdkey2.ur);
+});
+
+test("v2 hdkey token with nested v1 304/305 tags decodes", () => {
+  const body = decodeCbor(hexToBytes(hdkey2V1CborHex));
+  const decoded = asDerived(fromUr(Ur.create("hdkey", body), hdKeyCodec));
+  expect(decoded).toStrictEqual(asDerived(fromUrString(hdkey2.ur, hdKeyCodec)));
+});
+
+test("nested v1 origin tag 304 decodes", () => {
+  const key = derived2();
   const map = new CborMap();
   map.set(3, hexToBytes(hdkey2.keyDataHex));
   map.set(4, hexToBytes(hdkey2.chainCodeHex));
-  map.set(6, taggedValue(304, keypathCodec.untaggedCbor(origin)));
-  const err = errorOf(() => fromUr(Ur.create("hdkey", map), hdKeyCodec));
-  expect(err.code).toBe("CborType");
-  expect(err.cause).toBeInstanceOf(CborError);
-  expect(err.cause).toMatchObject({ code: "WrongTag" });
-});
-
-test("crypto-hdkey type token is UnexpectedType", () => {
-  const uri = Ur.create("crypto-hdkey", hdKeyCodec.untaggedCbor(master1())).string();
-  const err = errorOf(() => fromUrString(uri, hdKeyCodec));
-  expect(err.code).toBe("UnexpectedType");
-  expect(err.expected).toBe("hdkey");
-  expect(err.found).toBe("crypto-hdkey");
+  map.set(6, taggedValue(304, keypathCodec.untaggedCbor(key.origin!)));
+  const decoded = asDerived(fromUr(Ur.create("hdkey", map), hdKeyCodec));
+  expect(decoded.origin?.components).toStrictEqual(key.origin?.components);
 });
 
 test("derived extra map key is CborType", () => {

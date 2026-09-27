@@ -176,6 +176,16 @@ test("pair does not consume a trailing bool", () => {
   expect(err.code).toBe("CborType");
 });
 
+test("v1 crypto-keypath decodes and re-encodes as v2", () => {
+  // No official standalone v1 keypath UR exists; v1/v2 bodies share the CDDL (BCR-2020-006).
+  const keypath: Keypath = { components: [{ kind: "index", index: 44, hardened: true }] };
+  const v1Uri = Ur.create("crypto-keypath", keypathCodec.untaggedCbor(keypath)).string();
+  const v2 = fromUrString(toUrString(keypath, keypathCodec), keypathCodec);
+  expect(fromUrString(v1Uri, keypathCodec)).toStrictEqual(v2);
+  expect(fromUrString(v1Uri.toUpperCase(), keypathCodec)).toStrictEqual(v2);
+  expect(toUrString(v2, keypathCodec).startsWith("ur:keypath/")).toBe(true);
+});
+
 test("toUr copies caller path object by encoding immediately", () => {
   const components: PathComponent[] = [{ kind: "index", index: 44, hardened: true }];
   const ur = toUr({ components }, keypathCodec);
