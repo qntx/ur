@@ -110,6 +110,14 @@ test("invalid scheme", () => {
   expect(() => decode("uhr:bytes/aeadaolazmjendeoti")).toThrow(UrError);
 });
 
+test("invalid maxFragmentLength through Encoder.bytes", () => {
+  const data = new TextEncoder().encode("data");
+  const cases = [Number.NaN, -1, 0, 0.5, 1.5, Number.POSITIVE_INFINITY];
+  for (const len of cases) {
+    expect(errorOf(() => Encoder.bytes(data, len)).code).toBe("InvalidFragmentLen");
+  }
+});
+
 test("custom encoder", () => {
   const data = new TextEncoder().encode("Ten chars!");
   const encoder = Encoder.create(data, 5, UrType.parse("my-scheme"));

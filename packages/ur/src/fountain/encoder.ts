@@ -1,6 +1,6 @@
 import { checksum } from "../crc32.ts";
 import { fail } from "../error.ts";
-import { chooseFragments, fragmentLength, partition } from "./choose.ts";
+import { FragmentChooser, fragmentLength, partition } from "./choose.ts";
 import { Part } from "./part.ts";
 
 function xorInto(target: Uint8Array, src: Uint8Array): void {
@@ -30,6 +30,7 @@ export class FountainEncoder {
   private readonly sequenceCount: number;
   private readonly messageLength: number;
   private readonly messageChecksum: number;
+  private readonly chooser: FragmentChooser;
   private currentSequence = 0;
 
   private constructor(
@@ -42,13 +43,14 @@ export class FountainEncoder {
     this.sequenceCount = sequenceCount;
     this.messageLength = messageLength;
     this.messageChecksum = messageChecksum;
+    this.chooser = new FragmentChooser(sequenceCount, messageChecksum);
   }
 
   static create(message: Uint8Array, maxFragmentLength: number): FountainEncoder {
     if (message.length === 0) {
       fail("EmptyMessage");
     }
-    if (maxFragmentLength === 0) {
+    if (!Number.isSafeInteger(maxFragmentLength) || maxFragmentLength < 1) {
       fail("InvalidFragmentLen");
     }
     if (message.length > 0xff_ff_ff_ff) {
@@ -79,7 +81,7 @@ export class FountainEncoder {
       fail("SinglePartExhausted");
     }
     this.currentSequence = nextSequence(this.currentSequence);
-    const indexes = chooseFragments(this.currentSequence, this.parts.length, this.messageChecksum);
+    const indexes = this.chooser.choose(this.currentSequence);
     const [first] = this.parts;
     if (first === undefined) {
       fail("DecoderState");
