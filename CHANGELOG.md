@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 1.8.0 - 2026-09-27
+
+### Fixed
+
+- `FountainEncoder.create` rejects non-positive-int `maxFragmentLength` (`NaN`, negatives, fractions, `Infinity`, `0`) with `InvalidFragmentLen` instead of a raw `RangeError` or silent acceptance.
+
+### Changed
+
+- Fountain index selection uses a per-stream `FragmentChooser` (BCR-2024-001 §4): harmonic degree sampler built once, remove-shuffle stops at `degree`, indexes computed once per received part and returned sorted. Decode of a K=2000 stream at 20% simple-part loss: ~8 s → ~1 s (same part count; wire output unchanged).
+
+### Added
+
+- `THIRD_PARTY.md` covers test vectors derived from ur-rs, bcur, and bc-ur.
+
 ## 1.7.0 - 2026-09-27
 
 ### Changed

@@ -1,6 +1,6 @@
 {
   "name": "@qntx/ur",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Uniform Resources (UR) transport for JavaScript/TypeScript — Bytewords, fountain codes, and multi-part UR.",
   "keywords": [
     "blockchain-commons",

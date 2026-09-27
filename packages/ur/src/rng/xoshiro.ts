@@ -88,11 +88,11 @@ export class Xoshiro256 {
     return Math.trunc(this.nextDouble() * span) + low;
   }
 
-  /** Remove-order shuffle (not Fisher–Yates). */
-  shuffled<T>(items: T[]): T[] {
+  /** Remove-order shuffle (not Fisher–Yates); stops after `count` picks. */
+  shuffled<T>(items: T[], count = items.length): T[] {
     const pool = [...items];
     const out: T[] = [];
-    while (pool.length > 0) {
+    while (pool.length > 0 && out.length < count) {
       const index = this.nextInt(0, pool.length - 1);
       const [item] = pool.splice(index, 1);
       if (item === undefined) {

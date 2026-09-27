@@ -87,6 +87,27 @@ test("empty encoder", () => {
   expect(() => FountainEncoder.create(new Uint8Array(), 1)).toThrow(UrError);
 });
 
+test("invalid maxFragmentLength", () => {
+  const message = makeMessage("Wolf", 100);
+  const cases = [Number.NaN, -1, 0, 0.5, 1.5, Number.POSITIVE_INFINITY];
+  for (const len of cases) {
+    expect(errorOf(() => FountainEncoder.create(message, len)).code).toBe("InvalidFragmentLen");
+  }
+});
+
+test("decoder from rateless parts only (BCR-2024-001 §6 testDecoder)", () => {
+  const message = makeMessage("Wolf", 32767);
+  const encoder = FountainEncoder.create(message, 1000);
+  for (let i = 0; i < 99; i++) {
+    encoder.nextPart();
+  }
+  const decoder = new FountainDecoder();
+  while (!decoder.complete) {
+    decoder.receive(encoder.nextPart());
+  }
+  expect(decoder.message()).toStrictEqual(message);
+});
+
 test("skip fragments", () => {
   const message = makeMessage("Wolf", 32767);
   const encoder = FountainEncoder.create(message, 1000);

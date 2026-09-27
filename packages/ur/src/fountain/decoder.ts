@@ -1,6 +1,7 @@
 import { checksum } from "../crc32.ts";
 import { UrError, fail, failPoison } from "../error.ts";
 import type { DecoderPoison } from "../error.ts";
+import { FragmentChooser } from "./choose.ts";
 import { mergeLimits } from "./limits.ts";
 import type { DecoderLimits } from "./limits.ts";
 import { Part } from "./part.ts";
@@ -27,12 +28,14 @@ export class FountainDecoder {
   private readonly decoded = new Map<number, Part>();
   private readonly received = new Set<string>();
   private readonly buffer = new Map<string, { indexes: number[]; part: Part }>();
+  private readonly bufferIndex = new Map<number, Set<string>>();
   private readonly queue: Array<{ index: number; part: Part }> = [];
   private sequenceCount = 0;
   private messageLength = 0;
   private messageChecksum = 0;
   private fragmentLength = 0;
   private readonly limits: DecoderLimits;
+  private chooser: FragmentChooser | undefined;
   private poisoned: DecoderPoison | undefined;
 
   constructor(limits?: Partial<DecoderLimits>) {
@@ -116,11 +119,16 @@ export class FountainDecoder {
       this.messageLength = ml;
       this.messageChecksum = part.checksum;
       this.fragmentLength = fragLen;
+      this.chooser = new FragmentChooser(sc, part.checksum);
     } else if (!this.validate(part)) {
       fail("InconsistentPart");
     }
 
-    const indexes = part.indexes();
+    const { chooser } = this;
+    if (chooser === undefined) {
+      fail("DecoderState");
+    }
+    const indexes = chooser.choose(part.sequence);
     const key = keyOf(indexes);
     if (this.received.has(key)) {
       return false;
@@ -131,10 +139,10 @@ export class FountainDecoder {
     this.received.add(key);
 
     try {
-      if (part.isSimple()) {
-        this.enqueueSimple(part);
+      if (indexes.length === 1) {
+        this.enqueueSimple(part, indexes);
       } else {
-        this.processComplex(part);
+        this.processComplex(part, indexes);
       }
       this.processQueue();
     } catch (error) {
@@ -143,8 +151,8 @@ export class FountainDecoder {
     return true;
   }
 
-  private enqueueSimple(part: Part): void {
-    const [index] = part.indexes();
+  private enqueueSimple(part: Part, indexes: number[]): void {
+    const [index] = indexes;
     if (index === undefined) {
       fail("DecoderState");
     }
@@ -162,11 +170,9 @@ export class FountainDecoder {
         fail("DecoderState");
       }
       const { index, part: simple } = item;
-      const toProcess: string[] = [];
-      for (const [k, entry] of this.buffer) {
-        if (entry.indexes.includes(index)) {
-          toProcess.push(k);
-        }
+      const toProcess = this.bufferIndex.get(index);
+      if (toProcess === undefined) {
+        continue;
       }
       for (const k of toProcess) {
         this.reduceBufferedPart(k, index, simple);
@@ -180,6 +186,16 @@ export class FountainDecoder {
       fail("DecoderState");
     }
     this.buffer.delete(key);
+    for (const idx of entry.indexes) {
+      const keys = this.bufferIndex.get(idx);
+      if (keys === undefined) {
+        fail("DecoderState");
+      }
+      keys.delete(key);
+      if (keys.size === 0) {
+        this.bufferIndex.delete(idx);
+      }
+    }
     const newIndexes = entry.indexes.filter((x) => x !== knownIndex);
     if (newIndexes.length === entry.indexes.length) {
       fail("DecoderState");
@@ -196,20 +212,19 @@ export class FountainDecoder {
     this.insertReduced(newIndexes, reduced);
   }
 
-  private processComplex(part: Part): void {
-    let indexes = [...part.indexes()];
-    const known = indexes.filter((idx) => this.decoded.has(idx));
-    if (indexes.length === known.length) {
-      return;
-    }
+  private processComplex(part: Part, indexes: number[]): void {
+    const remaining: number[] = [];
     const data = new Uint8Array(part.data);
-    for (const remove of known) {
-      indexes = indexes.filter((x) => x !== remove);
-      const decoded = this.decoded.get(remove);
+    for (const idx of indexes) {
+      const decoded = this.decoded.get(idx);
       if (decoded === undefined) {
-        fail("DecoderState");
+        remaining.push(idx);
+      } else {
+        xorInto(data, decoded.data);
       }
-      xorInto(data, decoded.data);
+    }
+    if (remaining.length === 0) {
+      return;
     }
     const reduced = Part.fromFields(
       part.sequence,
@@ -218,7 +233,7 @@ export class FountainDecoder {
       part.checksum,
       data,
     );
-    this.insertReduced(indexes, reduced);
+    this.insertReduced(remaining, reduced);
   }
 
   private insertReduced(indexes: number[], part: Part): void {
@@ -239,6 +254,14 @@ export class FountainDecoder {
       this.poison("buffer_parts");
     }
     this.buffer.set(key, { indexes, part });
+    for (const idx of indexes) {
+      let keys = this.bufferIndex.get(idx);
+      if (keys === undefined) {
+        keys = new Set();
+        this.bufferIndex.set(idx, keys);
+      }
+      keys.add(key);
+    }
   }
 
   get complete(): boolean {
