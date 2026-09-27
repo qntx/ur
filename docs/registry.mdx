@@ -5,7 +5,7 @@ description: L5 v2 UR application types on @qntx/ur/registry.
 
 `@qntx/ur/registry` is L5: `UrCodec` implementations for BCR-2020-006 v2 types. This version ships `seed` (40300), `hdkey` / `keypath` / `coin-info` (40303–40305), `sskr` (40309), `psbt` (40310), and `envelope` (200). Hosts pass a codec into L4 `toUr` / `fromUr`. Optional `codecMap` / `fromUrStringWith` dispatch over a host-provided set.
 
-Requires the optional peer `@blockchaincommons/dcbor@1.0.0-beta.2`. Importing `@qntx/ur/registry` without the peer fails at load. Transport-only hosts that import only `@qntx/ur` may omit it.
+Requires the optional peer `@blockchaincommons/dcbor@1.0.0-beta.3`. Importing `@qntx/ur/registry` without the peer fails at load. Transport-only hosts that import only `@qntx/ur` may omit it.
 
 v1 `crypto-seed` / `crypto-psbt` and tags 300–311 are not decoded.
 
