@@ -3,12 +3,12 @@ import { UrType } from "./type.ts";
 
 export type Kind = "single" | "multi";
 
-export interface ParsedUr {
+export type ParsedUr = {
   type: UrType;
   kind: Kind;
   indices?: { seq: number; count: number };
   body: string;
-}
+};
 
 /** Lowercase a UR string for case-insensitive QR transport. */
 export function normalizeUr(uri: string): string {
@@ -22,16 +22,20 @@ export function parse(uri: string): ParsedUr {
 
 /** Parse an already-lowercased (or body-normalized) UR. */
 export function parseNormalized(uri: string): ParsedUr {
-  if (!uri.startsWith("ur:")) fail("InvalidScheme");
+  if (!uri.startsWith("ur:")) {
+    fail("InvalidScheme");
+  }
   const rest0 = uri.slice(3);
   const slash = rest0.indexOf("/");
-  if (slash < 0) fail("TypeUnspecified");
+  if (slash === -1) {
+    fail("TypeUnspecified");
+  }
   const typeStr = rest0.slice(0, slash);
   const rest = rest0.slice(slash + 1);
   const urType = UrType.parse(typeStr);
 
   const lastSlash = rest.lastIndexOf("/");
-  if (lastSlash < 0) {
+  if (lastSlash === -1) {
     return {
       type: urType,
       kind: "single",
@@ -51,14 +55,24 @@ export function parseNormalized(uri: string): ParsedUr {
 
 function decodeIndices(indices: string): { seq: number; count: number } {
   const dash = indices.indexOf("-");
-  if (dash < 0) fail("InvalidIndices");
+  if (dash === -1) {
+    fail("InvalidIndices");
+  }
   const a = indices.slice(0, dash);
   const b = indices.slice(dash + 1);
-  if (!/^\d+$/.test(a) || !/^\d+$/.test(b)) fail("InvalidIndices");
+  if (!/^\d+$/.test(a) || !/^\d+$/.test(b)) {
+    fail("InvalidIndices");
+  }
   const seq = Number(a);
   const count = Number(b);
-  if (!Number.isSafeInteger(seq) || !Number.isSafeInteger(count)) fail("InvalidIndices");
-  if (seq === 0 || count === 0) fail("InvalidIndices");
-  if (seq > 0xffff_ffff || count > 0xffff_ffff) fail("InvalidIndices");
+  if (!Number.isSafeInteger(seq) || !Number.isSafeInteger(count)) {
+    fail("InvalidIndices");
+  }
+  if (seq === 0 || count === 0) {
+    fail("InvalidIndices");
+  }
+  if (seq > 0xff_ff_ff_ff || count > 0xff_ff_ff_ff) {
+    fail("InvalidIndices");
+  }
   return { seq, count };
 }

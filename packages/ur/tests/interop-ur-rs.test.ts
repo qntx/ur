@@ -1,27 +1,34 @@
 /**
- * Interop vectors derived from ur-rs 0.5 tests (MIT License).
- * Source: https://github.com/dspicher/ur-rs
+ * Interop vectors derived from ur-rs 0.5 tests (MIT License). Source:
+ * https://github.com/dspicher/ur-rs
  *
- * Message payloads for single-part UR goldens are CBOR byte-string wrappers
- * of Xoshiro("Wolf") output, matching ur-rs `make_message_ur`.
+ * Message payloads for single-part UR goldens are CBOR byte-string wrappers of Xoshiro("Wolf")
+ * output, matching ur-rs `make_message_ur`.
  */
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { expect, test } from "vite-plus/test";
-import { makeMessage } from "../src/rng/index.ts";
+
 import * as bytewords from "../src/bytewords/index.ts";
 import { FountainEncoder } from "../src/fountain/index.ts";
+import { makeMessage } from "../src/rng/index.ts";
 import { Decoder, Encoder, UrType, decode, encode, toQrString } from "../src/ur/index.ts";
 
 /** CBOR bstr header + payload (ur-rs ByteVec). */
 function cborBstr(message: Uint8Array): Uint8Array {
   const len = message.length;
   let header: number[];
-  if (len <= 23) header = [0x40 | len];
-  else if (len <= 0xff) header = [0x58, len];
-  else if (len <= 0xffff) header = [0x59, (len >>> 8) & 0xff, len & 0xff];
-  else header = [0x5a, (len >>> 24) & 0xff, (len >>> 16) & 0xff, (len >>> 8) & 0xff, len & 0xff];
+  if (len <= 23) {
+    header = [0x40 | len];
+  } else if (len <= 0xff) {
+    header = [0x58, len];
+  } else if (len <= 0xffff) {
+    header = [0x59, (len >>> 8) & 0xff, len & 0xff];
+  } else {
+    header = [0x5a, (len >>> 24) & 0xff, (len >>> 16) & 0xff, (len >>> 8) & 0xff, len & 0xff];
+  }
   const out = new Uint8Array(header.length + len);
   out.set(header);
   out.set(message, header.length);
@@ -64,7 +71,7 @@ test("ur-rs test_single_part_ur", () => {
   );
   const { kind, payload } = decode(encoded);
   expect(kind).toBe("single");
-  expect(payload).toEqual(ur);
+  expect(payload).toStrictEqual(ur);
 });
 
 test("decode full-uppercase multipart URIs", () => {
@@ -74,7 +81,7 @@ test("decode full-uppercase multipart URIs", () => {
   while (!decoder.complete) {
     decoder.receive(toQrString(encoder.nextPart()));
   }
-  expect(decoder.message()).toEqual(data);
+  expect(decoder.message()).toStrictEqual(data);
 });
 
 test("test_foreign_1_1_fountain_uri_decodes", () => {
@@ -87,7 +94,7 @@ test("test_foreign_1_1_fountain_uri_decodes", () => {
   const decoder = new Decoder();
   decoder.receive(uri);
   expect(decoder.complete).toBe(true);
-  expect(decoder.message()).toEqual(message);
+  expect(decoder.message()).toStrictEqual(message);
 });
 
 test("bc-ur golden: ur:test array", () => {

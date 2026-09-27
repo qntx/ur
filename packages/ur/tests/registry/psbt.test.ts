@@ -7,6 +7,7 @@ import {
   hexToBytes,
 } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
+
 import {
   Ur,
   UrError,
@@ -15,16 +16,18 @@ import {
   psbtCodec,
   toUr,
   toUrString,
-  type Psbt,
 } from "../../src/registry/index.ts";
+import type { Psbt } from "../../src/registry/index.ts";
 import { psbt167 } from "./goldens.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
@@ -66,8 +69,8 @@ test("PSBT without magic prefix is CborType", () => {
   bytes.set([0x70, 0x73, 0x62, 0x74, 0xfe]);
   const encodeErr = errorOf(() => toUrString({ bytes }, psbtCodec));
   expect(encodeErr.code).toBe("CborType");
-  expect(CborError.isCborError(encodeErr.cause)).toBe(true);
-  if (CborError.isCborError(encodeErr.cause)) expect(encodeErr.cause.code).toBe("WrongType");
+  expect(encodeErr.cause).toBeInstanceOf(CborError);
+  expect(encodeErr.cause).toMatchObject({ code: "WrongType" });
 
   const uri = Ur.create("psbt", bytes).string();
   const decodeErr = errorOf(() => fromUrString(uri, psbtCodec));
@@ -79,8 +82,8 @@ test("PSBT shorter than magic is CborType OutOfRange", () => {
     toUrString({ bytes: new Uint8Array([0x70, 0x73, 0x62, 0x74]) }, psbtCodec),
   );
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("OutOfRange");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "OutOfRange" });
 });
 
 test("crypto-psbt type token is UnexpectedType", () => {

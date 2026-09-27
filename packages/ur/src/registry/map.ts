@@ -4,9 +4,8 @@ import {
   expectInteger,
   expectMap,
   expectUnsigned,
-  type Cbor,
-  type CborMap,
 } from "@blockchaincommons/dcbor";
+import type { Cbor, CborMap } from "@blockchaincommons/dcbor";
 
 export function expectClosedIntMap(cbor: Cbor, allowed: ReadonlySet<number>): CborMap {
   const map = expectMap(cbor);
@@ -28,17 +27,19 @@ export function expectUint(cbor: Cbor, max: number): number {
 }
 
 export const expectUint8 = (c: Cbor): number => expectUint(c, 0xff);
-export const expectUint31 = (c: Cbor): number => expectUint(c, 0x7fff_ffff);
+export const expectUint31 = (c: Cbor): number => expectUint(c, 0x7f_ff_ff_ff);
 export const expectUint32Ne0 = (c: Cbor): number => {
-  const n = expectUint(c, 0xffff_ffff);
-  if (n === 0) throw CborError.outOfRange();
+  const n = expectUint(c, 0xff_ff_ff_ff);
+  if (n === 0) {
+    throw CborError.outOfRange();
+  }
   return n;
 };
 
 /** CDDL `int` that must fit in JS number as int32. Used only for coin-info `network`. */
 export function expectInt32(cbor: Cbor): number {
   const n = expectInteger(cbor);
-  if (typeof n !== "number" || !Number.isInteger(n) || n < -0x8000_0000 || n > 0x7fff_ffff) {
+  if (typeof n !== "number" || !Number.isInteger(n) || n < -0x80_00_00_00 || n > 0x7f_ff_ff_ff) {
     throw CborError.outOfRange();
   }
   return n;

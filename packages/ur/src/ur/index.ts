@@ -1,17 +1,16 @@
 import * as bytewords from "../bytewords/index.ts";
-import {
-  type DecoderLimits,
-  FountainDecoder,
-  FountainEncoder,
-  Part,
-  mergeLimits,
-} from "../fountain/index.ts";
-import { UrError, fail, failPoison, type DecoderPoison } from "../error.ts";
-import { type Kind, type ParsedUr, normalizeUr, parse, parseNormalized } from "./parse.ts";
+import { UrError, fail, failPoison } from "../error.ts";
+import type { DecoderPoison } from "../error.ts";
+import { FountainDecoder, FountainEncoder, Part, mergeLimits } from "../fountain/index.ts";
+import type { DecoderLimits } from "../fountain/index.ts";
+import { parse } from "./parse.ts";
+import type { Kind, ParsedUr } from "./parse.ts";
 import { UrType } from "./type.ts";
 
-export type { DecoderLimits, Kind, ParsedUr };
-export { UrType, normalizeUr, parse, parseNormalized };
+export type { DecoderLimits } from "../fountain/index.ts";
+export { normalizeUr, parse, parseNormalized } from "./parse.ts";
+export type { Kind, ParsedUr } from "./parse.ts";
+export { UrType } from "./type.ts";
 
 /** Encode a single-part UR. Empty data is allowed. */
 export function encode(data: Uint8Array, type: UrType): string {
@@ -20,8 +19,8 @@ export function encode(data: Uint8Array, type: UrType): string {
 }
 
 /**
- * Decode payload from a single- or multi-part UR.
- * Multi-part returns the CBOR-encoded fountain part bytes, not the message.
+ * Decode payload from a single- or multi-part UR. Multi-part returns the CBOR-encoded fountain part
+ * bytes, not the message.
  */
 export function decode(uri: string): { kind: Kind; payload: Uint8Array } {
   const parsed = parse(uri);
@@ -43,7 +42,9 @@ export function decodeWithType(uri: string): {
 /** Decode a single-part UR payload. Multi-part URIs throw `NotSinglePart`. */
 export function decodeMessage(uri: string): Uint8Array {
   const { kind, payload } = decode(uri);
-  if (kind !== "single") fail("NotSinglePart");
+  if (kind !== "single") {
+    fail("NotSinglePart");
+  }
   return payload;
 }
 
@@ -70,7 +71,7 @@ export class Encoder {
       FountainEncoder.create(message, maxFragmentLength),
       type,
       // copy: later mutation of the caller buffer must not change K==1 output
-      message.slice(),
+      new Uint8Array(message),
     );
   }
 
@@ -144,12 +145,20 @@ export class Decoder {
   }
 
   receive(uri: string): void {
-    if (this.poisoned) failPoison(this.poisoned);
-    if (this.fountain.isPoisoned) {
-      this.poisoned ??= this.fountain.poisonState!;
+    if (this.poisoned) {
       failPoison(this.poisoned);
     }
-    if (uri.length > this.maxUriLen) this.poison("uri_len");
+    if (this.fountain.isPoisoned) {
+      const poison = this.fountain.poisonState;
+      if (poison === undefined) {
+        fail("DecoderState");
+      }
+      this.poisoned ??= poison;
+      failPoison(poison);
+    }
+    if (uri.length > this.maxUriLen) {
+      this.poison("uri_len");
+    }
 
     const parsed = parse(uri);
     if (this.expectedType && !parsed.type.equals(this.expectedType)) {
@@ -166,32 +175,45 @@ export class Decoder {
     }
 
     try {
-      if (parsed.kind === "single") this.receiveSingle(parsed);
-      else this.receiveFountain(parsed);
-    } catch (e) {
-      this.escalate(e);
+      if (parsed.kind === "single") {
+        this.receiveSingle(parsed);
+      } else {
+        this.receiveFountain(parsed);
+      }
+    } catch (error) {
+      this.escalate(error);
     }
   }
 
   private receiveSingle(parsed: ParsedUr): void {
-    if (this.fountain.resolvedFragmentCount() !== undefined) fail("InconsistentPart");
-    if (this.single !== undefined) return;
+    if (this.fountain.resolvedFragmentCount() !== undefined) {
+      fail("InconsistentPart");
+    }
+    if (this.single !== undefined) {
+      return;
+    }
     const data = bytewords.decode(parsed.body, "minimal");
-    if (data.length > this.maxMessageLength) this.poison("message_length");
+    if (data.length > this.maxMessageLength) {
+      this.poison("message_length");
+    }
     this.seenType = parsed.type;
     this.single = data;
   }
 
   private receiveFountain(parsed: ParsedUr): void {
-    if (this.single !== undefined) fail("InconsistentPart");
+    if (this.single !== undefined) {
+      fail("InconsistentPart");
+    }
     const decoded = bytewords.decode(parsed.body, "minimal");
     const part = Part.fromCbor(
       decoded,
       this.fountain.maxFragmentDataLength,
       this.fountain.maxFragmentCount,
     );
-    const indices = parsed.indices;
-    if (!indices) fail("InvalidIndices");
+    const { indices } = parsed;
+    if (!indices) {
+      fail("InvalidIndices");
+    }
     if (part.sequence !== indices.seq || part.sequenceCount !== indices.count) {
       fail("InvalidIndices");
     }
@@ -204,14 +226,26 @@ export class Decoder {
   }
 
   message(): Uint8Array | undefined {
-    if (this.poisoned) failPoison(this.poisoned);
-    if (this.fountain.isPoisoned) failPoison(this.fountain.poisonState!);
-    if (this.single) return this.single.slice();
+    if (this.poisoned) {
+      failPoison(this.poisoned);
+    }
+    if (this.fountain.isPoisoned) {
+      const poison = this.fountain.poisonState;
+      if (poison === undefined) {
+        fail("DecoderState");
+      }
+      failPoison(poison);
+    }
+    if (this.single) {
+      return new Uint8Array(this.single);
+    }
     return this.fountain.message();
   }
 
   resolvedFragmentCount(): number | undefined {
-    if (this.single) return 1;
+    if (this.single) {
+      return 1;
+    }
     return this.fountain.resolvedFragmentCount();
   }
 

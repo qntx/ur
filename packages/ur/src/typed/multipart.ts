@@ -1,7 +1,10 @@
 import { encodeCbor } from "@blockchaincommons/dcbor";
-import { fail, failPoison, type DecoderPoison } from "../error.ts";
-import { Decoder, Encoder, UrType } from "../ur/index.ts";
+
+import { fail, failPoison } from "../error.ts";
+import type { DecoderPoison } from "../error.ts";
 import type { DecoderLimits } from "../fountain/index.ts";
+import type { UrType } from "../ur/index.ts";
+import { Decoder, Encoder } from "../ur/index.ts";
 import { Ur, mapCborType } from "./ur.ts";
 
 export class MultipartEncoder {
@@ -73,11 +76,21 @@ export class MultipartDecoder {
   }
 
   message(): Ur | undefined {
-    if (this.#inner.isPoisoned) failPoison(this.#inner.poisonState!);
+    if (this.#inner.isPoisoned) {
+      const poison = this.#inner.poisonState;
+      if (poison === undefined) {
+        fail("DecoderState");
+      }
+      failPoison(poison);
+    }
     const data = this.#inner.message();
-    if (data === undefined) return undefined;
-    const type = this.#inner.type;
-    if (type === undefined) fail("DecoderState");
+    if (data === undefined) {
+      return undefined;
+    }
+    const { type } = this.#inner;
+    if (type === undefined) {
+      fail("DecoderState");
+    }
     return Ur.fromCborData(type, data);
   }
 }

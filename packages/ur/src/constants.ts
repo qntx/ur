@@ -1,7 +1,7 @@
 /** BCR-2020-012 bytewords tables. */
 
 /** Four-letter bytewords (index = byte value). */
-export const WORDS: readonly string[] = [
+export const WORDS: ReadonlyArray<string> = [
   "able",
   "acid",
   "also",
@@ -261,7 +261,7 @@ export const WORDS: readonly string[] = [
 ];
 
 /** First+last letter of each byteword (UR minimal style). */
-export const MINIMALS: readonly string[] = [
+export const MINIMALS: ReadonlyArray<string> = [
   "ae",
   "ad",
   "ao",

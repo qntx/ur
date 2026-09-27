@@ -1,9 +1,11 @@
-import { CborError, cbor, cborEquals, encodeCbor, taggedValue } from "@blockchaincommons/dcbor";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { CborError, cbor, cborEquals, encodeCbor, taggedValue } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
-import { Encoder, encode } from "../src/ur/index.ts";
+
 import { Ur, UrError, UrType } from "../src/typed/index.ts";
+import { Encoder, encode } from "../src/ur/index.ts";
 
 const L4 = JSON.parse(
   readFileSync(join(import.meta.dirname, "vectors/l4-test-array.json"), "utf8"),
@@ -17,9 +19,11 @@ const L4 = JSON.parse(
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }

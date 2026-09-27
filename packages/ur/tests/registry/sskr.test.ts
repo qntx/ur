@@ -1,5 +1,6 @@
 import { CborError, bytesToHex, encodeCbor, hexToBytes } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
+
 import {
   Ur,
   UrError,
@@ -8,16 +9,18 @@ import {
   sskrCodec,
   toUr,
   toUrString,
-  type SskrShare,
 } from "../../src/registry/index.ts";
+import type { SskrShare } from "../../src/registry/index.ts";
 import { sskrShare } from "./goldens.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
@@ -34,7 +37,7 @@ function golden(shareValue = hexToBytes(sskrShare.shareValueHex)): SskrShare {
   };
 }
 
-function rawShare(header: readonly number[], valueHex = sskrShare.shareValueHex): Uint8Array {
+function rawShare(header: ReadonlyArray<number>, valueHex = sskrShare.shareValueHex): Uint8Array {
   const value = hexToBytes(valueHex);
   const bytes = new Uint8Array(header.length + value.length);
   bytes.set(header);
@@ -80,8 +83,8 @@ test("length under 5 is CborType OutOfRange", () => {
     fromUr(Ur.create("sskr", new Uint8Array([0x4b, 0xbf, 0x11, 0x01])), sskrCodec),
   );
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("OutOfRange");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "OutOfRange" });
 });
 
 test("reserved nibble nonzero is CborType WrongType", () => {
@@ -89,8 +92,8 @@ test("reserved nibble nonzero is CborType WrongType", () => {
     fromUr(Ur.create("sskr", rawShare([0x4b, 0xbf, 0x11, 0x01, 0x12])), sskrCodec),
   );
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("WrongType");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "WrongType" });
 });
 
 test("groupThreshold greater than groupCount is CborType OutOfRange", () => {
@@ -98,13 +101,13 @@ test("groupThreshold greater than groupCount is CborType OutOfRange", () => {
     fromUr(Ur.create("sskr", rawShare([0x4b, 0xbf, 0x10, 0x01, 0x02])), sskrCodec),
   );
   expect(decodeErr.code).toBe("CborType");
-  expect(CborError.isCborError(decodeErr.cause)).toBe(true);
-  if (CborError.isCborError(decodeErr.cause)) expect(decodeErr.cause.code).toBe("OutOfRange");
+  expect(decodeErr.cause).toBeInstanceOf(CborError);
+  expect(decodeErr.cause).toMatchObject({ code: "OutOfRange" });
 
   const encodeErr = errorOf(() => toUrString({ ...golden(), groupCount: 1 }, sskrCodec));
   expect(encodeErr.code).toBe("CborType");
-  expect(CborError.isCborError(encodeErr.cause)).toBe(true);
-  if (CborError.isCborError(encodeErr.cause)) expect(encodeErr.cause.code).toBe("OutOfRange");
+  expect(encodeErr.cause).toBeInstanceOf(CborError);
+  expect(encodeErr.cause).toMatchObject({ code: "OutOfRange" });
 });
 
 test("groupIndex at or above groupCount is CborType OutOfRange", () => {
@@ -112,13 +115,13 @@ test("groupIndex at or above groupCount is CborType OutOfRange", () => {
     fromUr(Ur.create("sskr", rawShare([0x4b, 0xbf, 0x11, 0x21, 0x02])), sskrCodec),
   );
   expect(decodeErr.code).toBe("CborType");
-  expect(CborError.isCborError(decodeErr.cause)).toBe(true);
-  if (CborError.isCborError(decodeErr.cause)) expect(decodeErr.cause.code).toBe("OutOfRange");
+  expect(decodeErr.cause).toBeInstanceOf(CborError);
+  expect(decodeErr.cause).toMatchObject({ code: "OutOfRange" });
 
   const encodeErr = errorOf(() => toUrString({ ...golden(), groupIndex: 2 }, sskrCodec));
   expect(encodeErr.code).toBe("CborType");
-  expect(CborError.isCborError(encodeErr.cause)).toBe(true);
-  if (CborError.isCborError(encodeErr.cause)) expect(encodeErr.cause.code).toBe("OutOfRange");
+  expect(encodeErr.cause).toBeInstanceOf(CborError);
+  expect(encodeErr.cause).toMatchObject({ code: "OutOfRange" });
 });
 
 test("crypto-sskr type token is UnexpectedType", () => {

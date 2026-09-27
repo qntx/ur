@@ -1,6 +1,6 @@
-/**
- * CRC-32 ISO-HDLC (polynomial 0xedb88320), matching bcur / ur-rs.
- */
+import { fail } from "./error.ts";
+
+/** CRC-32 ISO-HDLC (polynomial 0xedb88320), matching bcur / ur-rs. */
 
 const TABLE = (() => {
   const table = new Uint32Array(256);
@@ -16,10 +16,9 @@ const TABLE = (() => {
 
 /** CRC-32 ISO-HDLC checksum of `data`. */
 export function checksum(data: Uint8Array): number {
-  let crc = 0xffffffff;
-  for (let i = 0; i < data.length; i++) {
-    const b = data[i]!;
-    crc = TABLE[(crc ^ b) & 0xff]! ^ (crc >>> 8);
+  let crc = 0xff_ff_ff_ff;
+  for (const b of data) {
+    crc = (TABLE[(crc ^ b) & 0xff] ?? fail("DecoderState")) ^ (crc >>> 8);
   }
-  return (crc ^ 0xffffffff) >>> 0;
+  return (crc ^ 0xff_ff_ff_ff) >>> 0;
 }

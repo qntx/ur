@@ -1,19 +1,23 @@
-import { type Cbor, type Tag } from "@blockchaincommons/dcbor";
+import type { Cbor, Tag } from "@blockchaincommons/dcbor";
+
 import { fail } from "../error.ts";
 import { UrType } from "../ur/type.ts";
 import { Ur, mapCborType } from "./ur.ts";
 
 /** First `tags[0].name` is the UR type; body is untagged. */
-export interface UrCodec<T> {
+export type UrCodec<T> = {
   /** Most-preferred first. First tag.name is the UR type token. */
-  readonly tags: readonly Tag[];
+  readonly tags: ReadonlyArray<Tag>;
+  // oxlint-disable-next-line typescript/method-signature-style -- bivariance in T keeps UrCodec<Specific> assignable to UrCodec<unknown> for codecMap
   untaggedCbor(value: T): Cbor;
-  fromUntaggedCbor(cbor: Cbor): T;
-}
+  readonly fromUntaggedCbor: (cbor: Cbor) => T;
+};
 
-export function firstTagUrType(tags: readonly Tag[]): UrType {
+export function firstTagUrType(tags: ReadonlyArray<Tag>): UrType {
   const name = tags[0]?.name;
-  if (name === undefined || name === "") fail("InvalidType");
+  if (name === undefined || name === "") {
+    fail("InvalidType");
+  }
   return UrType.parse(name);
 }
 

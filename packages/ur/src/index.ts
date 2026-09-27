@@ -1,15 +1,14 @@
 /**
  * Uniform Resources (UR) for JavaScript/TypeScript.
  *
- * Root barrel: 1.0 transport freeze — opaque payload bytes plus a type token.
- * Bytewords, fountain codes, and UR encode/decode. No dCBOR parse
- * and no application type registry.
+ * Root barrel: 1.0 transport freeze — opaque payload bytes plus a type token. Bytewords, fountain
+ * codes, and UR encode/decode. No dCBOR parse and no application type registry.
  *
- * L4 typed dCBOR lives on `@qntx/ur/typed` and is the first dCBOR parse
- * in this package. This root does not import dcbor.
+ * L4 typed dCBOR lives on `@qntx/ur/typed` and is the first dCBOR parse in this package. This root
+ * does not import dcbor.
  *
- * Do not rely on deep imports of RNG/fountain helpers unless documented
- * as supported subpath exports.
+ * Do not rely on deep imports of RNG/fountain helpers unless documented as supported subpath
+ * exports.
  */
 
 export { UrError, failPoison, type DecoderPoison, type UrErrorCode } from "./error.ts";

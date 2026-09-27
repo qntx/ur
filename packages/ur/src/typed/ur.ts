@@ -1,29 +1,28 @@
-import {
-  cbor,
-  decodeCbor,
-  encodeCbor,
-  CborError,
-  type Cbor,
-  type CborInput,
-} from "@blockchaincommons/dcbor";
+import { cbor, decodeCbor, encodeCbor, CborError } from "@blockchaincommons/dcbor";
+import type { Cbor, CborInput } from "@blockchaincommons/dcbor";
+
 import { fail } from "../error.ts";
 import { UrType, decodeWithType, encode, toQrString } from "../ur/index.ts";
 
 export function mapCborDecode<T>(run: () => T): T {
   try {
     return run();
-  } catch (e) {
-    if (CborError.isCborError(e)) fail("CborDecode", { cause: e });
-    throw e;
+  } catch (error) {
+    if (CborError.isCborError(error)) {
+      fail("CborDecode", { cause: error });
+    }
+    throw error;
   }
 }
 
 export function mapCborType<T>(run: () => T): T {
   try {
     return run();
-  } catch (e) {
-    if (CborError.isCborError(e)) fail("CborType", { cause: e });
-    throw e;
+  } catch (error) {
+    if (CborError.isCborError(error)) {
+      fail("CborType", { cause: error });
+    }
+    throw error;
   }
 }
 
@@ -60,7 +59,9 @@ export class Ur {
 
   static fromUrString(uri: string): Ur {
     const { type, kind, payload } = decodeWithType(uri);
-    if (kind !== "single") fail("NotSinglePart");
+    if (kind !== "single") {
+      fail("NotSinglePart");
+    }
     return Ur.fromCborData(type, payload);
   }
 

@@ -6,8 +6,9 @@ import {
   isBytes,
   isMap,
   isTagged,
-  type Cbor,
 } from "@blockchaincommons/dcbor";
+import type { Cbor } from "@blockchaincommons/dcbor";
+
 import type { UrCodec } from "../typed/codec.ts";
 import {
   TAG_COMPRESSED,
@@ -26,7 +27,9 @@ function isElided(cbor: Cbor): boolean {
 }
 
 function assertAssertion(cbor: Cbor, depth: number): void {
-  if (!isMap(cbor) || cbor.value.size !== 1) throw CborError.wrongType();
+  if (!isMap(cbor) || cbor.value.size !== 1) {
+    throw CborError.wrongType();
+  }
   for (const [key, value] of cbor.value) {
     assertEnvelopeContent(key, depth);
     assertEnvelopeContent(value, depth);
@@ -34,9 +37,13 @@ function assertAssertion(cbor: Cbor, depth: number): void {
 }
 
 export function assertEnvelopeContent(cbor: Cbor, depth = 0): void {
-  if (depth > ENVELOPE_MAX_DEPTH) throw CborError.outOfRange();
+  if (depth > ENVELOPE_MAX_DEPTH) {
+    throw CborError.outOfRange();
+  }
   if (isTagged(cbor)) {
-    if (hasTag(cbor, TAG_ENVELOPE_LEAF)) return;
+    if (hasTag(cbor, TAG_ENVELOPE_LEAF)) {
+      return;
+    }
     if (hasTag(cbor, TAG_ENVELOPE)) {
       assertEnvelopeContent(cbor.value, depth + 1);
       return;
@@ -45,20 +52,28 @@ export function assertEnvelopeContent(cbor: Cbor, depth = 0): void {
       expectUnsigned(cbor.value);
       return;
     }
-    if (hasTag(cbor, TAG_ENCRYPTED) || hasTag(cbor, TAG_COMPRESSED)) return;
+    if (hasTag(cbor, TAG_ENCRYPTED) || hasTag(cbor, TAG_COMPRESSED)) {
+      return;
+    }
     throw CborError.wrongType();
   }
-  if (isElided(cbor)) return;
+  if (isElided(cbor)) {
+    return;
+  }
   if (isArray(cbor)) {
     const items = cbor.value;
-    if (items.length < 2) throw CborError.wrongType();
-    const subject = items[0];
-    if (subject === undefined) throw CborError.wrongType();
+    if (items.length < 2) {
+      throw CborError.wrongType();
+    }
+    const [subject] = items;
+    if (subject === undefined) {
+      throw CborError.wrongType();
+    }
     assertEnvelopeContent(subject, depth + 1);
-    for (let i = 1; i < items.length; i++) {
-      const element = items[i];
-      if (element === undefined) throw CborError.wrongType();
-      if (isElided(element)) continue;
+    for (const element of items.slice(1)) {
+      if (isElided(element)) {
+        continue;
+      }
       assertAssertion(element, depth + 1);
     }
     return;

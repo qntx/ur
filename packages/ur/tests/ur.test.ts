@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { UrError } from "../src/error.ts";
 import { makeMessage } from "../src/rng/index.ts";
 import {
@@ -15,9 +16,11 @@ import {
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
@@ -26,10 +29,15 @@ function errorOf(fn: () => void): UrError {
 function cborBstr(message: Uint8Array): Uint8Array {
   const len = message.length;
   let header: number[];
-  if (len <= 23) header = [0x40 | len];
-  else if (len <= 0xff) header = [0x58, len];
-  else if (len <= 0xffff) header = [0x59, (len >>> 8) & 0xff, len & 0xff];
-  else header = [0x5a, (len >>> 24) & 0xff, (len >>> 16) & 0xff, (len >>> 8) & 0xff, len & 0xff];
+  if (len <= 23) {
+    header = [0x40 | len];
+  } else if (len <= 0xff) {
+    header = [0x58, len];
+  } else if (len <= 0xffff) {
+    header = [0x59, (len >>> 8) & 0xff, len & 0xff];
+  } else {
+    header = [0x5a, (len >>> 24) & 0xff, (len >>> 16) & 0xff, (len >>> 8) & 0xff, len & 0xff];
+  }
   const out = new Uint8Array(header.length + len);
   out.set(header);
   out.set(message, header.length);
@@ -48,7 +56,7 @@ test("single part ur", () => {
   expect(encoded).toBe(expected);
   const decoded = decode(encoded);
   expect(decoded.kind).toBe("single");
-  expect(decoded.payload).toEqual(ur);
+  expect(decoded.payload).toStrictEqual(ur);
 });
 
 test("ur encoder first three parts (smoke; full 20 in interop-ur-rs)", () => {
@@ -74,7 +82,7 @@ test("multipart ur", () => {
     expect(decoder.message()).toBeUndefined();
     decoder.receive(encoder.nextPart());
   }
-  expect(decoder.message()).toEqual(ur);
+  expect(decoder.message()).toStrictEqual(ur);
 });
 
 test("data encode", () => {
@@ -86,7 +94,7 @@ test("data encode", () => {
 test("case fold", () => {
   const lower = encode(new TextEncoder().encode("data"), UrType.bytes());
   const upper = toQrString(lower);
-  expect(decode(upper)).toEqual(decode(lower));
+  expect(decode(upper)).toStrictEqual(decode(lower));
 });
 
 test("type stickiness", () => {
@@ -95,11 +103,11 @@ test("type stickiness", () => {
   const encB = Encoder.create(data, 5, UrType.parse("beta"));
   const decoder = new Decoder();
   decoder.receive(encA.nextPart());
-  expect(() => decoder.receive(encB.nextPart())).toThrowError(UrError);
+  expect(() => decoder.receive(encB.nextPart())).toThrow(UrError);
 });
 
 test("invalid scheme", () => {
-  expect(() => decode("uhr:bytes/aeadaolazmjendeoti")).toThrowError(UrError);
+  expect(() => decode("uhr:bytes/aeadaolazmjendeoti")).toThrow(UrError);
 });
 
 test("custom encoder", () => {
@@ -114,7 +122,7 @@ test("test_single_part_receive_completes", () => {
   expect(decoder.complete).toBe(true);
   expect(decoder.fragmentCount).toBe(1);
   expect(decoder.resolvedFragmentCount()).toBe(1);
-  expect(decoder.message()).toEqual(new TextEncoder().encode("data"));
+  expect(decoder.message()).toStrictEqual(new TextEncoder().encode("data"));
 });
 
 test("Encoder K==1 emits single-part", () => {
@@ -123,7 +131,7 @@ test("Encoder K==1 emits single-part", () => {
   expect(encoder.isSinglePart).toBe(true);
   expect(encoder.fragmentCount).toBe(1);
   const part = encoder.nextPart();
-  expect(part.includes("/1-1/")).toBe(false);
+  expect(part).not.toContain("/1-1/");
   expect(part).toBe(encode(data, UrType.bytes()));
 });
 
@@ -163,11 +171,11 @@ test("duplicate single-part ignored", () => {
   const decoder = new Decoder();
   decoder.receive(encode(first, UrType.bytes()));
   decoder.receive(encode(second, UrType.bytes()));
-  expect(decoder.message()).toEqual(first);
+  expect(decoder.message()).toStrictEqual(first);
 });
 
 test("decodeMessage success", () => {
-  expect(decodeMessage(encode(new TextEncoder().encode("data"), UrType.bytes()))).toEqual(
+  expect(decodeMessage(encode(new TextEncoder().encode("data"), UrType.bytes()))).toStrictEqual(
     new TextEncoder().encode("data"),
   );
 });
@@ -183,7 +191,7 @@ test("test_garbage_does_not_pin_type", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(6));
   const encoder = Encoder.create(data, 5, UrType.parse("alpha"));
   const decoder = new Decoder();
-  expect(() => decoder.receive("ur:beta/1-2/zzzz")).toThrowError(UrError);
+  expect(() => decoder.receive("ur:beta/1-2/zzzz")).toThrow(UrError);
   expect(decoder.type).toBeUndefined();
   decoder.receive(encoder.nextPart());
   expect(decoder.type?.value).toBe("alpha");
@@ -195,7 +203,7 @@ test("bc-ur example array", () => {
   expect(ur).toBe("ur:test/lsadaoaxjygonesw");
   const { kind, payload } = decode(ur);
   expect(kind).toBe("single");
-  expect(payload).toEqual(cbor);
+  expect(payload).toStrictEqual(cbor);
 });
 
 test("parse", () => {
@@ -210,5 +218,5 @@ test("empty single part", () => {
   const ur = encode(new Uint8Array(), UrType.bytes());
   const { kind, payload } = decode(ur);
   expect(kind).toBe("single");
-  expect(payload).toEqual(new Uint8Array());
+  expect(payload).toStrictEqual(new Uint8Array());
 });

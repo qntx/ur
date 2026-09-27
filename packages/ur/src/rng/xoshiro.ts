@@ -6,8 +6,8 @@ import { Weighted } from "./sampler.ts";
 const MASK64 = (1n << 64n) - 1n;
 
 function rotl(x: bigint, k: number): bigint {
-  x &= MASK64;
-  return ((x << BigInt(k)) | (x >> BigInt(64 - k))) & MASK64;
+  const v = x & MASK64;
+  return ((v << BigInt(k)) | (v >> BigInt(64 - k))) & MASK64;
 }
 
 function unitInterval(value: bigint): number {
@@ -17,9 +17,7 @@ function unitInterval(value: bigint): number {
   return shifted * SCALE;
 }
 
-/**
- * Xoshiro256** with SHA-256 seeding matching URKit / ur-rs / bcur.
- */
+/** Xoshiro256** with SHA-256 seeding matching URKit / ur-rs / bcur. */
 export class Xoshiro256 {
   private s0: bigint;
   private s1: bigint;
@@ -56,15 +54,13 @@ export class Xoshiro256 {
   static fromDigest(seed32: Uint8Array): Xoshiro256 {
     // ur-rs packs each 8-byte BE limb, stores LE, then from_seed LE-loads —
     // net effect: each state word is the big-endian u64 of that hash limb.
-    const limbs: bigint[] = [];
-    for (let i = 0; i < 4; i++) {
-      let v = 0n;
-      for (let n = 0; n < 8; n++) {
-        v = (v << 8n) | BigInt(seed32[8 * i + n]!);
-      }
-      limbs.push(v & MASK64);
-    }
-    return new Xoshiro256(limbs[0]!, limbs[1]!, limbs[2]!, limbs[3]!);
+    const view = new DataView(seed32.buffer, seed32.byteOffset, seed32.byteLength);
+    return new Xoshiro256(
+      view.getBigUint64(0),
+      view.getBigUint64(8),
+      view.getBigUint64(16),
+      view.getBigUint64(24),
+    );
   }
 
   nextU64(): bigint {
@@ -84,8 +80,8 @@ export class Xoshiro256 {
   }
 
   /**
-   * Inclusive `[low, high]` via double scaling (normative float path).
-   * Truncation toward zero matches Rust `as u64`.
+   * Inclusive `[low, high]` via double scaling (normative float path). Truncation toward zero
+   * matches Rust `as u64`.
    */
   nextInt(low: number, high: number): number {
     const span = high - low + 1;
@@ -94,11 +90,15 @@ export class Xoshiro256 {
 
   /** Remove-order shuffle (not Fisher–Yates). */
   shuffled<T>(items: T[]): T[] {
-    const pool = items.slice();
+    const pool = [...items];
     const out: T[] = [];
     while (pool.length > 0) {
       const index = this.nextInt(0, pool.length - 1);
-      out.push(pool.splice(index, 1)[0]!);
+      const [item] = pool.splice(index, 1);
+      if (item === undefined) {
+        throw new Error("unreachable: splice returned empty");
+      }
+      out.push(item);
     }
     return out;
   }

@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { Weighted } from "../src/rng/sampler.ts";
 import { Xoshiro256 } from "../src/rng/xoshiro.ts";
 
@@ -52,12 +53,12 @@ test("shuffle", () => {
     [6, 4, 5, 8, 9, 3, 2, 1, 7, 10],
   ];
   for (const e of expected) {
-    expect(rng.shuffled(values)).toEqual(e);
+    expect(rng.shuffled(values)).toStrictEqual(e);
   }
 });
 
 test("sampler", () => {
-  const weights = [1.0, 2.0, 4.0, 8.0];
+  const weights = [1, 2, 4, 8];
   const xoshiro = Xoshiro256.fromString("Wolf");
   const sampler = Weighted.new(weights);
   const expected = [

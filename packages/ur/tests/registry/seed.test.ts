@@ -8,6 +8,7 @@ import {
   hexToBytes,
 } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
+
 import {
   TAGS,
   Ur,
@@ -17,16 +18,18 @@ import {
   seedCodec,
   toUr,
   toUrString,
-  type Seed,
 } from "../../src/registry/index.ts";
+import type { Seed } from "../../src/registry/index.ts";
 import { seedC709, seedHistoricalTag100Ur, seedYinmn, seedYinmnFull } from "./goldens.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
     fn();
-  } catch (e) {
-    if (e instanceof UrError) return e;
-    throw e;
+  } catch (error) {
+    if (error instanceof UrError) {
+      return error;
+    }
+    throw error;
   }
   throw new Error("expected UrError");
 }
@@ -40,7 +43,7 @@ function payload(hex: string): Uint8Array {
 }
 
 test("TAGS names envelope, seed, hdkey, keypath, coin-info, sskr, psbt", () => {
-  expect(Object.keys(TAGS)).toEqual([
+  expect(Object.keys(TAGS)).toStrictEqual([
     "envelope",
     "seed",
     "hdkey",
@@ -127,8 +130,8 @@ test("fromUr copies decoded payload", () => {
 test("historical tag 100 date is CborType", () => {
   const err = errorOf(() => fromUrString(seedHistoricalTag100Ur, seedCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("WrongTag");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "WrongTag" });
 });
 
 test("untagged number creation-date is CborType", () => {
@@ -153,20 +156,20 @@ test("crypto-seed type token is UnexpectedType", () => {
 test("missing payload is CborType MissingMapKey", () => {
   const err = errorOf(() => fromUr(Ur.create("seed", new CborMap()), seedCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("MissingMapKey");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "MissingMapKey" });
 });
 
 test("payload length 0 or 65 is CborType OutOfRange", () => {
   const empty = errorOf(() => toUrString({ payload: new Uint8Array() }, seedCodec));
   expect(empty.code).toBe("CborType");
-  expect(CborError.isCborError(empty.cause)).toBe(true);
-  if (CborError.isCborError(empty.cause)) expect(empty.cause.code).toBe("OutOfRange");
+  expect(empty.cause).toBeInstanceOf(CborError);
+  expect(empty.cause).toMatchObject({ code: "OutOfRange" });
 
   const long = errorOf(() => toUrString({ payload: new Uint8Array(65) }, seedCodec));
   expect(long.code).toBe("CborType");
-  expect(CborError.isCborError(long.cause)).toBe(true);
-  if (CborError.isCborError(long.cause)) expect(long.cause.code).toBe("OutOfRange");
+  expect(long.cause).toBeInstanceOf(CborError);
+  expect(long.cause).toMatchObject({ code: "OutOfRange" });
 });
 
 test("extra map key 5 is CborType", () => {
@@ -175,6 +178,6 @@ test("extra map key 5 is CborType", () => {
   map.set(5, 0);
   const err = errorOf(() => fromUr(Ur.create("seed", map), seedCodec));
   expect(err.code).toBe("CborType");
-  expect(CborError.isCborError(err.cause)).toBe(true);
-  if (CborError.isCborError(err.cause)) expect(err.cause.code).toBe("WrongType");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "WrongType" });
 });
