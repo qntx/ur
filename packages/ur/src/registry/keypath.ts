@@ -141,7 +141,7 @@ function decodeComponents(value: Cbor): PathComponent[] {
 }
 
 export const keypathCodec: UrCodec<Keypath> = {
-  tags: [TAGS.keypath],
+  tags: [TAGS.keypath, TAGS["crypto-keypath"]],
   untaggedCbor(keypath) {
     if (keypath.components.length === 0 && keypath.sourceFingerprint === undefined) {
       throw CborError.wrongType();

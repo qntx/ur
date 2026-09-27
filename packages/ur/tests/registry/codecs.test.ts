@@ -2,15 +2,20 @@ import { bytesToHex, decodeCbor, expectBytes, hexToBytes } from "@blockchaincomm
 import { expect, test } from "vite-plus/test";
 
 import {
+  TAGS,
   Ur,
   UrError,
   codecMap,
+  coinInfoCodec,
   fromUrStringWith,
+  hdKeyCodec,
+  keypathCodec,
   psbtCodec,
   seedCodec,
+  sskrCodec,
 } from "../../src/registry/index.ts";
-import type { Psbt, Seed } from "../../src/registry/index.ts";
-import { psbt167, seedC709 } from "./goldens.ts";
+import type { Psbt, Seed, UrCodec } from "../../src/registry/index.ts";
+import { psbt167, psbt167V1Ur, seedC709 } from "./goldens.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
@@ -31,17 +36,24 @@ test("duplicate tags[0].name is TypeError not InvalidType", () => {
   expect(call).toThrow("duplicate codec for UR type seed");
 });
 
+test("duplicate v1 name is TypeError", () => {
+  const v1Only: UrCodec<unknown> = { ...seedCodec, tags: [TAGS["crypto-seed"]] };
+  const call = () => codecMap([seedCodec, v1Only]);
+  expect(call).toThrow(TypeError);
+  expect(call).toThrow("duplicate codec for UR type crypto-seed");
+});
+
 test("fromUrStringWith unknown type is UnexpectedType", () => {
   const uri = Ur.create("bytes", new Uint8Array([1, 2, 3])).string();
   const err = errorOf(() => fromUrStringWith(uri, codecMap([seedCodec])));
   expect(err.code).toBe("UnexpectedType");
-  expect(err.expected).toBe("seed");
+  expect(err.expected).toBe("seed|crypto-seed");
   expect(err.found).toBe("bytes");
 });
 
 test("codecMap seed+psbt dispatch", () => {
   const map = codecMap([seedCodec, psbtCodec]);
-  expect([...map.keys()]).toStrictEqual(["seed", "psbt"]);
+  expect([...map.keys()]).toStrictEqual(["seed", "crypto-seed", "psbt", "crypto-psbt"]);
 
   const seed = fromUrStringWith(seedC709.ur, map);
   expect(seed.type).toBe("seed");
@@ -52,4 +64,11 @@ test("codecMap seed+psbt dispatch", () => {
   expect(bytesToHex((psbt.value as Psbt).bytes)).toBe(
     bytesToHex(new Uint8Array(expectBytes(decodeCbor(hexToBytes(psbt167.cborHex))))),
   );
+});
+
+test("codecMap dispatches v1 token and reports inbound type", () => {
+  const map = codecMap([seedCodec, hdKeyCodec, keypathCodec, coinInfoCodec, sskrCodec, psbtCodec]);
+  const result = fromUrStringWith(psbt167V1Ur, map);
+  expect(result.type).toBe("crypto-psbt");
+  expect(result.value).toStrictEqual(fromUrStringWith(psbt167.ur, map).value);
 });

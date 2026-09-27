@@ -18,7 +18,7 @@ import {
   toUrString,
 } from "../../src/registry/index.ts";
 import type { Psbt } from "../../src/registry/index.ts";
-import { psbt167 } from "./goldens.ts";
+import { psbt167, psbt167V1Ur } from "./goldens.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
@@ -86,10 +86,9 @@ test("PSBT shorter than magic is CborType OutOfRange", () => {
   expect(err.cause).toMatchObject({ code: "OutOfRange" });
 });
 
-test("crypto-psbt type token is UnexpectedType", () => {
-  const uri = Ur.create("crypto-psbt", psbtCodec.untaggedCbor({ bytes: psbtBytes() })).string();
-  const err = errorOf(() => fromUrString(uri, psbtCodec));
-  expect(err.code).toBe("UnexpectedType");
-  expect(err.expected).toBe("psbt");
-  expect(err.found).toBe("crypto-psbt");
+test("v1 crypto-psbt decodes and re-encodes as v2", () => {
+  const v1 = fromUrString(psbt167V1Ur, psbtCodec);
+  expect(v1).toStrictEqual(fromUrString(psbt167.ur, psbtCodec));
+  expect(fromUrString(psbt167V1Ur.toUpperCase(), psbtCodec)).toStrictEqual(v1);
+  expect(toUrString(v1, psbtCodec)).toBe(psbt167.ur);
 });

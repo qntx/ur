@@ -22,7 +22,7 @@ function assertPayloadLen(bytes: Uint8Array): void {
 }
 
 export const seedCodec: UrCodec<Seed> = {
-  tags: [TAGS.seed],
+  tags: [TAGS.seed, TAGS["crypto-seed"]],
   untaggedCbor(seed) {
     assertPayloadLen(seed.payload);
     const map = new CborMap();

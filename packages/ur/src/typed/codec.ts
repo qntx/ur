@@ -4,21 +4,33 @@ import { fail } from "../error.ts";
 import { UrType } from "../ur/type.ts";
 import { Ur, mapCborType } from "./ur.ts";
 
-/** First `tags[0].name` is the UR type; body is untagged. */
+/** `tags[0]` is written; every tag is accepted on read. Body is untagged. */
 export type UrCodec<T> = {
-  /** Most-preferred first. First tag.name is the UR type token. */
+  /** Most-preferred first. Every `tag.name` is a UR type token accepted on read. */
   readonly tags: ReadonlyArray<Tag>;
   // oxlint-disable-next-line typescript/method-signature-style -- bivariance in T keeps UrCodec<Specific> assignable to UrCodec<unknown> for codecMap
   untaggedCbor(value: T): Cbor;
   readonly fromUntaggedCbor: (cbor: Cbor) => T;
 };
 
-export function firstTagUrType(tags: ReadonlyArray<Tag>): UrType {
-  const name = tags[0]?.name;
-  if (name === undefined || name === "") {
+export function tagUrTypes(tags: ReadonlyArray<Tag>): UrType[] {
+  if (tags.length === 0) {
     fail("InvalidType");
   }
-  return UrType.parse(name);
+  return tags.map((tag) => {
+    if (tag.name === undefined || tag.name === "") {
+      fail("InvalidType");
+    }
+    return UrType.parse(tag.name);
+  });
+}
+
+export function firstTagUrType(tags: ReadonlyArray<Tag>): UrType {
+  const [first] = tagUrTypes(tags);
+  if (first === undefined) {
+    fail("InvalidType");
+  }
+  return first;
 }
 
 export function toUr<T>(value: T, codec: UrCodec<T>): Ur {
@@ -28,7 +40,13 @@ export function toUr<T>(value: T, codec: UrCodec<T>): Ur {
 }
 
 export function fromUr<T>(ur: Ur, codec: UrCodec<T>): T {
-  ur.checkType(firstTagUrType(codec.tags));
+  const accepted = tagUrTypes(codec.tags);
+  if (!accepted.some((t) => ur.type.equals(t))) {
+    fail("UnexpectedType", {
+      expected: accepted.map((t) => t.value).join("|"),
+      found: ur.type.value,
+    });
+  }
   return mapCborType(() => codec.fromUntaggedCbor(ur.cbor));
 }
 

@@ -20,7 +20,14 @@ import {
   toUrString,
 } from "../../src/registry/index.ts";
 import type { Seed } from "../../src/registry/index.ts";
-import { seedC709, seedHistoricalTag100Ur, seedYinmn, seedYinmnFull } from "./goldens.ts";
+import {
+  seedC709,
+  seedC709V1Ur,
+  seedHistoricalTag100Ur,
+  seedHistoricalTag100V1Ur,
+  seedYinmn,
+  seedYinmnFull,
+} from "./goldens.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
@@ -42,7 +49,7 @@ function payload(hex: string): Uint8Array {
   return hexToBytes(hex);
 }
 
-test("TAGS names envelope, seed, hdkey, keypath, coin-info, sskr, psbt", () => {
+test("TAGS names v2 tokens plus deprecated v1 crypto-* tokens", () => {
   expect(Object.keys(TAGS)).toStrictEqual([
     "envelope",
     "seed",
@@ -51,9 +58,17 @@ test("TAGS names envelope, seed, hdkey, keypath, coin-info, sskr, psbt", () => {
     "coin-info",
     "sskr",
     "psbt",
+    "crypto-seed",
+    "crypto-hdkey",
+    "crypto-keypath",
+    "crypto-coin-info",
+    "crypto-sskr",
+    "crypto-psbt",
   ]);
-  expect(seedCodec.tags[0]?.name).toBe("seed");
-  expect(seedCodec.tags[0]?.value).toBe(40_300);
+  expect(seedCodec.tags.map((t) => [t.value, t.name])).toStrictEqual([
+    [40_300, "seed"],
+    [300, "crypto-seed"],
+  ]);
 });
 
 test("c709 payload-only write golden", () => {
@@ -134,6 +149,13 @@ test("historical tag 100 date is CborType", () => {
   expect(err.cause).toMatchObject({ code: "WrongTag" });
 });
 
+test("official crypto-seed vector with tag 100 is CborType", () => {
+  const err = errorOf(() => fromUrString(seedHistoricalTag100V1Ur, seedCodec));
+  expect(err.code).toBe("CborType");
+  expect(err.cause).toBeInstanceOf(CborError);
+  expect(err.cause).toMatchObject({ code: "WrongTag" });
+});
+
 test("untagged number creation-date is CborType", () => {
   const map = new CborMap();
   map.set(1, payload(seedC709.payloadHex));
@@ -142,15 +164,23 @@ test("untagged number creation-date is CborType", () => {
   expect(err.code).toBe("CborType");
 });
 
-test("crypto-seed type token is UnexpectedType", () => {
-  const uri = Ur.create(
-    "crypto-seed",
-    seedCodec.untaggedCbor({ payload: payload(seedC709.payloadHex) }),
-  ).string();
-  const err = errorOf(() => fromUrString(uri, seedCodec));
+test("v1 crypto-seed decodes and re-encodes as v2", () => {
+  const v1 = fromUrString(seedC709V1Ur, seedCodec);
+  expect(v1).toStrictEqual(fromUrString(seedC709.ur, seedCodec));
+  expect(fromUrString(seedC709V1Ur.toUpperCase(), seedCodec)).toStrictEqual(v1);
+  expect(toUrString(v1, seedCodec)).toBe(seedC709.ur);
+});
+
+test("fromUr mismatch lists every accepted type", () => {
+  const err = errorOf(() =>
+    fromUr(
+      Ur.create("bytes", seedCodec.untaggedCbor({ payload: payload(seedC709.payloadHex) })),
+      seedCodec,
+    ),
+  );
   expect(err.code).toBe("UnexpectedType");
-  expect(err.expected).toBe("seed");
-  expect(err.found).toBe("crypto-seed");
+  expect(err.expected).toBe("seed|crypto-seed");
+  expect(err.found).toBe("bytes");
 });
 
 test("missing payload is CborType MissingMapKey", () => {

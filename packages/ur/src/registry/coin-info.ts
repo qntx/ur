@@ -29,7 +29,7 @@ function assertInt32(n: number): number {
 }
 
 export const coinInfoCodec: UrCodec<CoinInfo> = {
-  tags: [TAGS["coin-info"]],
+  tags: [TAGS["coin-info"], TAGS["crypto-coin-info"]],
   untaggedCbor(info) {
     const map = new CborMap();
     if (info.type !== undefined && info.type !== 0) {

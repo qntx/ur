@@ -1,4 +1,9 @@
-import { CborError, expectTaggedContent, taggedValue } from "@blockchaincommons/dcbor";
+import {
+  CborError,
+  extractTaggedContent,
+  taggedValue,
+  validateTag,
+} from "@blockchaincommons/dcbor";
 import type { Cbor } from "@blockchaincommons/dcbor";
 
 import type { UrCodec } from "../typed/codec.ts";
@@ -12,9 +17,9 @@ export function toTagged<T>(codec: UrCodec<T>, value: T): Cbor {
 }
 
 export function fromTagged<T>(codec: UrCodec<T>, cbor: Cbor): T {
-  const [tag] = codec.tags;
-  if (tag === undefined) {
+  if (codec.tags.length === 0) {
     throw CborError.wrongType();
   }
-  return codec.fromUntaggedCbor(expectTaggedContent(cbor, tag.value));
+  validateTag(cbor, [...codec.tags]);
+  return codec.fromUntaggedCbor(extractTaggedContent(cbor));
 }

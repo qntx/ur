@@ -16,7 +16,7 @@ ur.string(); // "ur:test/lsadaoaxjygonesw"
 const again = Ur.fromUrString(ur.string());
 ```
 
-`Ur.create` maps a JS value through dCBOR. The UR body is untagged. Application codecs use `UrCodec`: first `tags[0].name` is the UR type token; `untaggedCbor` / `fromUntaggedCbor` are the body.
+`Ur.create` maps a JS value through dCBOR. The UR body is untagged. Application codecs use `UrCodec`: `tags[0].name` is the UR type token written; every `tag.name` is accepted on read; `untaggedCbor` / `fromUntaggedCbor` are the body.
 
 ```ts
 import { toUr, fromUr, type UrCodec } from "@qntx/ur/typed";
@@ -34,6 +34,6 @@ fromUr(ur, noteCodec);
 
 `MultipartEncoder.create(ur, maxFragmentLength)` encodes dCBOR **once**, then uses L3 `Encoder`. `MultipartDecoder.message()` dCBOR-parses recovered bytes. `CborDecode` on `message()` is not session poison.
 
-`@qntx/ur/typed` does not ship application types. v2 `seed` / `hdkey` / `keypath` / `coin-info` / `sskr` / `psbt` / `envelope` live on `@qntx/ur/registry`. This export does not ship v1 `crypto-seed`.
+`@qntx/ur/typed` does not ship application types. v2 `seed` / `hdkey` / `keypath` / `coin-info` / `sskr` / `psbt` / `envelope` live on `@qntx/ur/registry`, whose codecs also accept the deprecated v1 `crypto-*` tokens on read.
 
 L3 UTF-8 `"hello"` remains valid transport. `Ur.fromUrString` of that URI throws `CborDecode`.

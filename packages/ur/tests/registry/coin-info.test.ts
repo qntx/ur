@@ -74,6 +74,16 @@ test("extra map key is CborType", () => {
   expect(err.cause).toMatchObject({ code: "WrongType" });
 });
 
+test("v1 crypto-coin-info decodes and re-encodes as v2", () => {
+  // No official standalone v1 coin-info UR exists; v1/v2 bodies share the CDDL (BCR-2020-006).
+  const info: CoinInfo = { type: CoinType.eth, network: Network.btcTestnet };
+  const v1Uri = Ur.create("crypto-coin-info", coinInfoCodec.untaggedCbor(info)).string();
+  const v2 = fromUrString(toUrString(info, coinInfoCodec), coinInfoCodec);
+  expect(fromUrString(v1Uri, coinInfoCodec)).toStrictEqual(v2);
+  expect(fromUrString(v1Uri.toUpperCase(), coinInfoCodec)).toStrictEqual(v2);
+  expect(toUrString(v2, coinInfoCodec).startsWith("ur:coin-info/")).toBe(true);
+});
+
 test("type above uint31 is CborType OutOfRange", () => {
   const err = errorOf(() => toUrString({ type: 0x80_00_00_00 }, coinInfoCodec));
   expect(err.code).toBe("CborType");

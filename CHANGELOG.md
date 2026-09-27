@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Read-only decode of deprecated BCR-2020-006 v1 tokens/tags: `crypto-seed` (300), `crypto-hdkey` (303), `crypto-keypath` (304), `crypto-coin-info` (305), `crypto-sskr` (309), `crypto-psbt` (310). Writes always emit v2. New `tagUrTypes` helper parses every `UrCodec.tags` name.
+
+### Changed
+
+- `fromTagged` accepts any tag in `codec.tags`, so v1 nested keypath/coin-info tags 304/305 decode; `codecMap` registers every accepted name, including the v1 tokens.
+
 ## 1.8.0 - 2026-09-27
 
 ### Fixed

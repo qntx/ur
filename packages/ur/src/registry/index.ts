@@ -6,6 +6,7 @@ export {
   fromUrString,
   Ur,
   firstTagUrType,
+  tagUrTypes,
   MultipartEncoder,
   MultipartDecoder,
   UrType,

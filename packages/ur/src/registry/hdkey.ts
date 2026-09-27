@@ -60,7 +60,7 @@ function assertUint32Ne0(n: number): number {
 }
 
 export const hdKeyCodec: UrCodec<HdKey> = {
-  tags: [TAGS.hdkey],
+  tags: [TAGS.hdkey, TAGS["crypto-hdkey"]],
   untaggedCbor(key) {
     const map = new CborMap();
     if (key.kind === "master") {
