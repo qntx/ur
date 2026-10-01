@@ -5,7 +5,7 @@
     "": {
       "name": "ur.js",
       "devDependencies": {
-        "@qntx/oxfmt": "^1.0.2",
+        "@qntx/oxfmt": "^1.0.4",
         "@qntx/oxlint": "^1.0.2",
         "@qntx/tsconfig": "^1.0.1",
         "vite": "npm:@voidzero-dev/vite-plus-core@0.3.3",
@@ -33,7 +33,7 @@
     },
     "packages/ur": {
       "name": "@qntx/ur",
-      "version": "1.6.0",
+      "version": "1.8.0",
       "dependencies": {
         "@noble/hashes": "^2.4.0",
       },
@@ -167,7 +167,7 @@
 
     "@polka/url": ["@polka/url@1.0.0-next.29", "", {}, "sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww=="],
 
-    "@qntx/oxfmt": ["@qntx/oxfmt@1.0.2", "", { "peerDependencies": { "oxfmt": "^0.66.0" }, "optionalPeers": ["oxfmt"] }, "sha512-Xdb2Va8xbsvubyK6i41EAaTBkBpMXIL2SeHf/Rw0D9PWWIfq7hlpKPXWoDiRrVNm/XK7CR2wtBnrw5nqYmsSsg=="],
+    "@qntx/oxfmt": ["@qntx/oxfmt@1.0.4", "", { "peerDependencies": { "oxfmt": ">=0.66.0 <1.0.0" }, "optionalPeers": ["oxfmt"] }, "sha512-4w1V6N/6wq+p9IZ+OjeEy8rDm8owLwxq7AaOr5XWfJF/kqe6gHzFYxsG8WMOXXAjKsPlzK3YdCTci+NCmu3t5Q=="],
 
     "@qntx/oxlint": ["@qntx/oxlint@1.0.2", "", { "peerDependencies": { "oxlint": "^1.82.0", "oxlint-tsgolint": ">=7.0.2001" }, "optionalPeers": ["oxlint", "oxlint-tsgolint"] }, "sha512-gRM19mthH85d+t06cMRdliWkmaswtDZNt3H8ckgwrtacaFmqGFptDGb4cLDxFdozHa4cYPJlouJi1ld/7MypTw=="],
 
