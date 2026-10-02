@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@qntx/oxfmt": "^1.0.4",
-    "@qntx/oxlint": "^1.0.2",
+    "@qntx/oxlint": "^1.1.1",
     "@qntx/tsconfig": "^1.0.1",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.3.3",
     "vite-plus": "^0.3.3"
