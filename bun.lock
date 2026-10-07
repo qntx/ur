@@ -5,7 +5,7 @@
     "": {
       "name": "ur.js",
       "devDependencies": {
-        "@qntx/oxfmt": "^1.0.4",
+        "@qntx/oxfmt": "^1.1.1",
         "@qntx/oxlint": "^1.1.1",
         "@qntx/tsconfig": "^1.0.1",
         "vite": "npm:@voidzero-dev/vite-plus-core@0.3.3",
@@ -167,7 +167,7 @@
 
     "@polka/url": ["@polka/url@1.0.0-next.29", "", {}, "sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww=="],
 
-    "@qntx/oxfmt": ["@qntx/oxfmt@1.0.4", "", { "peerDependencies": { "oxfmt": ">=0.66.0 <1.0.0" }, "optionalPeers": ["oxfmt"] }, "sha512-4w1V6N/6wq+p9IZ+OjeEy8rDm8owLwxq7AaOr5XWfJF/kqe6gHzFYxsG8WMOXXAjKsPlzK3YdCTci+NCmu3t5Q=="],
+    "@qntx/oxfmt": ["@qntx/oxfmt@1.1.1", "", { "peerDependencies": { "oxfmt": ">=0.66.0 <1.0.0" }, "optionalPeers": ["oxfmt"] }, "sha512-i/+3GBLZlwDNW6gT1Z76LKEfPBm4LMSjee0URPRn5YeILbEtGQtMuUNNLcfabYpGPZI4wGL3YyPjdD3/Abf9Kw=="],
 
     "@qntx/oxlint": ["@qntx/oxlint@1.1.1", "", { "peerDependencies": { "oxlint": "^1.82.0", "oxlint-tsgolint": ">=7.0.2001" }, "optionalPeers": ["oxlint", "oxlint-tsgolint"] }, "sha512-zvn9BENK1Ly1GmxwVYEDZJOCm7koW2Cji3l+M1i19gLpcTqmatvtWBEtBRNc6rPxfVRNz0mhc+6z76iTKuNFqw=="],
 
