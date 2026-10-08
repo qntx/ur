@@ -7,13 +7,24 @@
     reason = "integration targets link full dev-deps and host unwraps by design"
 )]
 
-//! Canonical contract vectors for ur.js + bcur sister interop.
+//! TypeScript/Rust parity contract vectors, read from the repository-root
+//! `vectors/` tree.
 
 use serde_json::Value;
 
 use bcur::bytewords::{self, Style};
 use bcur::fountain::{self, Part};
 use bcur::{Decoder, DecoderLimits, Encoder, Error, Kind, ResourceKind, UrType, decode, encode};
+
+macro_rules! vector {
+    ($path:literal) => {
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../vectors/",
+            $path
+        ))
+    };
+}
 
 fn json(raw: &str) -> Value {
     serde_json::from_str(raw).unwrap()
@@ -34,7 +45,7 @@ fn json_usize(v: &Value, key: &str) -> usize {
 fn data_lines(raw: &str) -> Vec<&str> {
     raw.lines()
         .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .filter(|line| !line.is_empty())
         .collect()
 }
 
@@ -73,18 +84,22 @@ fn assert_session_poison(kind: ResourceKind, decoder: &mut Decoder, part: &str) 
 }
 
 #[test]
-fn readme_is_canonical_paragraph() {
-    let readme = include_str!("vectors/contract/README.md");
-    assert!(readme.contains("ur.js"));
-    assert!(readme.contains("bcur"));
+fn vectors_readme_is_canonical() {
+    let readme = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../vectors/README.md"
+    ));
+    assert!(readme.contains("packages/ur/tests/"));
+    assert!(readme.contains("crates/bcur"));
     assert!(readme.contains("implementation bug"));
     assert!(readme.contains("THIRD_PARTY.md"));
+    assert!(readme.contains("parity.json"));
     assert!(readme.contains("data-only"));
 }
 
 #[test]
 fn bytewords_contract() {
-    let spec = json(include_str!("vectors/contract/bytewords.json"));
+    let spec = json(vector!("bytewords/contract.json"));
     let input = hex::decode(json_str(&spec, "inputHex")).unwrap();
     assert_eq!(
         bytewords::encode(&input, Style::Standard),
@@ -114,7 +129,7 @@ fn bytewords_contract() {
 
 #[test]
 fn part_cbor_contract() {
-    let spec = json(include_str!("vectors/contract/part-cbor.json"));
+    let spec = json(vector!("fountain/part-cbor.json"));
     let cbor = hex::decode(json_str(&spec, "cborHex")).unwrap();
     let part = Part::from_cbor(&cbor).unwrap();
     assert_eq!(part.sequence(), json_u32(&spec, "sequence"));
@@ -133,7 +148,7 @@ fn part_cbor_contract() {
 
 #[test]
 fn k1_contract() {
-    let spec = json(include_str!("vectors/contract/k1.json"));
+    let spec = json(vector!("ur/k1.json"));
     let payload = json_str(&spec, "payloadUtf8").as_bytes();
     let ur_type = UrType::new(json_str(&spec, "type")).unwrap();
     let mut encoder = Encoder::new(payload, 64, &ur_type).unwrap();
@@ -163,7 +178,7 @@ fn k1_contract() {
 
 #[test]
 fn l4_test_array_contract() {
-    let spec = json(include_str!("vectors/contract/l4-test-array.json"));
+    let spec = json(vector!("typed/test-array.json"));
     let cbor = hex::decode(json_str(&spec, "cborHex")).unwrap();
     let ur_type = UrType::new(json_str(&spec, "type")).unwrap();
     let uri = json_str(&spec, "uri");
@@ -182,7 +197,7 @@ fn l4_test_array_contract() {
 
 #[test]
 fn decoder_limits_contract() {
-    let spec = json(include_str!("vectors/contract/decoder-limits.json"));
+    let spec = json(vector!("limits/defaults.json"));
     let limits = DecoderLimits::default();
     assert_eq!(
         limits.max_message_length,
@@ -206,8 +221,8 @@ fn decoder_limits_contract() {
 
 #[test]
 fn poison_maps_via_rust_ident() {
-    let spec = json(include_str!("vectors/contract/poison.json"));
-    let raw = include_str!("vectors/contract/poison.json");
+    let spec = json(vector!("limits/poison.json"));
+    let raw = vector!("limits/poison.json");
     assert!(!raw.contains("DecoderState"));
     let rows = spec.get("limits").and_then(Value::as_array).unwrap();
     let kinds = [
@@ -234,7 +249,7 @@ fn poison_maps_via_rust_ident() {
 
 #[test]
 fn poison_receive_and_message_same_code() {
-    let spec = json(include_str!("vectors/contract/poison.json"));
+    let spec = json(vector!("limits/poison.json"));
     let names: Vec<&str> = spec
         .get("receiveAndMessageSameCode")
         .and_then(Value::as_array)
@@ -270,7 +285,7 @@ fn poison_receive_and_message_same_code() {
 
 #[test]
 fn poison_not_poison_errors() {
-    let spec = json(include_str!("vectors/contract/poison.json"));
+    let spec = json(vector!("limits/poison.json"));
     let names = spec
         .get("notPoison")
         .and_then(Value::as_array)
@@ -309,15 +324,11 @@ fn poison_not_poison_errors() {
 }
 
 #[test]
-fn fountain_mixed_contract() {
-    let mixed = include_str!("vectors/contract/fountain-mixed.txt");
+fn multipart_20_contract() {
+    let mixed = vector!("ur-rs/multipart-20.txt");
     assert_line_file(mixed);
     let uris = data_lines(mixed);
-    assert_eq!(uris.len(), 20, "fountain-mixed.txt");
-    assert_eq!(
-        uris,
-        data_lines(include_str!("vectors/ur_rs_multipart_20.txt"))
-    );
+    assert_eq!(uris.len(), 20, "ur-rs/multipart-20.txt");
 
     let mut decoder = Decoder::default();
     for uri in &uris {
@@ -335,14 +346,10 @@ fn fountain_mixed_contract() {
 
 #[test]
 fn published_singles_contract() {
-    let raw = include_str!("vectors/contract/published-singles.txt");
+    let raw = vector!("ur/published-singles.txt");
     assert_line_file(raw);
     let uris = data_lines(raw);
-    assert_eq!(uris.len(), 3, "published-singles.txt");
-    assert_eq!(
-        uris,
-        data_lines(include_str!("vectors/published_single.txt"))
-    );
+    assert_eq!(uris.len(), 3, "ur/published-singles.txt");
     for uri in uris {
         let (kind, _) = decode(uri).unwrap();
         assert_eq!(kind, Kind::SinglePart);

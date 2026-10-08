@@ -14,6 +14,7 @@
 - Repository moved to `github.com/qntx/ur` (was `qntx/ur.js`).
 - Fountain index sorting no longer uses ES2023 `Array.prototype.toSorted`, so the package runs on Hermes V1 (React Native).
 - Rust crates `bcur` and `bcur-cli` moved into this repository from qntx-labs/bcur (b2c1fb1); their earlier history lives in that repository's CHANGELOG. Workspace version is lockstep with `@qntx/ur`; MSRV is Rust 1.99.
+- Test vectors moved to a shared repository-root `vectors/` tree consumed by both the TypeScript and Rust suites, and capabilities are tracked in `parity.json`. No user-facing API change.
 
 ## 1.8.0 - 2026-09-27
 

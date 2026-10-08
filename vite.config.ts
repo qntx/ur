@@ -43,11 +43,10 @@ const config: UserConfig = defineConfig({
       ...fmt.ignorePatterns,
       "target/**",
       "bun.lock",
-      // TOML is owned by taplo (.taplo.toml, align_entries); generated vectors
+      // TOML is owned by taplo (.taplo.toml, align_entries); shared vectors
       // stay byte-frozen.
       "**/*.toml",
-      "crates/**/tests/vectors/**",
-      "packages/ur/tests/vectors/**",
+      "vectors/**",
       "fuzz/**",
     ],
   },
@@ -69,7 +68,7 @@ const config: UserConfig = defineConfig({
         rules: { "eslint/no-bitwise": "off" },
       },
       {
-        files: ["packages/ur/scripts/**"],
+        files: ["packages/ur/scripts/**", "scripts/**"],
         rules: {
           // Maintenance scripts print their results.
           "eslint/no-console": "off",
@@ -131,6 +130,9 @@ const config: UserConfig = defineConfig({
     ],
   }),
   run: { cache: process.env["CI"] === undefined || process.env["CI"] === "" },
+  test: {
+    include: ["scripts/**/*.test.ts"],
+  },
 });
 
 export default config;

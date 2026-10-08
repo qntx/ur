@@ -14,11 +14,12 @@
   ],
   "type": "module",
   "scripts": {
-    "lint": "vp check && taplo fmt --check",
+    "lint": "vp check && taplo fmt --check && bun scripts/check-version.ts && bun scripts/check-layers.ts && bun scripts/parity/check.ts",
     "typecheck": "vp run -r typecheck && tsc --noEmit",
     "build": "vp run -r build",
-    "test": "vp run -r test",
+    "test": "vp run -r test && vp test",
     "dev": "vp run @qntx/ur#build && vp run website#dev",
+    "release": "bumpp",
     "prepare": "vp config"
   },
   "devDependencies": {
@@ -27,6 +28,7 @@
     "@qntx/tsconfig": "1.0.1",
     "@taplo/cli": "0.7.0",
     "@types/node": "26.6.3",
+    "bumpp": "12.3.0",
     "typescript": "7.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
     "vite-plus": "1.0.0"

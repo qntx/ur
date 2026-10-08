@@ -1,0 +1,259 @@
+{
+  "schema": 1,
+  "capabilities": [
+    {
+      "id": "bytewords.codec",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/bytewords/index.ts",
+        "tests": ["packages/ur/tests/bytewords.test.ts", "packages/ur/tests/contract.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/bytewords/mod.rs",
+        "tests": ["crates/bcur/tests/contract.rs"]
+      },
+      "vectors": ["vectors/bytewords/contract.json"]
+    },
+    {
+      "id": "fountain.part-cbor",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/fountain/part-cbor.ts",
+        "tests": ["packages/ur/tests/fountain.test.ts", "packages/ur/tests/contract.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/fountain/part_cbor.rs",
+        "tests": ["crates/bcur/tests/contract.rs"]
+      },
+      "vectors": ["vectors/fountain/part-cbor.json"]
+    },
+    {
+      "id": "consensus.chooser",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/fountain/choose.ts",
+        "tests": ["packages/ur/tests/fountain.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/fountain/mod.rs",
+        "tests": ["crates/bcur/src/fountain/mod.rs"]
+      },
+      "vectors": ["vectors/ur-rs/choose-fragments.txt"]
+    },
+    {
+      "id": "fountain.partition",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/fountain/choose.ts",
+        "tests": ["packages/ur/tests/fountain.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/fountain/mod.rs",
+        "tests": ["crates/bcur/src/fountain/mod.rs"]
+      },
+      "vectors": ["vectors/ur-rs/wolf256-fragments.hex"]
+    },
+    {
+      "id": "ur.encoder",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/ur/index.ts",
+        "tests": ["packages/ur/tests/interop-ur-rs.test.ts", "packages/ur/tests/contract.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/ur/mod.rs",
+        "tests": [
+          "crates/bcur/src/ur/mod.rs",
+          "crates/bcur/tests/interop_ur_rs.rs",
+          "crates/bcur/tests/contract.rs"
+        ]
+      },
+      "vectors": ["vectors/ur-rs/multipart-20.txt"]
+    },
+    {
+      "id": "ur.parse",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/ur/parse.ts",
+        "tests": ["packages/ur/tests/interop-ur-rs.test.ts", "packages/ur/tests/contract.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/ur/mod.rs",
+        "tests": ["crates/bcur/tests/interop_ur_rs.rs", "crates/bcur/tests/contract.rs"]
+      },
+      "vectors": ["vectors/ur/published-singles.txt", "vectors/official/published-from-refs.txt"]
+    },
+    {
+      "id": "ur.decoder",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/ur/index.ts",
+        "tests": ["packages/ur/tests/contract.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/ur/mod.rs",
+        "tests": ["crates/bcur/tests/contract.rs"]
+      },
+      "vectors": ["vectors/ur/k1.json"]
+    },
+    {
+      "id": "typed.ur",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/typed/index.ts",
+        "tests": [
+          "packages/ur/tests/typed-ur.test.ts",
+          "packages/ur/tests/interop-ur-rs.test.ts",
+          "packages/ur/tests/contract.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur/src/typed/mod.rs",
+        "tests": ["crates/bcur/tests/contract.rs"]
+      },
+      "vectors": ["vectors/typed/test-array.json"]
+    },
+    {
+      "id": "limits.defaults",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/fountain/limits.ts",
+        "tests": ["packages/ur/tests/contract.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/fountain/mod.rs",
+        "tests": ["crates/bcur/tests/contract.rs"]
+      },
+      "vectors": ["vectors/limits/defaults.json"]
+    },
+    {
+      "id": "limits.poison",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/ur/index.ts",
+        "tests": ["packages/ur/tests/contract.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/ur/mod.rs",
+        "tests": ["crates/bcur/tests/contract.rs"]
+      },
+      "vectors": ["vectors/limits/poison.json"]
+    },
+    {
+      "id": "registry.seed",
+      "tier": "A",
+      "status": "ts-only",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/seed.ts",
+        "tests": ["packages/ur/tests/registry/seed.test.ts"]
+      },
+      "rust": null,
+      "vectors": []
+    },
+    {
+      "id": "registry.hdkey",
+      "tier": "A",
+      "status": "ts-only",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/hdkey.ts",
+        "tests": ["packages/ur/tests/registry/hdkey.test.ts"]
+      },
+      "rust": null,
+      "vectors": []
+    },
+    {
+      "id": "registry.keypath",
+      "tier": "A",
+      "status": "ts-only",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/keypath.ts",
+        "tests": ["packages/ur/tests/registry/keypath.test.ts"]
+      },
+      "rust": null,
+      "vectors": []
+    },
+    {
+      "id": "registry.coin-info",
+      "tier": "A",
+      "status": "ts-only",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/coin-info.ts",
+        "tests": ["packages/ur/tests/registry/coin-info.test.ts"]
+      },
+      "rust": null,
+      "vectors": []
+    },
+    {
+      "id": "registry.sskr",
+      "tier": "A",
+      "status": "ts-only",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/sskr.ts",
+        "tests": ["packages/ur/tests/registry/sskr.test.ts"]
+      },
+      "rust": null,
+      "vectors": []
+    },
+    {
+      "id": "registry.psbt",
+      "tier": "A",
+      "status": "ts-only",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/psbt.ts",
+        "tests": ["packages/ur/tests/registry/psbt.test.ts"]
+      },
+      "rust": null,
+      "vectors": []
+    },
+    {
+      "id": "registry.envelope",
+      "tier": "A",
+      "status": "ts-only",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/envelope.ts",
+        "tests": ["packages/ur/tests/registry/envelope.test.ts"]
+      },
+      "rust": null,
+      "vectors": []
+    },
+    {
+      "id": "registry.codec-map",
+      "tier": "A",
+      "status": "ts-only",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/codecs.ts",
+        "tests": ["packages/ur/tests/registry/codecs.test.ts"]
+      },
+      "rust": null,
+      "vectors": []
+    }
+  ]
+}

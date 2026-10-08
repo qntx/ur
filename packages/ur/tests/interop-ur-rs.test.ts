@@ -6,15 +6,13 @@
  * output, matching ur-rs `make_message_ur`.
  */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { expect, test } from "vite-plus/test";
 
 import * as bytewords from "../src/bytewords/index.ts";
 import { FountainEncoder } from "../src/fountain/index.ts";
 import { makeMessage } from "../src/rng/index.ts";
-import { Decoder, Encoder, UrType, decode, encode, toQrString } from "../src/ur/index.ts";
+import { Decoder, Encoder, UrType, decode, encode, parse, toQrString } from "../src/ur/index.ts";
+import { vectorJson, vectorLines } from "./vectors.ts";
 
 /** CBOR bstr header + payload (ur-rs ByteVec). */
 function cborBstr(message: Uint8Array): Uint8Array {
@@ -40,18 +38,13 @@ function makeMessageUr(length: number, seed: string): Uint8Array {
 }
 
 /** Full 20-URI table from ur-rs `test_ur_encoder` (max_frag 30, 256-byte Wolf bstr). */
-const UR_ENCODER_20 = readFileSync(join(import.meta.dirname, "vectors/fountain-mixed.txt"), "utf8")
-  .split("\n")
-  .map((line) => line.trim())
-  .filter((line) => line.length > 0);
+const UR_ENCODER_20 = vectorLines("ur-rs/multipart-20.txt");
 
-const L4 = JSON.parse(
-  readFileSync(join(import.meta.dirname, "vectors/l4-test-array.json"), "utf8"),
-) as {
-  type: string;
-  cborHex: string;
-  uri: string;
-};
+const PUBLISHED_SINGLES = vectorLines("ur/published-singles.txt");
+
+const PUBLISHED_REFS = vectorLines("official/published-from-refs.txt");
+
+const L4 = vectorJson<{ type: string; cborHex: string; uri: string }>("typed/test-array.json");
 
 test("ur-rs test_ur_encoder: full 20 URI goldens", () => {
   const ur = makeMessageUr(256, "Wolf");
@@ -100,4 +93,19 @@ test("test_foreign_1_1_fountain_uri_decodes", () => {
 test("bc-ur golden: ur:test array", () => {
   const cbor = new Uint8Array(Buffer.from(L4.cborHex, "hex"));
   expect(encode(cbor, UrType.parse(L4.type))).toBe(L4.uri);
+});
+
+test("published-from-refs: pinned literals contain the in-tree goldens", () => {
+  const refSet = new Set(PUBLISHED_REFS);
+  for (const uri of UR_ENCODER_20) {
+    expect(refSet.has(uri)).toBe(true);
+  }
+  const wolf = PUBLISHED_SINGLES.find((uri) => uri.includes("hdeymejtswhh"));
+  expect(wolf).toBeDefined();
+  expect(PUBLISHED_REFS).toContain(wolf);
+  // Sorted unique, matching the extraction script's ordering contract.
+  expect(PUBLISHED_REFS).toStrictEqual([...new Set(PUBLISHED_REFS)].toSorted());
+  for (const uri of PUBLISHED_REFS) {
+    parse(uri);
+  }
 });
