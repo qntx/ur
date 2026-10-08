@@ -1,13 +1,4 @@
 {
-  "extends": [
-    "@qntx/tsconfig/configs/strictest.json",
-    "@qntx/tsconfig/configs/node22.json",
-    "@qntx/tsconfig/configs/node-ts.json"
-  ],
-  "compilerOptions": {
-    "noEmit": true,
-    "moduleDetection": "force",
-    "types": ["node"]
-  },
-  "include": ["src", "tests", "vite.config.ts"]
+  "extends": "../../tsconfig.base.json",
+  "include": ["src", "tests", "scripts", "vite.config.ts"]
 }

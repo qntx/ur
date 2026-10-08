@@ -48,8 +48,8 @@ export class Part {
 
   static fromCbor(
     bytes: Uint8Array,
-    maxDataLen = DEFAULT_LIMITS.maxFragmentDataLength,
-    maxFragmentCount = DEFAULT_LIMITS.maxFragmentCount,
+    maxDataLen: number = DEFAULT_LIMITS.maxFragmentDataLength,
+    maxFragmentCount: number = DEFAULT_LIMITS.maxFragmentCount,
   ): Part {
     const f = decodePart(bytes, maxDataLen, maxFragmentCount);
     return Part.fromFields(f.sequence, f.sequenceCount, f.messageLength, f.checksum, f.data);

@@ -62,7 +62,7 @@ export class FragmentChooser {
     const xoshiro = Xoshiro256.fromBytes(seed);
     const degree = this.#degrees.next(xoshiro) + 1;
     const indexes = Array.from({ length: this.fragmentCount }, (_, i) => i);
-    return xoshiro.shuffled(indexes, degree).toSorted((a, b) => a - b);
+    return xoshiro.shuffled(indexes, degree).sort((a, b) => a - b);
   }
 }
 

@@ -16,7 +16,7 @@
 ## Reporting a vulnerability
 
 Report security issues privately via GitHub Security Advisories on
-[qntx/ur.js](https://github.com/qntx/ur.js/security/advisories/new), or email
+[qntx/ur](https://github.com/qntx/ur/security/advisories/new), or email
 `security@qntx.org` if that channel is unavailable.
 
 Please include:

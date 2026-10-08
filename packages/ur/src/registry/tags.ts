@@ -23,7 +23,21 @@ export const TAG_COMPRESSED = 40_003;
  * Codecs that exist in this version. The `crypto-*` entries are the deprecated v1 tags
  * (BCR-2020-006): read-only, never written. Number constants for later tags live above.
  */
-export const TAGS = {
+export const TAGS: Readonly<{
+  envelope: Tag;
+  seed: Tag;
+  hdkey: Tag;
+  keypath: Tag;
+  "coin-info": Tag;
+  sskr: Tag;
+  psbt: Tag;
+  "crypto-seed": Tag;
+  "crypto-hdkey": Tag;
+  "crypto-keypath": Tag;
+  "crypto-coin-info": Tag;
+  "crypto-sskr": Tag;
+  "crypto-psbt": Tag;
+}> = {
   envelope: Tag.from(TAG_ENVELOPE, "envelope"),
   seed: Tag.from(TAG_SEED, "seed"),
   hdkey: Tag.from(TAG_HDKEY, "hdkey"),
@@ -37,4 +51,4 @@ export const TAGS = {
   "crypto-coin-info": Tag.from(TAG_COIN_INFO_V1, "crypto-coin-info"),
   "crypto-sskr": Tag.from(TAG_SSKR_V1, "crypto-sskr"),
   "crypto-psbt": Tag.from(TAG_PSBT_V1, "crypto-psbt"),
-} as const;
+};
