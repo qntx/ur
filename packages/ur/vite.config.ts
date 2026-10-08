@@ -1,6 +1,7 @@
 import { defineConfig } from "vite-plus";
+import type { UserConfig } from "vite-plus";
 
-export default defineConfig({
+const config: UserConfig = defineConfig({
   pack: {
     dts: {},
     // ESM-only sugar flattens to a string; keep types/import/default for pack entries.
@@ -29,3 +30,5 @@ export default defineConfig({
     },
   },
 });
+
+export default config;

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { JSX, SubmitEvent } from "react";
+import { useActionState } from "react";
+import type { JSX } from "react";
 
 import {
   SEED_ENTROPY_BYTES,
@@ -17,6 +17,73 @@ function messageOf(e: unknown): string {
   return e instanceof Error ? e.message : "failed";
 }
 
+function field(data: FormData, name: string): string {
+  const value = data.get(name);
+  return typeof value === "string" ? value : "";
+}
+
+function attempt<S extends { error: string }>(state: S, run: (s: S) => S, onError: Partial<S>): S {
+  try {
+    return { ...run(state), error: "" };
+  } catch (error) {
+    return { ...state, ...onError, error: messageOf(error) };
+  }
+}
+
+type SeedState = {
+  hex: string;
+  ur: string;
+  decoded: string;
+  error: string;
+};
+
+const INITIAL_SEED: SeedState = { hex: "", ur: "", decoded: "", error: "" };
+
+function seedAction(prev: SeedState, data: FormData): SeedState {
+  const input: SeedState = { ...prev, hex: field(data, "hex"), ur: field(data, "ur") };
+  switch (data.get("intent")) {
+    case "generate":
+      return { ...input, hex: toHex(randomBytes(SEED_ENTROPY_BYTES)), error: "" };
+    case "encode":
+      return attempt(input, (s) => ({ ...s, ur: encodeSeed(parseHex(s.hex)) }), { ur: "" });
+    case "decode":
+      return attempt(input, (s) => ({ ...s, decoded: toHex(decodeSeed(s.ur)) }), { decoded: "" });
+    default:
+      return input;
+  }
+}
+
+type PsbtState = {
+  hex: string;
+  parts: string[];
+  urText: string;
+  decoded: string;
+  error: string;
+};
+
+const INITIAL_PSBT: PsbtState = { hex: "", parts: [], urText: "", decoded: "", error: "" };
+
+function psbtAction(prev: PsbtState, data: FormData): PsbtState {
+  const input: PsbtState = { ...prev, hex: field(data, "hex"), urText: field(data, "ur") };
+  switch (data.get("intent")) {
+    case "encode":
+      return attempt(
+        input,
+        (s) => {
+          const parts = encodePsbtParts(parseHex(s.hex));
+          return { ...s, parts, urText: parts.join("\n") };
+        },
+        { parts: [], urText: "" },
+      );
+    case "decode":
+      return attempt(input, (s) => ({ ...s, decoded: toHex(decodePsbt(s.urText)) }), {
+        decoded: "",
+      });
+    default:
+      return input;
+  }
+}
+
 export function App(): JSX.Element {
   return (
     <main>
@@ -32,149 +99,70 @@ export function App(): JSX.Element {
 }
 
 function SeedPanel() {
-  const [hex, setHex] = useState("");
-  const [ur, setUr] = useState("");
-  const [decoded, setDecoded] = useState("");
-  const [error, setError] = useState("");
-
-  function generate() {
-    setError("");
-    setHex(toHex(randomBytes(SEED_ENTROPY_BYTES)));
-  }
-
-  function encode(e: SubmitEvent) {
-    e.preventDefault();
-    setError("");
-    try {
-      setUr(encodeSeed(parseHex(hex)));
-    } catch (error) {
-      setUr("");
-      setError(messageOf(error));
-    }
-  }
-
-  function decode(e: SubmitEvent) {
-    e.preventDefault();
-    setError("");
-    try {
-      setDecoded(toHex(decodeSeed(ur)));
-    } catch (error) {
-      setDecoded("");
-      setError(messageOf(error));
-    }
-  }
+  const [state, action] = useActionState(seedAction, INITIAL_SEED);
 
   return (
     <section>
       <h2>Seed</h2>
-      <form onSubmit={encode}>
+      <form action={action}>
         <label htmlFor="seed-hex">Entropy hex</label>
-        <textarea
-          id="seed-hex"
-          rows={2}
-          spellCheck={false}
-          value={hex}
-          onChange={(e) => setHex(e.target.value)}
-        />
+        <textarea id="seed-hex" name="hex" rows={2} spellCheck={false} defaultValue={state.hex} />
         <div className="row">
-          <button type="button" onClick={generate}>
+          <button type="submit" name="intent" value="generate">
             Generate 16 bytes
           </button>
-          <button type="submit">Encode ur:seed</button>
+          <button type="submit" name="intent" value="encode">
+            Encode ur:seed
+          </button>
         </div>
-      </form>
-      {ur === "" ? null : (
-        <div className="result">
-          <Qr value={ur} label="ur:seed" />
-          <pre>{ur}</pre>
-        </div>
-      )}
-      <form onSubmit={decode}>
+        {state.ur === "" ? null : (
+          <div className="result">
+            <Qr value={state.ur} label="ur:seed" />
+            <pre>{state.ur}</pre>
+          </div>
+        )}
         <label htmlFor="seed-ur">Paste UR</label>
-        <textarea
-          id="seed-ur"
-          rows={3}
-          spellCheck={false}
-          value={ur}
-          onChange={(e) => setUr(e.target.value)}
-        />
-        <button type="submit">Decode</button>
+        <textarea id="seed-ur" name="ur" rows={3} spellCheck={false} defaultValue={state.ur} />
+        <button type="submit" name="intent" value="decode">
+          Decode
+        </button>
       </form>
-      {decoded === "" ? null : <pre>{decoded}</pre>}
-      {error === "" ? null : <p className="error">{error}</p>}
+      {state.decoded === "" ? null : <pre>{state.decoded}</pre>}
+      {state.error === "" ? null : <p className="error">{state.error}</p>}
     </section>
   );
 }
 
 function PsbtPanel() {
-  const [hex, setHex] = useState("");
-  const [parts, setParts] = useState<string[]>([]);
-  const [urText, setUrText] = useState("");
-  const [decoded, setDecoded] = useState("");
-  const [error, setError] = useState("");
-
-  function encode(e: SubmitEvent) {
-    e.preventDefault();
-    setError("");
-    try {
-      const next = encodePsbtParts(parseHex(hex));
-      setParts(next);
-      setUrText(next.join("\n"));
-    } catch (error) {
-      setParts([]);
-      setUrText("");
-      setError(messageOf(error));
-    }
-  }
-
-  function decode(e: SubmitEvent) {
-    e.preventDefault();
-    setError("");
-    try {
-      setDecoded(toHex(decodePsbt(urText)));
-    } catch (error) {
-      setDecoded("");
-      setError(messageOf(error));
-    }
-  }
+  const [state, action] = useActionState(psbtAction, INITIAL_PSBT);
 
   return (
     <section>
       <h2>PSBT</h2>
-      <form onSubmit={encode}>
+      <form action={action}>
         <label htmlFor="psbt-hex">PSBT hex</label>
-        <textarea
-          id="psbt-hex"
-          rows={6}
-          spellCheck={false}
-          value={hex}
-          onChange={(e) => setHex(e.target.value)}
-        />
-        <button type="submit">Encode ur:psbt (maxFragmentLength 50)</button>
-      </form>
-      {parts.length > 0 ? (
-        <ol className="parts">
-          {parts.map((part, i) => (
-            <li key={part}>
-              <Qr value={part} label={`${i + 1}/${parts.length}`} />
-              <pre>{part}</pre>
-            </li>
-          ))}
-        </ol>
-      ) : null}
-      <form onSubmit={decode}>
+        <textarea id="psbt-hex" name="hex" rows={6} spellCheck={false} defaultValue={state.hex} />
+        <button type="submit" name="intent" value="encode">
+          Encode ur:psbt (maxFragmentLength 50)
+        </button>
+        {state.parts.length > 0 ? (
+          <ol className="parts">
+            {state.parts.map((part, i) => (
+              <li key={part}>
+                <Qr value={part} label={`${i + 1}/${state.parts.length}`} />
+                <pre>{part}</pre>
+              </li>
+            ))}
+          </ol>
+        ) : null}
         <label htmlFor="psbt-ur">Paste UR parts</label>
-        <textarea
-          id="psbt-ur"
-          rows={6}
-          spellCheck={false}
-          value={urText}
-          onChange={(e) => setUrText(e.target.value)}
-        />
-        <button type="submit">Decode</button>
+        <textarea id="psbt-ur" name="ur" rows={6} spellCheck={false} defaultValue={state.urText} />
+        <button type="submit" name="intent" value="decode">
+          Decode
+        </button>
       </form>
-      {decoded === "" ? null : <pre>{decoded}</pre>}
-      {error === "" ? null : <p className="error">{error}</p>}
+      {state.decoded === "" ? null : <pre>{state.decoded}</pre>}
+      {state.error === "" ? null : <p className="error">{state.error}</p>}
     </section>
   );
 }

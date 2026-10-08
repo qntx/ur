@@ -1,9 +1,35 @@
+import { builtinModules } from "node:module";
+
 import { defineConfig } from "vite-plus";
+import type { UserConfig } from "vite-plus";
 
 import { fmt } from "@qntx/oxfmt";
 import { merge, react } from "@qntx/oxlint";
 
-export default defineConfig({
+// The library runs on Node, browsers, and Hermes: Node builtins must not be
+// imported from src.
+const platformNeutralImports = {
+  paths: builtinModules.map((name) => ({
+    name,
+    message: "Node builtin — the library must stay platform-neutral",
+  })),
+  patterns: [
+    {
+      group: ["node:*"],
+      message: "Node builtin — the library must stay platform-neutral",
+    },
+  ],
+};
+
+// dCBOR parsing is confined to the typed and registry subpath entries; the
+// root transport stays free of the optional dcbor peer.
+const dcborImport = {
+  name: "@blockchaincommons/dcbor",
+  message:
+    "dcbor is confined to src/typed and src/registry — the root transport does not import it",
+};
+
+const config: UserConfig = defineConfig({
   defaultPackage: {
     dev: "./apps/website",
     build: "./apps/website",
@@ -11,8 +37,13 @@ export default defineConfig({
     pack: "./packages/ur",
   },
   staged: { "*": "vp check --fix" },
-  fmt,
+  fmt: {
+    ...fmt,
+    ignorePatterns: [...fmt.ignorePatterns, "target/**", "bun.lock"],
+  },
   lint: merge(react, {
+    // merge() concatenates arrays onto the preset's own ignorePatterns.
+    ignorePatterns: ["target/**", "packages/ur/.hermes-smoke.iife.js"],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
@@ -27,7 +58,69 @@ export default defineConfig({
         files: ["packages/ur/src/**", "packages/ur/tests/**"],
         rules: { "eslint/no-bitwise": "off" },
       },
+      {
+        files: ["packages/ur/scripts/**"],
+        rules: {
+          // Maintenance scripts print their results.
+          "eslint/no-console": "off",
+        },
+      },
+      {
+        files: ["packages/*/src/**"],
+        rules: {
+          // Hermes V1 (what React Native ships) has no ES2023 immutable array
+          // methods, so the library must sort/reverse copies in place.
+          "unicorn/no-array-sort": "off",
+          "unicorn/no-array-reverse": "off",
+          // @types/node is in the program via tests and scripts, so Node-only
+          // globals would typecheck silently; browser-only globals are equally
+          // absent on Hermes. Both sets are banned — library code must use
+          // globalThis lookups instead.
+          "eslint/no-restricted-globals": [
+            "error",
+            { name: "Buffer", message: "Node-only global — use Uint8Array" },
+            { name: "process", message: "Node-only global — not available in browsers or Hermes" },
+            { name: "global", message: "Node-only global — use globalThis" },
+            { name: "require", message: "CJS-only — use import" },
+            { name: "module", message: "CJS-only global" },
+            { name: "__dirname", message: "CJS-only global" },
+            { name: "__filename", message: "CJS-only global" },
+            { name: "setImmediate", message: "Node-only global — use setTimeout" },
+            { name: "clearImmediate", message: "Node-only global — use clearTimeout" },
+            { name: "window", message: "browser-only global — use globalThis" },
+            { name: "document", message: "browser-only global — use globalThis" },
+            { name: "navigator", message: "browser-only global — use globalThis" },
+            { name: "location", message: "browser-only global — use globalThis" },
+            { name: "localStorage", message: "browser-only global — inject a store" },
+            { name: "sessionStorage", message: "browser-only global — inject a store" },
+          ],
+          "eslint/no-restricted-imports": ["error", platformNeutralImports],
+        },
+      },
+      {
+        // Overrides replace (not merge) a rule's config per override, so this
+        // re-adds the platform-neutral paths/patterns on top of dcbor.
+        files: ["packages/ur/src/**"],
+        rules: {
+          "eslint/no-restricted-imports": [
+            "error",
+            {
+              paths: [...platformNeutralImports.paths, dcborImport],
+              patterns: platformNeutralImports.patterns,
+            },
+          ],
+        },
+      },
+      {
+        // The dcbor peer is allowed only behind the typed and registry entries.
+        files: ["packages/ur/src/typed/**", "packages/ur/src/registry/**"],
+        rules: {
+          "eslint/no-restricted-imports": ["error", platformNeutralImports],
+        },
+      },
     ],
   }),
   run: { cache: process.env["CI"] === undefined || process.env["CI"] === "" },
 });
+
+export default config;

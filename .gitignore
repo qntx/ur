@@ -12,3 +12,6 @@ dist
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# Hermes smoke bundle (built by packages/ur/scripts/hermes-smoke.ts)
+.hermes-smoke.iife.js

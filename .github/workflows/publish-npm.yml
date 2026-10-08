@@ -1,4 +1,7 @@
-name: Publish to npm
+# Caller owns on:. Pin at @v2.
+# OIDC. Do not pass NPM_TOKEN. Do not set environment, runs-on, or steps.
+# Required check-run on a tag: ur / publish.
+name: Publish
 
 on:
   push:
@@ -9,14 +12,11 @@ permissions:
   id-token: write
 
 jobs:
-  publish:
+  ur:
     uses: qntx/workflows/.github/workflows/publish-npm.yml@v2
     permissions:
       contents: read
       id-token: write
     with:
       package-manager: bun
-      bun-version: "1.3.14"
-      node-version: "24"
-      install-directory: .
       working-directory: packages/ur

@@ -89,7 +89,7 @@ export class Xoshiro256 {
   }
 
   /** Remove-order shuffle (not Fisher–Yates); stops after `count` picks. */
-  shuffled<T>(items: T[], count = items.length): T[] {
+  shuffled<T>(items: T[], count: number = items.length): T[] {
     const pool = [...items];
     const out: T[] = [];
     while (pool.length > 0 && out.length < count) {

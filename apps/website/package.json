@@ -2,27 +2,28 @@
   "name": "website",
   "version": "0.0.0",
   "private": true,
-  "license": "MIT",
+  "license": "MIT OR Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vp dev",
-    "build": "vp run ur#build && tsc && vp build . --emptyOutDir",
+    "build": "tsc --noEmit && vp build",
     "preview": "vp preview",
-    "test": "vp test"
+    "test": "vp test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@blockchaincommons/dcbor": "1.0.0-beta.3",
     "@qntx/ur": "workspace:*",
-    "qrcode.react": "^4.2.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "qrcode.react": "4.2.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
-    "@qntx/tsconfig": "^1.0.1",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.5",
-    "@vitejs/plugin-react": "^6.1.0",
-    "typescript": "^7.0.2",
-    "vite-plus": "^0.3.3"
+    "@qntx/tsconfig": "1.0.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "7.0.2",
+    "vite-plus": "1.0.0"
   }
 }

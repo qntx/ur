@@ -1,4 +1,12 @@
 {
   "extends": ["@qntx/tsconfig/configs/vite-react.json", "@qntx/tsconfig/configs/strictest.json"],
+  "compilerOptions": {
+    // Typecheck against sources so lint/typecheck do not depend on build order
+    // (the exports map points at dist/, which does not exist on a fresh clone).
+    "paths": {
+      "@qntx/ur": ["../../packages/ur/src/index.ts"],
+      "@qntx/ur/registry": ["../../packages/ur/src/registry/index.ts"]
+    }
+  },
   "include": ["src"]
 }
