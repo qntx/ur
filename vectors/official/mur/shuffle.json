@@ -1,0 +1,412 @@
+{
+  "capability": "consensus.shuffle",
+  "cases": [
+    {
+      "count": 1,
+      "expected": [
+        6
+      ],
+      "kind": "prefix",
+      "name": "testShuffle count=1",
+      "rngSeed": "Wolf",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "count": 2,
+      "expected": [
+        6,
+        4
+      ],
+      "kind": "prefix",
+      "name": "testShuffle count=2",
+      "rngSeed": "Wolf",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "count": 3,
+      "expected": [
+        6,
+        4,
+        9
+      ],
+      "kind": "prefix",
+      "name": "testShuffle count=3",
+      "rngSeed": "Wolf",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "count": 4,
+      "expected": [
+        6,
+        4,
+        9,
+        3
+      ],
+      "kind": "prefix",
+      "name": "testShuffle count=4",
+      "rngSeed": "Wolf",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "count": 5,
+      "expected": [
+        6,
+        4,
+        9,
+        3,
+        10
+      ],
+      "kind": "prefix",
+      "name": "testShuffle count=5",
+      "rngSeed": "Wolf",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "count": 6,
+      "expected": [
+        6,
+        4,
+        9,
+        3,
+        10,
+        5
+      ],
+      "kind": "prefix",
+      "name": "testShuffle count=6",
+      "rngSeed": "Wolf",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "count": 7,
+      "expected": [
+        6,
+        4,
+        9,
+        3,
+        10,
+        5,
+        7
+      ],
+      "kind": "prefix",
+      "name": "testShuffle count=7",
+      "rngSeed": "Wolf",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "count": 8,
+      "expected": [
+        6,
+        4,
+        9,
+        3,
+        10,
+        5,
+        7,
+        8
+      ],
+      "kind": "prefix",
+      "name": "testShuffle count=8",
+      "rngSeed": "Wolf",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "count": 9,
+      "expected": [
+        6,
+        4,
+        9,
+        3,
+        10,
+        5,
+        7,
+        8,
+        1
+      ],
+      "kind": "prefix",
+      "name": "testShuffle count=9",
+      "rngSeed": "Wolf",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "count": 10,
+      "expected": [
+        6,
+        4,
+        9,
+        3,
+        10,
+        5,
+        7,
+        8,
+        1,
+        2
+      ],
+      "kind": "prefix",
+      "name": "testShuffle count=10",
+      "rngSeed": "Wolf",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "count": 10,
+      "expected": [
+        [
+          6,
+          4,
+          9,
+          3,
+          10,
+          5,
+          7,
+          8,
+          1,
+          2
+        ],
+        [
+          10,
+          8,
+          6,
+          5,
+          1,
+          2,
+          3,
+          9,
+          7,
+          4
+        ],
+        [
+          6,
+          4,
+          5,
+          8,
+          9,
+          3,
+          2,
+          1,
+          7,
+          10
+        ],
+        [
+          7,
+          3,
+          5,
+          1,
+          10,
+          9,
+          4,
+          8,
+          2,
+          6
+        ],
+        [
+          8,
+          5,
+          7,
+          10,
+          2,
+          1,
+          4,
+          3,
+          9,
+          6
+        ],
+        [
+          4,
+          3,
+          5,
+          6,
+          10,
+          2,
+          7,
+          8,
+          9,
+          1
+        ],
+        [
+          5,
+          1,
+          3,
+          9,
+          4,
+          6,
+          2,
+          10,
+          7,
+          8
+        ],
+        [
+          2,
+          1,
+          10,
+          8,
+          9,
+          4,
+          7,
+          6,
+          3,
+          5
+        ],
+        [
+          6,
+          7,
+          10,
+          4,
+          8,
+          9,
+          2,
+          3,
+          1,
+          5
+        ],
+        [
+          10,
+          2,
+          1,
+          7,
+          9,
+          5,
+          6,
+          3,
+          4,
+          8
+        ]
+      ],
+      "kind": "continued",
+      "name": "bc-ur test_shuffle",
+      "rngSeed": "Wolf",
+      "rounds": 10,
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "crossChecked": [
+      "URKit ebba59b2e1538cb368d98147dd58c452e6d1dc47 Tests/URKitTests/FountainCodesTests.swift",
+      "bc-ur 4479fb81b2350ae8bafa042a5572b9c64c2c32ca test/test.cpp"
+    ],
+    "kind": "official",
+    "name": "BCR-2024-001",
+    "path": "papers/bcr-2024-001-multipart-ur.md",
+    "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+  }
+}

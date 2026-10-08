@@ -1,0 +1,29 @@
+{
+  "capability": "registry.hdkey",
+  "cases": [
+    {
+      "cborHex": "a301f503582100e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35045820873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508",
+      "name": "BIP32 master (vector 1)",
+      "tag": 40303,
+      "ur": "ur:hdkey/otadykaxhdclaevswfdmjpfswpwkahcywspsmndwmusoskprbbehetchsnpfcybbmwrhchspfxjeecaahdcxltfszmlyrtdlgmhfcnzcctvwcmkbpsftgonbgauefsehgrqzdmvodizmweemtlaybakiylat",
+      "urType": "hdkey"
+    },
+    {
+      "cborHex": "a5035821026fe2355745bb2db3630bbc80ef5d58951c963c841f54170ba6e5c12be7fc12a6045820ced155c72456255881793514edc5bd9447e7f74abb88c6d6b6480fd016ee8c8505d99d71a1020106d99d70a1018a182cf501f501f500f401f4081ae9181cf3",
+      "digestHex": "362af3038da7600ad1581c19161c8594aafafc24e5acf1aefc8f7a0bbe366df2",
+      "digestSourceHex": "845821026fe2355745bb2db3630bbc80ef5d58951c963c841f54170ba6e5c12be7fc12a65820ced155c72456255881793514edc5bd9447e7f74abb88c6d6b6480fd016ee8c850001",
+      "name": "testnet derived m/44'/1'/1'/0/1 (vector 2)",
+      "tag": 40303,
+      "ur": "ur:hdkey/onaxhdclaojlvoechgferkdpqdiabdrflawshlhdmdcemtfnlrctghchbdolvwsednvdztbgolaahdcxtottgostdkhfdahdlykkecbbweskrymwflvdylgerkloswtbrpfdbsticmwylklpahtantjsoyaoadamtantjooyadlecsdwykadykadykaewkadwkaycywlcscewfjnkpvllt",
+      "urType": "hdkey"
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "crossChecked": [],
+    "kind": "official",
+    "name": "BCR-2020-007",
+    "path": "papers/bcr-2020-007-hdkey.md",
+    "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "capability": "fountain.part-cbor",
+  "cases": [
+    {
+      "cborHex": "850c0818641a12345678450105030305",
+      "checksum": "12345678",
+      "dataHex": "0105030305",
+      "messageLen": 100,
+      "seqLen": 8,
+      "seqNum": 12
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "crossChecked": [
+      "URKit ebba59b2e1538cb368d98147dd58c452e6d1dc47 Tests/URKitTests/FountainCodesTests.swift",
+      "bc-ur 4479fb81b2350ae8bafa042a5572b9c64c2c32ca test/test.cpp"
+    ],
+    "kind": "official",
+    "name": "BCR-2024-001",
+    "path": "papers/bcr-2024-001-multipart-ur.md",
+    "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+  }
+}

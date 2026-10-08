@@ -1,0 +1,85 @@
+{
+  "capability": "registry.sskr",
+  "cases": [
+    {
+      "masterSecretHex": "7daa851251002874e1a1995f0897e6b1",
+      "name": "2 groups (2-of-3, 3-of-5), group threshold 2",
+      "shares": [
+        {
+          "bytewords": "tuna next keep gyro gear runs body acid able film nail barn cost aqua epic veto quad fern jump buzz epic slot frog apex taxi grim fern twin leaf",
+          "cborHex": "554bbf1101003e990c1f0435e2b33c721535c74603d0",
+          "group": 1,
+          "index": 0,
+          "taggedCborHex": "d99d75554bbf1101003e990c1f0435e2b33c721535c74603d0",
+          "ur": "ur:sskr/gogrrsbyadaefmnlbnctaaecvoqdfnjpbzecstfgaxtifpsskbfw"
+        },
+        {
+          "bytewords": "tuna next keep gyro gear runs body acid acid barn luau omit navy keep also omit data wave aunt redo toil miss tent redo bias fuel work king kick",
+          "cborHex": "554bbf1101010c8ba39a7502a325ed07b8d597d1b80f",
+          "group": 1,
+          "index": 1,
+          "taggedCborHex": "d99d75554bbf1101010c8ba39a7502a325ed07b8d597d1b80f",
+          "ur": "ur:sskr/gogrrsbyadadbnluotnykpaootdaweatrotlmsttrobsghbnurrh"
+        },
+        {
+          "bytewords": "tuna next keep gyro gear runs body acid also heat ruby gala beta visa help horn liar limp monk gush waxy into junk jolt keep lion leaf ruby purr",
+          "cborHex": "554bbf1101025abd490ee65b6084859854ee67736e75",
+          "group": 1,
+          "index": 2,
+          "taggedCborHex": "d99d75554bbf1101025abd490ee65b6084859854ee67736e75",
+          "ur": "ur:sskr/gogrrsbyadaohtrygabavahphnlrlpmkghwyiojkjtkpmdkncfjp"
+        },
+        {
+          "bytewords": "tuna next keep gyro gear runs body brag able foxy webs free fish inky memo figs easy inch fair exam kiwi view solo gear eyes ruin tuna gala iris",
+          "cborHex": "554bbf11120044ef453f66923d32653b377de5c94b39",
+          "group": 2,
+          "index": 3,
+          "taggedCborHex": "d99d75554bbf11120044ef453f66923d32653b377de5c94b39",
+          "ur": "ur:sskr/gogrrsbybgaefywsfefhiymofseyihfremkivwsogrespmclwepd"
+        },
+        {
+          "bytewords": "tuna next keep gyro gear runs body brag acid jowl zero claw barn silk play fund hope heat into brew jazz lava down skew king sets very whiz crux",
+          "cborHex": "554bbf1112016ffb1b0cc5ab485f5a67136c802bc67b",
+          "group": 2,
+          "index": 4,
+          "taggedCborHex": "d99d75554bbf1112016ffb1b0cc5ab485f5a67136c802bc67b",
+          "ur": "ur:sskr/gogrrsbybgadjlzocwbnskpyfdhehtiobwjzladnswkgtscfhfvt"
+        },
+        {
+          "bytewords": "tuna next keep gyro gear runs body brag also omit keno each gyro zest zinc race logo kiln roof visa waxy iron sets rock swan leaf tent navy redo",
+          "cborHex": "554bbf111202a3763155fcfdb5887abce6ee69c4bbcd",
+          "group": 2,
+          "index": 5,
+          "taggedCborHex": "d99d75554bbf111202a3763155fcfdb5887abce6ee69c4bbcd",
+          "ur": "ur:sskr/gogrrsbybgaootkoehgoztzcreloknrfvawyinssrksnmedtfmks"
+        },
+        {
+          "bytewords": "tuna next keep gyro gear runs body brag apex logo iced jowl inky hope sets rust view free vast saga zoom barn days even many yoga wall curl what",
+          "cborHex": "554bbf11120388626f665fc4c0e545e0c2ff0c26368f",
+          "group": 2,
+          "index": 6,
+          "taggedCborHex": "d99d75554bbf11120388626f665fc4c0e545e0c2ff0c26368f",
+          "ur": "ur:sskr/gogrrsbybgaxloidjliyhessrtvwfevtsazmbndsenmywmbylpdy"
+        },
+        {
+          "bytewords": "tuna next keep gyro gear runs body brag aqua idea edge numb ugly keys exit open skew sets tied undo purr view ramp hawk body skew redo data unit",
+          "cborHex": "554bbf1112046334a0db7838a5c6c4d2dcb2e5b65911",
+          "group": 2,
+          "index": 7,
+          "taggedCborHex": "d99d75554bbf1112046334a0db7838a5c6c4d2dcb2e5b65911",
+          "ur": "ur:sskr/gogrrsbybgaaiaeenbuyksetonswsstduoprvwrphkbytlfzlyca"
+        }
+      ],
+      "tag": 40309,
+      "urType": "sskr"
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "crossChecked": [],
+    "kind": "official",
+    "name": "BCR-2020-011",
+    "path": "papers/bcr-2020-011-sskr.md",
+    "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+  }
+}
