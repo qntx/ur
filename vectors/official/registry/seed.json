@@ -1,0 +1,30 @@
+{
+  "capability": "registry.seed",
+  "cases": [
+    {
+      "cborHex": "a20150c7098580125e2ab0981253468b2dbc5202d8641947da",
+      "diagnostic": "{ 1: h'c7098580125e2ab0981253468b2dbc52', 2: 100(18394) }",
+      "name": "v2 seed, tag-100 creation date",
+      "tag": 40300,
+      "ur": "ur:seed/oeadgdstaslplabghydrpfmkbggufgludprfgmaotpiecffltnlpqdenos",
+      "urType": "seed"
+    },
+    {
+      "cborHex": "a10150c7098580125e2ab0981253468b2dbc52",
+      "name": "payload-only seed (BCR-2020-005)",
+      "tag": 40300,
+      "ur": "ur:seed/oyadgdstaslplabghydrpfmkbggufgludprfgmamdpwmox",
+      "urType": "seed"
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "crossChecked": [
+      "BCR-2020-005 e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850 papers/bcr-2020-005-ur.md"
+    ],
+    "kind": "official",
+    "name": "BCR-2020-006",
+    "path": "papers/bcr-2020-006-urtypes.md",
+    "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+  }
+}

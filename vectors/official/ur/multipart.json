@@ -1,0 +1,39 @@
+{
+  "capability": "ur.encoder",
+  "cases": [
+    {
+      "maxFragmentLength": 30,
+      "message": {
+        "length": 256,
+        "seed": "Wolf"
+      },
+      "name": "testEncode",
+      "partCount": 20,
+      "partsFile": "ur-rs/multipart-20.txt",
+      "urType": "bytes",
+      "wrap": "cbor-bstr"
+    },
+    {
+      "firstSeqNum": 100,
+      "maxFragmentLength": 1000,
+      "message": {
+        "length": 32767,
+        "seed": "Wolf"
+      },
+      "name": "testMultipartUR",
+      "urType": "bytes",
+      "wrap": "cbor-bstr"
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "crossChecked": [
+      "bc-ur 4479fb81b2350ae8bafa042a5572b9c64c2c32ca test/test.cpp",
+      "ur-rs 9b3064d… vectors/ur-rs/multipart-20.txt"
+    ],
+    "kind": "official",
+    "name": "URKit",
+    "path": "Tests/URKitTests/URTests.swift",
+    "revision": "ebba59b2e1538cb368d98147dd58c452e6d1dc47"
+  }
+}

@@ -91,6 +91,8 @@ pub mod typed;
 #[cfg(test)]
 use criterion as _;
 #[cfg(test)]
+mod official_vectors;
+#[cfg(test)]
 use serde_json as _;
 #[cfg(feature = "dcbor")]
 pub use typed::{MultipartDecoder, MultipartEncoder, Ur, UrCodable, UrDecodable, UrEncodable};

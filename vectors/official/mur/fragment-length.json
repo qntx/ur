@@ -1,0 +1,28 @@
+{
+  "capability": "fountain.fragment-length",
+  "cases": [
+    {
+      "expected": 1764,
+      "maxFragmentLength": 1955,
+      "messageLength": 12345,
+      "minFragmentLength": 1005
+    },
+    {
+      "expected": 12345,
+      "maxFragmentLength": 30000,
+      "messageLength": 12345,
+      "minFragmentLength": 1005
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "crossChecked": [
+      "URKit ebba59b2e1538cb368d98147dd58c452e6d1dc47 Tests/URKitTests/FountainCodesTests.swift",
+      "bc-ur 4479fb81b2350ae8bafa042a5572b9c64c2c32ca test/test.cpp"
+    ],
+    "kind": "official",
+    "name": "BCR-2024-001",
+    "path": "papers/bcr-2024-001-multipart-ur.md",
+    "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+  }
+}

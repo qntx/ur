@@ -1,0 +1,46 @@
+{
+  "capability": "ur.parse",
+  "cases": [
+    {
+      "name": "testSinglePartUR",
+      "payload": {
+        "cborBstr": {
+          "length": 50,
+          "seed": "Wolf"
+        }
+      },
+      "ur": "ur:bytes/hdeymejtswhhylkepmykhhtsytsnoyoyaxaedsuttydmmhhpktpmsrjtgwdpfnsboxgwlbaawzuefywkdplrsrjynbvygabwjldapfcsdwkbrkch",
+      "urType": "bytes"
+    },
+    {
+      "cborHex": "a10150c7098580125e2ab0981253468b2dbc52",
+      "name": "bcr-2020-005 worked seed",
+      "ur": "ur:seed/oyadgdstaslplabghydrpfmkbggufgludprfgmamdpwmox",
+      "urType": "seed"
+    },
+    {
+      "name": "bcr-2020-005 single-part example",
+      "ur": "ur:seed/oyadhdeynteelblrcygldwvarflojtcywyjytpdkfwprylienshnjnpluypmamtkmybsjkspvseesawmrltdlnlgkplfbkqzzoglfeoyaegslobemohs",
+      "urType": "seed"
+    },
+    {
+      "kind": "multi",
+      "name": "bcr-2020-005 multipart fragment",
+      "seqLen": 3,
+      "seqNum": 1,
+      "ur": "ur:seed/1-3/lpadaxcsencylobemohsgmoyadhdeynteelblrcygldwvarflojtcywyjydmylgdsa",
+      "urType": "seed"
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "crossChecked": [
+      "URKit ebba59b2e1538cb368d98147dd58c452e6d1dc47 Tests/URKitTests/URTests.swift",
+      "bc-ur 4479fb81b2350ae8bafa042a5572b9c64c2c32ca test/test.cpp"
+    ],
+    "kind": "official",
+    "name": "BCR-2020-005",
+    "path": "papers/bcr-2020-005-ur.md",
+    "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+  }
+}
