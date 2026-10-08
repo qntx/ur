@@ -1,0 +1,52 @@
+[package]
+name                   = "bcur"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+homepage.workspace     = true
+authors.workspace      = true
+description.workspace  = true
+keywords               = ["ur", "bytewords", "fountain", "cbor", "qr"]
+categories             = ["encoding", "cryptography", "no-std"]
+readme                 = "README.md"
+documentation          = "https://docs.rs/bcur"
+
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+default = ["std"]
+## Enables `std` (host builds). Transport works with or without this feature.
+std = []
+## Typed dCBOR layer (`typed` module). Implies `std` in v1.
+dcbor = ["dep:dcbor", "std"]
+
+[dependencies]
+bitcoin_hashes = { version = "1", default-features = false }
+crc            = "3"
+rand_xoshiro   = "0.8"
+thiserror      = { version = "2", default-features = false }
+dcbor          = { version = "0.25", optional = true, default-features = false, features = ["std", "multithreaded"] }
+
+[dev-dependencies]
+criterion  = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
+hex        = { workspace = true }
+minicbor   = { version = "2", features = ["alloc"] }
+serde_json = "1"
+
+[[bench]]
+name    = "bytewords"
+harness = false
+
+[[bench]]
+name    = "fountain"
+harness = false
+
+[[bench]]
+name    = "ur_roundtrip"
+harness = false
+
+[lints]
+workspace = true

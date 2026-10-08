@@ -39,7 +39,17 @@ const config: UserConfig = defineConfig({
   staged: { "*": "vp check --fix" },
   fmt: {
     ...fmt,
-    ignorePatterns: [...fmt.ignorePatterns, "target/**", "bun.lock"],
+    ignorePatterns: [
+      ...fmt.ignorePatterns,
+      "target/**",
+      "bun.lock",
+      // TOML is owned by taplo (.taplo.toml, align_entries); generated vectors
+      // stay byte-frozen.
+      "**/*.toml",
+      "crates/**/tests/vectors/**",
+      "packages/ur/tests/vectors/**",
+      "fuzz/**",
+    ],
   },
   lint: merge(react, {
     // merge() concatenates arrays onto the preset's own ignorePatterns.

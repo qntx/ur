@@ -14,7 +14,7 @@
   ],
   "type": "module",
   "scripts": {
-    "lint": "vp check",
+    "lint": "vp check && taplo fmt --check",
     "typecheck": "vp run -r typecheck && tsc --noEmit",
     "build": "vp run -r build",
     "test": "vp run -r test",
@@ -25,6 +25,7 @@
     "@qntx/oxfmt": "1.1.1",
     "@qntx/oxlint": "1.1.1",
     "@qntx/tsconfig": "1.0.1",
+    "@taplo/cli": "0.7.0",
     "@types/node": "26.6.3",
     "typescript": "7.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",

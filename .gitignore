@@ -15,3 +15,9 @@ dist
 
 # Hermes smoke bundle (built by packages/ur/scripts/hermes-smoke.ts)
 .hermes-smoke.iife.js
+
+# Rust
+/target
+/fuzz/target
+/fuzz/artifacts
+/fuzz/coverage
