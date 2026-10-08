@@ -727,7 +727,7 @@ mod tests {
     fn testdata_lines(raw: &str) -> Vec<&str> {
         raw.lines()
             .map(str::trim)
-            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .filter(|line| !line.is_empty())
             .collect()
     }
 
@@ -854,9 +854,10 @@ mod tests {
         let checksum = crc32::checksum(&message);
         let fl = fragment_length(message.len(), 100);
         let fragments = partition(message, fl);
-        let expected: Vec<Vec<usize>> = testdata_lines(include_str!(
-            "../../tests/vectors/ur_rs_choose_fragments.txt"
-        ))
+        let expected: Vec<Vec<usize>> = testdata_lines(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../vectors/ur-rs/choose-fragments.txt"
+        )))
         .into_iter()
         .map(|line| {
             line.split(',')
@@ -880,8 +881,10 @@ mod tests {
         let message = make_message("Wolf", 1024);
         let fl = fragment_length(message.len(), 100);
         let fragments = partition(message.clone(), fl);
-        let expected_fragments =
-            testdata_lines(include_str!("../../tests/vectors/wolf256_fragments.hex"));
+        let expected_fragments = testdata_lines(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../vectors/ur-rs/wolf256-fragments.hex"
+        )));
         assert_eq!(fragments.len(), expected_fragments.len());
         for (fragment, expected) in fragments.iter().zip(expected_fragments.iter()) {
             assert_eq!(hex::encode(fragment), *expected);

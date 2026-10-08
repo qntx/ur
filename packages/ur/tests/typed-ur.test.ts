@@ -1,20 +1,13 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { CborError, cbor, cborEquals, encodeCbor, taggedValue } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
 
 import { Ur, UrError, UrType } from "../src/typed/index.ts";
 import { Encoder, encode } from "../src/ur/index.ts";
+import { vectorJson } from "./vectors.ts";
 
-const L4 = JSON.parse(
-  readFileSync(join(import.meta.dirname, "vectors/l4-test-array.json"), "utf8"),
-) as {
-  type: string;
-  cborHex: string;
-  uri: string;
-  uriUpper: string;
-};
+const L4 = vectorJson<{ type: string; cborHex: string; uri: string; uriUpper: string }>(
+  "typed/test-array.json",
+);
 
 function errorOf(fn: () => void): UrError {
   try {

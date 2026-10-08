@@ -24,7 +24,9 @@ apps/website/   playground website
 crates/bcur/    bcur — no_std + alloc Rust UR transport and typed dCBOR layer
 crates/bcur-cli/  bcur-cli — `bcur` CLI encoder/decoder with terminal QR output
 fuzz/           libFuzzer targets for bcur (separate workspace, nightly)
-scripts/vectors/  test-vector maintenance (extract-published-urs.sh)
+vectors/        shared golden data consumed by both languages (see vectors/README.md)
+parity.json     capability ledger: every shared capability and the vectors/tests behind it
+scripts/        repository checks (version lockstep, crate layers, parity) and vector maintenance
 ```
 
 ## Local gate
@@ -32,13 +34,28 @@ scripts/vectors/  test-vector maintenance (extract-published-urs.sh)
 Run before opening a pull request:
 
 ```bash
-bun run lint && bun run typecheck && bun run test   # lint includes taplo fmt --check
+bun run lint && bun run typecheck && bun run test   # lint includes taplo, version,
+                                                    # layer and parity checks
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo clippy --workspace --all-targets --no-default-features -- -D warnings
 cargo test --workspace --all-features
 cargo deny check
 ```
+
+## Versioning and release
+
+`@qntx/ur`, `bcur`, and `bcur-cli` share one lockstep version. `bun run release`
+runs `bumpp` (`bump.config.ts`), which bumps `packages/ur/package.json` and the
+Cargo workspace version together, refreshes `Cargo.lock`, and opens a
+`release/v<version>` pull request. `scripts/check-version.ts` (part of `bun run
+lint`) guards against drift: every published package version must equal
+`[workspace.package].version`, internal path dependencies must pin `=<version>`,
+and the version string may appear nowhere else in `Cargo.toml`.
+
+After the release PR merges, tag the merge commit `v*.*.*` and push it by hand;
+one tag publishes npm (`@qntx/ur`), crates.io (`bcur`, `bcur-cli`), and the
+GitHub Release (`bcur` binaries).
 
 ## Commits
 

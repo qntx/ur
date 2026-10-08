@@ -1,7 +1,8 @@
 # Third-Party Notices
 
-Test vectors and golden data under `packages/ur/tests/` and `crates/bcur/tests/` derive from the
-projects below. Their license texts are reproduced verbatim.
+Test vectors and golden data under `vectors/` derive from the projects below and are shared by the
+TypeScript (`packages/ur/tests/`) and Rust (`crates/bcur/tests/`, `crates/bcur/src/`) test suites.
+Their license texts are reproduced verbatim.
 
 ## ur-rs
 
@@ -10,13 +11,10 @@ projects below. Their license texts are reproduced verbatim.
 - Used by:
   - `packages/ur/tests/interop-ur-rs.test.ts` — interop vectors derived from ur-rs 0.5 tests
   - `packages/ur/tests/ur.test.ts` — single-part UR goldens and message helper semantics from ur-rs tests
-  - `packages/ur/tests/vectors/fountain-mixed.txt` — ur-rs `test_ur_encoder` goldens
-  - `packages/ur/tests/vectors/published-singles.txt` — ur-rs published single-part UR goldens
-  - `crates/bcur/tests/vectors/ur_rs_multipart_20.txt` — ur-rs multipart UR goldens
-  - `crates/bcur/tests/vectors/wolf256_fragments.hex` — ur-rs fountain partition hex
-  - `crates/bcur/tests/vectors/ur_rs_choose_fragments.txt` — ur-rs `choose_fragments` tables
+  - `vectors/ur-rs/multipart-20.txt` — ur-rs `test_ur_encoder` multipart UR goldens
+  - `vectors/ur-rs/wolf256-fragments.hex` — ur-rs fountain partition hex
+  - `vectors/ur-rs/choose-fragments.txt` — ur-rs `choose_fragments` tables
   - `crates/bcur/tests/interop_ur_rs.rs` — crypto-request CBOR fixture and RNG sequences derived from ur-rs tests
-  - `crates/bcur/tests/vectors/contract/` — copies of the shared `fountain-mixed.txt` and `published-singles.txt` contract vectors
 
 bcur reimplements the ur-rs algorithms; it does not vendor ur-rs source modules.
 
@@ -48,7 +46,7 @@ SOFTWARE.
 
 - Repository: <https://github.com/qntx/bcur>
 - License: MIT OR Apache-2.0
-- Used by: `crates/bcur/` and `crates/bcur-cli/` — imported into this repository at b2c1fb1; `packages/ur/tests/vectors/` is a byte-identical copy of `crates/bcur/tests/vectors/contract/`, consumed by `packages/ur/tests/contract.test.ts` and other vector-driven tests
+- Used by: `crates/bcur/` and `crates/bcur-cli/` — imported into this repository at b2c1fb1; the shared vectors under `vectors/` are consumed by `packages/ur/tests/contract.test.ts` and other vector-driven tests in both languages
 
 ```text
 MIT License
@@ -284,9 +282,9 @@ SOFTWARE.
 - License: BSD-2-Clause Plus Patent
 - Used by:
   - `packages/ur/tests/ur.test.ts` — "bc-ur example array" (`ur:test/lsadaoaxjygonesw`)
-  - `packages/ur/tests/interop-ur-rs.test.ts` — "bc-ur golden: ur:test array" via `vectors/l4-test-array.json`
-  - `crates/bcur/tests/vectors/published_single.txt` — published single-part UR examples from BCR papers and bc-ur documentation (`ur:test/lsadaoaxjygonesw`, `ur:bytes/iehsjyhspmwfwfia`, the Wolf/50 `ur:bytes` example)
-  - `crates/bcur/tests/vectors/published_from_refs.txt` — sorted unique `ur:…` string literals quoted from pinned URKit and bc-ur test files; drift detection only, not BCR-2020-005 compliance. Regenerate with `scripts/vectors/extract-published-urs.sh`
+  - `packages/ur/tests/interop-ur-rs.test.ts` — "bc-ur golden: ur:test array" via `vectors/typed/test-array.json`
+  - `vectors/ur/published-singles.txt` — published single-part UR examples from BCR papers and bc-ur documentation (`ur:test/lsadaoaxjygonesw`, `ur:bytes/iehsjyhspmwfwfia`, the Wolf/50 `ur:bytes` example)
+  - `vectors/official/published-from-refs.txt` — sorted unique `ur:…` string literals quoted from pinned URKit and bc-ur test files; drift detection only, not BCR-2020-005 compliance. Regenerate with `scripts/vectors/extract-published-urs.sh`
   - `crates/bcur/src/bytewords/mod.rs` — the Standard-style bytewords phrase `able acid also lava zoom…` golden
 
 This repository does **not** contain source from [URKit](https://github.com/BlockchainCommons/URKit),

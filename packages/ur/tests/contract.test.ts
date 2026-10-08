@@ -1,10 +1,7 @@
 /**
- * Canonical contract vectors for ur.js + bcur sister interop. Files in tests/vectors/ are a
- * byte-identical copy of bcur crates/bcur/tests/vectors/contract/.
+ * TypeScript/Rust parity contract vectors, read from the repository-root vectors/ tree. Rust
+ * mirror: crates/bcur/tests/contract.rs.
  */
-
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
@@ -22,23 +19,7 @@ import {
   encode,
 } from "../src/index.ts";
 import { MultipartDecoder, Ur } from "../src/typed/index.ts";
-
-const VECTORS = join(import.meta.dirname, "vectors");
-
-function readVector(name: string): string {
-  return readFileSync(join(VECTORS, name), "utf8");
-}
-
-function jsonVector(name: string): unknown {
-  return JSON.parse(readVector(name));
-}
-
-function dataLines(raw: string): string[] {
-  return raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-}
+import { vectorJson, vectorLines, vectorText } from "./vectors.ts";
 
 function assertLineFile(raw: string): void {
   expect(raw.endsWith("\n")).toBe(true);
@@ -131,17 +112,8 @@ type PoisonSpec = {
   notPoison: string[];
 };
 
-test("readme is canonical paragraph", () => {
-  const readme = readVector("README.md");
-  expect(readme).toContain("ur.js");
-  expect(readme).toContain("bcur");
-  expect(readme).toContain("implementation bug");
-  expect(readme).toContain("THIRD_PARTY.md");
-  expect(readme).toContain("data-only");
-});
-
 test("bytewords contract", () => {
-  const spec = jsonVector("bytewords.json") as BytewordsSpec;
+  const spec = vectorJson<BytewordsSpec>("bytewords/contract.json");
   const input = new Uint8Array(Buffer.from(spec.inputHex, "hex"));
   expect(bytewords.encode(input, "standard")).toBe(spec.standard);
   expect(bytewords.encode(input, "uri")).toBe(spec.uri);
@@ -152,7 +124,7 @@ test("bytewords contract", () => {
 });
 
 test("part cbor contract", () => {
-  const spec = jsonVector("part-cbor.json") as PartCborSpec;
+  const spec = vectorJson<PartCborSpec>("fountain/part-cbor.json");
   const part = Part.fromCbor(new Uint8Array(Buffer.from(spec.cborHex, "hex")));
   expect(part.sequence).toBe(spec.sequence);
   expect(part.sequenceCount).toBe(spec.sequenceCount);
@@ -168,7 +140,7 @@ test("part cbor contract", () => {
 });
 
 test("k1 contract", () => {
-  const spec = jsonVector("k1.json") as K1Spec;
+  const spec = vectorJson<K1Spec>("ur/k1.json");
   const payload = new TextEncoder().encode(spec.payloadUtf8);
   const urType = UrType.parse(spec.type);
   const encoder = Encoder.create(payload, 64, urType);
@@ -189,7 +161,7 @@ test("k1 contract", () => {
 });
 
 test("l4 test array contract", () => {
-  const spec = jsonVector("l4-test-array.json") as L4Spec;
+  const spec = vectorJson<L4Spec>("typed/test-array.json");
   const cborBytes = new Uint8Array(Buffer.from(spec.cborHex, "hex"));
   const urType = UrType.parse(spec.type);
   expect(encode(cborBytes, urType)).toBe(spec.uri);
@@ -200,7 +172,7 @@ test("l4 test array contract", () => {
 });
 
 test("decoder limits contract", () => {
-  const spec = jsonVector("decoder-limits.json") as LimitsSpec;
+  const spec = vectorJson<LimitsSpec>("limits/defaults.json");
   expect(DEFAULT_LIMITS.maxMessageLength).toBe(spec.maxMessageLength);
   expect(DEFAULT_LIMITS.maxFragmentCount).toBe(spec.maxFragmentCount);
   expect(DEFAULT_LIMITS.maxFragmentDataLength).toBe(spec.maxFragmentDataLength);
@@ -210,9 +182,9 @@ test("decoder limits contract", () => {
 });
 
 test("poison maps via limit string", () => {
-  const raw = readVector("poison.json");
+  const raw = vectorText("limits/poison.json");
   expect(raw).not.toContain("DecoderState");
-  const spec = jsonVector("poison.json") as PoisonSpec;
+  const spec = vectorJson<PoisonSpec>("limits/poison.json");
   expect(spec.limits).toStrictEqual([
     { limit: "uri_len", rust: "UriLen", sessionPoison: true },
     { limit: "fragment_count", rust: "FragmentCount", sessionPoison: true },
@@ -230,7 +202,7 @@ test("poison maps via limit string", () => {
 });
 
 test("poison receive and message same code", () => {
-  const spec = jsonVector("poison.json") as PoisonSpec;
+  const spec = vectorJson<PoisonSpec>("limits/poison.json");
   expect(spec.receiveAndMessageSameCode).toStrictEqual(["uri_len", "fragment_count"]);
 
   const uriEncoder = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(8)), 5);
@@ -244,7 +216,7 @@ test("poison receive and message same code", () => {
 });
 
 test("poison not-poison errors", () => {
-  const spec = jsonVector("poison.json") as PoisonSpec;
+  const spec = vectorJson<PoisonSpec>("limits/poison.json");
   expect(spec.notPoison).toStrictEqual(["UnexpectedType", "CborDecode"]);
 
   const data = new TextEncoder().encode("Ten chars!".repeat(6));
@@ -264,10 +236,10 @@ test("poison not-poison errors", () => {
   expect(typed.isPoisoned).toBe(false);
 });
 
-test("fountain mixed contract", () => {
-  const mixed = readVector("fountain-mixed.txt");
+test("multipart 20 contract", () => {
+  const mixed = vectorText("ur-rs/multipart-20.txt");
   assertLineFile(mixed);
-  const uris = dataLines(mixed);
+  const uris = vectorLines("ur-rs/multipart-20.txt");
   expect(uris).toHaveLength(20);
   const decoder = new Decoder();
   for (const uri of uris) {
@@ -281,9 +253,9 @@ test("fountain mixed contract", () => {
 });
 
 test("published singles contract", () => {
-  const raw = readVector("published-singles.txt");
+  const raw = vectorText("ur/published-singles.txt");
   assertLineFile(raw);
-  const uris = dataLines(raw);
+  const uris = vectorLines("ur/published-singles.txt");
   expect(uris).toHaveLength(3);
   for (const uri of uris) {
     expect(decode(uri).kind).toBe("single");

@@ -1,14 +1,12 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { expect, test } from "vite-plus/test";
 
 import { canonicalizeByteword, decode, encode, encodeRaw } from "../src/bytewords/index.ts";
 import { UrError } from "../src/error.ts";
+import { vectorJson } from "./vectors.ts";
 
-const BYTEWORDS = JSON.parse(
-  readFileSync(join(import.meta.dirname, "vectors/bytewords.json"), "utf8"),
-) as { inputHex: string; standard: string; uri: string; minimal: string };
+const BYTEWORDS = vectorJson<{ inputHex: string; standard: string; uri: string; minimal: string }>(
+  "bytewords/contract.json",
+);
 
 test("bytewords styles and roundtrip", () => {
   const input = new Uint8Array(Buffer.from(BYTEWORDS.inputHex, "hex"));

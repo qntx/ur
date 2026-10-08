@@ -580,7 +580,7 @@ mod tests {
     fn testdata_lines(raw: &str) -> Vec<&str> {
         raw.lines()
             .map(str::trim)
-            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .filter(|line| !line.is_empty())
             .collect()
     }
 
@@ -599,7 +599,10 @@ mod tests {
         // Full 20-URI table from ur-rs 0.5 `test_ur_encoder` (MIT).
         let ur = make_message_ur(256, "Wolf");
         let mut encoder = Encoder::bytes(&ur, 30).unwrap();
-        let expected = testdata_lines(include_str!("../../tests/vectors/ur_rs_multipart_20.txt"));
+        let expected = testdata_lines(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../vectors/ur-rs/multipart-20.txt"
+        )));
         assert_eq!(expected.len(), 20);
         assert_eq!(encoder.fragment_count(), 9);
         for (index, e) in expected.into_iter().enumerate() {

@@ -12,6 +12,8 @@ keywords               = ["ur", "bytewords", "fountain", "cbor", "qr"]
 categories             = ["encoding", "cryptography", "no-std"]
 readme                 = "README.md"
 documentation          = "https://docs.rs/bcur"
+# Tests live outside the package: they read the repository-root vectors/ tree.
+include = ["src/**/*", "benches/**/*", "examples/**/*", "README.md"]
 
 [package.metadata.docs.rs]
 all-features = true

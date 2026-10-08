@@ -10,37 +10,47 @@
 //! Integration interop checks against ur-rs 0.5 public vectors.
 //!
 //! Vector tables originate from ur-rs 0.5.x (MIT); see repository-root
-//! `THIRD_PARTY.md` and `tests/vectors/` (goldens only; no `URKit` / `bc-ur`
+//! `THIRD_PARTY.md` and `vectors/` (goldens only; no `URKit` / `bc-ur`
 //! source).
 
 use std::collections::BTreeSet;
 
 use bcur::{Decoder, Encoder, Kind, UrType, decode, encode};
 
+macro_rules! vector {
+    ($path:literal) => {
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../vectors/",
+            $path
+        ))
+    };
+}
+
 fn testdata_lines(raw: &str) -> Vec<&str> {
     raw.lines()
         .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .filter(|line| !line.is_empty())
         .collect()
 }
 
 fn multipart_20() -> Vec<&'static str> {
-    testdata_lines(include_str!("vectors/ur_rs_multipart_20.txt"))
+    testdata_lines(vector!("ur-rs/multipart-20.txt"))
 }
 
 fn published_singles() -> Vec<&'static str> {
-    testdata_lines(include_str!("vectors/published_single.txt"))
+    testdata_lines(vector!("ur/published-singles.txt"))
 }
 
 fn published_from_refs() -> Vec<&'static str> {
-    testdata_lines(include_str!("vectors/published_from_refs.txt"))
+    testdata_lines(vector!("official/published-from-refs.txt"))
 }
 
 fn published_single_containing(needle: &str) -> &'static str {
     published_singles()
         .into_iter()
         .find(|uri| uri.contains(needle))
-        .expect("published_single.txt missing expected UR")
+        .expect("published-singles.txt missing expected UR")
 }
 
 #[test]
@@ -123,47 +133,47 @@ fn multipart_roundtrip_lossy_channel() {
     assert_eq!(decoder.message().unwrap().as_deref(), Some(data.as_slice()));
 }
 
-/// `published_from_refs.txt` is the pinned extract of quoted `ur:` literals.
+/// `published-from-refs.txt` is the pinned extract of quoted `ur:` literals.
 /// It must contain the 20-URI table and every in-tree published single that
 /// the pinned files actually quote.
 #[test]
 fn published_from_refs_contains_multipart_and_in_tree_singles() {
     let refs: BTreeSet<&str> = published_from_refs().into_iter().collect();
     let multipart = multipart_20();
-    assert_eq!(multipart.len(), 20, "ur_rs_multipart_20.txt");
+    assert_eq!(multipart.len(), 20, "multipart-20.txt");
     for uri in &multipart {
         assert!(
             refs.contains(uri),
-            "published_from_refs.txt missing multipart {uri}"
+            "published-from-refs.txt missing multipart {uri}"
         );
     }
 
     let singles = published_singles();
     assert!(
         singles.contains(&"ur:test/lsadaoaxjygonesw"),
-        "published_single.txt missing lsadaoaxjygonesw"
+        "published-singles.txt missing lsadaoaxjygonesw"
     );
     assert!(
         singles.contains(&"ur:bytes/iehsjyhspmwfwfia"),
-        "published_single.txt missing iehsjyhspmwfwfia"
+        "published-singles.txt missing iehsjyhspmwfwfia"
     );
     let wolf = published_single_containing("hdeymejtswhh");
     assert!(
         singles.contains(&wolf),
-        "published_single.txt missing wolf 50-byte"
+        "published-singles.txt missing wolf 50-byte"
     );
     // Only the Wolf/50 single is a quoted literal in the pinned URKit / bc-ur
     // files. The other two are BCR / docs examples; do not union them into
     // the allowlist or the weekly exact-set diff goes red.
     assert!(
         refs.contains(wolf),
-        "published_from_refs.txt missing wolf 50-byte {wolf}"
+        "published-from-refs.txt missing wolf 50-byte {wolf}"
     );
 
     let raw = published_from_refs();
     let sorted_unique = raw.iter().zip(raw.iter().skip(1)).all(|(a, b)| a < b);
     assert!(
         sorted_unique,
-        "published_from_refs.txt must be sorted unique"
+        "published-from-refs.txt must be sorted unique"
     );
 }

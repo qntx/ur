@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { expect, test } from "vite-plus/test";
 
 import { checksum } from "../src/crc32.ts";
@@ -15,17 +12,16 @@ import {
   partition,
 } from "../src/fountain/index.ts";
 import { makeMessage } from "../src/rng/index.ts";
+import { vectorJson, vectorLines } from "./vectors.ts";
 
-const PART_CBOR = JSON.parse(
-  readFileSync(join(import.meta.dirname, "vectors/part-cbor.json"), "utf8"),
-) as {
+const PART_CBOR = vectorJson<{
   sequence: number;
   sequenceCount: number;
   messageLength: number;
   checksum: number;
   dataHex: string;
   cborHex: string;
-};
+}>("fountain/part-cbor.json");
 
 function hex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
@@ -120,31 +116,41 @@ test("skip fragments", () => {
 });
 
 test("choose_fragments", () => {
+  // ur-rs 0.5 test_choose_fragments table (sorted indexes, seq 1..=30).
   const message = makeMessage("Wolf", 1024);
   const cs = checksum(message);
   const fl = fragmentLength(message.length, 100);
   const fragments = partition(message, fl);
-  const expected = [
-    [0],
-    [1],
-    [2],
-    [3],
-    [4],
-    [5],
-    [6],
-    [7],
-    [8],
-    [9],
-    [10],
-    [9],
-    [2, 5, 6, 8, 9, 10],
-    [8],
-    [1, 5],
-  ];
+  const expected = vectorLines("ur-rs/choose-fragments.txt").map((line) =>
+    line
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .map(Number),
+  );
+  expect(expected).toHaveLength(30);
   for (let i = 0; i < expected.length; i++) {
     const indexes = chooseFragments(i + 1, fragments.length, cs).toSorted((a, b) => a - b);
     expect(indexes).toStrictEqual(expected[i]);
   }
+});
+
+test("ur-rs partition and join hex", () => {
+  // ur-rs 0.5 test_partition_and_join: Wolf/1024 message at max fragment 100.
+  const message = makeMessage("Wolf", 1024);
+  const fragments = partition(message, fragmentLength(message.length, 100));
+  const expected = vectorLines("ur-rs/wolf256-fragments.hex");
+  expect(fragments).toHaveLength(expected.length);
+  for (const [i, fragment] of fragments.entries()) {
+    expect(hex(fragment)).toBe(expected[i]);
+  }
+  const rejoined = new Uint8Array(fragments.reduce((n, f) => n + f.length, 0));
+  let offset = 0;
+  for (const fragment of fragments) {
+    rejoined.set(fragment, offset);
+    offset += fragment.length;
+  }
+  expect(rejoined.subarray(0, message.length)).toStrictEqual(message);
 });
 
 test("inconsistent part rejected", () => {

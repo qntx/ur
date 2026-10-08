@@ -2,6 +2,9 @@
 # Extract quoted `ur:…` literals from pinned URKit / bc-ur test files.
 # Drift detection only — not BCR-2020-005 compliance. Prints sorted unique
 # strings to stdout. Do not vendor the fetched sources.
+#
+# Canonical output file: vectors/official/published-from-refs.txt
+#   scripts/vectors/extract-published-urs.sh > vectors/official/published-from-refs.txt
 set -euo pipefail
 
 : "${URKIT_REPO:=BlockchainCommons/URKit}"
