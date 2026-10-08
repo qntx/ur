@@ -43,12 +43,12 @@ bcur qr parts.txt
 
 ## Defaults
 
-| Flag | Default | Role |
-|------|---------|------|
-| `--type` | none (required) | Type token |
-| `--max-chars` | `400` text / terminal-derived with `--qr` | Single vs fountain; fragment sizing |
-| `--interval-ms` | `200` | Animated QR frame time |
-| QR ECC | Quartile (Q) | Screen scan robustness |
+| Flag            | Default                                   | Role                                |
+| --------------- | ----------------------------------------- | ----------------------------------- |
+| `--type`        | none (required)                           | Type token                          |
+| `--max-chars`   | `400` text / terminal-derived with `--qr` | Single vs fountain; fragment sizing |
+| `--interval-ms` | `200`                                     | Animated QR frame time              |
+| QR ECC          | Quartile (Q)                              | Screen scan robustness              |
 
 `--max-fragment` overrides the auto fragment size. Text fountain output emits `max(3K, 20)` parts unless `--count` is set.
 

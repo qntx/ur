@@ -1,12 +1,10 @@
 <!-- markdownlint-disable MD033 MD041 -->
 
-# ur.js
+# ur
 
-Bun workspace. `packages/ur` publishes [`@qntx/ur`](https://www.npmjs.com/package/@qntx/ur).
+[Uniform Resources](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-005-ur.md) for TypeScript and Rust: [`@qntx/ur`](https://www.npmjs.com/package/@qntx/ur) (npm, `packages/ur`) and [`bcur`](https://crates.io/crates/bcur) / [`bcur-cli`](https://crates.io/crates/bcur-cli) (crates.io, `crates/`).
 
-Bytewords, fountain codes, and single- or multi-part UR strings. Transport-only at the root export; typed dCBOR is `@qntx/ur/typed`. Wire-compatible with [bcur](https://github.com/qntx/bcur).
-
-See [docs/](docs/).
+Changes are tracked in [CHANGELOG.md](CHANGELOG.md); contributor invariants and the local gate live in [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

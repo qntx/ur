@@ -86,7 +86,7 @@ pub fn decode(encoded: &str, style: Style) -> Result<Vec<u8>> {
 }
 
 fn decode_minimal(encoded: &str) -> Result<Vec<u8>> {
-    if encoded.len() % 2 != 0 {
+    if !encoded.len().is_multiple_of(2) {
         return Err(Error::InvalidBytewordsLength);
     }
     let parts = (0..encoded.len())

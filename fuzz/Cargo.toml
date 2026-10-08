@@ -1,5 +1,5 @@
 [package]
-name = "bcur-fuzz"
+name    = "bcur-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2024"
@@ -18,29 +18,29 @@ path = "../crates/bcur"
 members = ["."]
 
 [[bin]]
-name = "decode_ur"
-path = "fuzz_targets/decode_ur.rs"
-test = false
-doc = false
+name  = "decode_ur"
+path  = "fuzz_targets/decode_ur.rs"
+test  = false
+doc   = false
 bench = false
 
 [[bin]]
-name = "fountain_part"
-path = "fuzz_targets/fountain_part.rs"
-test = false
-doc = false
+name  = "fountain_part"
+path  = "fuzz_targets/fountain_part.rs"
+test  = false
+doc   = false
 bench = false
 
 [[bin]]
-name = "bytewords"
-path = "fuzz_targets/bytewords.rs"
-test = false
-doc = false
+name  = "bytewords"
+path  = "fuzz_targets/bytewords.rs"
+test  = false
+doc   = false
 bench = false
 
 [[bin]]
-name = "encode_roundtrip"
-path = "fuzz_targets/encode_roundtrip.rs"
-test = false
-doc = false
+name  = "encode_roundtrip"
+path  = "fuzz_targets/encode_roundtrip.rs"
+test  = false
+doc   = false
 bench = false

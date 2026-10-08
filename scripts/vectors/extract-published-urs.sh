@@ -12,7 +12,7 @@ set -euo pipefail
 : "${BCUR_CPP_REF:=4479fb81b2350ae8bafa042a5572b9c64c2c32ca}"
 : "${BCUR_CPP_TESTS:=test/test.cpp}"
 
-USER_AGENT="bcur-vector-extract/0.3 (+https://github.com/qntx/bcur)"
+USER_AGENT="bcur-vector-extract/0.3 (+https://github.com/qntx/ur)"
 
 fetch_raw() {
   local repo="$1" path="$2" ref="$3" dest="$4"
@@ -32,11 +32,11 @@ tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 fetch_raw "$URKIT_REPO" "$URKIT_UR_TESTS" "$URKIT_REF" "$tmpdir/urkit_ur.swift" \
-  || { echo "extract_published_urs: failed to fetch ${URKIT_REPO} ${URKIT_UR_TESTS} @ ${URKIT_REF}" >&2; exit 1; }
+  || { echo "extract-published-urs: failed to fetch ${URKIT_REPO} ${URKIT_UR_TESTS} @ ${URKIT_REF}" >&2; exit 1; }
 fetch_raw "$URKIT_REPO" "$URKIT_FOUNTAIN_TESTS" "$URKIT_REF" "$tmpdir/urkit_fountain.swift" \
-  || { echo "extract_published_urs: failed to fetch ${URKIT_REPO} ${URKIT_FOUNTAIN_TESTS} @ ${URKIT_REF}" >&2; exit 1; }
+  || { echo "extract-published-urs: failed to fetch ${URKIT_REPO} ${URKIT_FOUNTAIN_TESTS} @ ${URKIT_REF}" >&2; exit 1; }
 fetch_raw "$BCUR_CPP_REPO" "$BCUR_CPP_TESTS" "$BCUR_CPP_REF" "$tmpdir/bcur_test.cpp" \
-  || { echo "extract_published_urs: failed to fetch ${BCUR_CPP_REPO} ${BCUR_CPP_TESTS} @ ${BCUR_CPP_REF}" >&2; exit 1; }
+  || { echo "extract-published-urs: failed to fetch ${BCUR_CPP_REPO} ${BCUR_CPP_TESTS} @ ${BCUR_CPP_REF}" >&2; exit 1; }
 
 # Quoted literals only (`"ur:type/…"` / Swift `"""ur:type/…"""`).
 # Bare `ur:` hits comments and concatenations.

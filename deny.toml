@@ -1,37 +1,42 @@
-# cargo-deny configuration for bcur
+# cargo-deny configuration for the bcur workspace.
+#
+# Run with `cargo deny check` to enforce supply-chain hygiene:
+# - advisories: every transitive dependency must be free of known CVEs
+# - bans:       the workspace ships exactly one version of every crate
+# - licenses:   only permissive licenses are allowed
+# - sources:    only crates.io is trusted
 
 [graph]
-all-features = true
+all-features        = true
+no-default-features = false
+
+[output]
+feature-depth = 1
 
 [advisories]
-version = 2
-yanked = "warn"
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked  = "deny"
 # `dcbor` transitively depends on unmaintained `paste` (RUSTSEC-2024-0436).
 # Ignore until upstream switches; do not expand ignore list casually.
-ignore = [
-    { id = "RUSTSEC-2024-0436", reason = "transitive via optional dcbor (unmaintained paste); drop when dcbor replaces it" },
-]
+ignore = [{ id = "RUSTSEC-2024-0436", reason = "transitive via optional dcbor (unmaintained paste); drop when dcbor replaces it" }]
 
 [licenses]
-version = 2
-confidence-threshold = 0.8
-allow = [
-    "MIT",
-    "Apache-2.0",
-    "BSD-2-Clause",
-    "BSD-3-Clause",
-    "BSD-2-Clause-Patent",
-    "CC0-1.0",
-    "Unicode-3.0",
-    "Zlib",
-    "BlueOak-1.0.0",
-]
+allow                = ["MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-2-Clause-Patent", "Unicode-3.0", "Zlib", "CC0-1.0"]
+confidence-threshold = 0.93
+exceptions           = []
 
 [bans]
 multiple-versions = "warn"
-wildcards = "allow"
+wildcards         = "deny"
+highlight         = "all"
+allow             = []
+deny              = []
+skip              = []
+skip-tree         = []
 
 [sources]
 unknown-registry = "deny"
-unknown-git = "deny"
-allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+unknown-git      = "deny"
+allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
+allow-git        = []

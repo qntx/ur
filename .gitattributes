@@ -13,7 +13,8 @@
 *.json  text
 *.yaml  text
 *.yml   text
-*.toml  text
+*.toml  text diff=toml
+*.rs    text diff=rust
 *.md    text
 *.txt   text
 

@@ -418,21 +418,21 @@ impl Decoder {
     }
 
     fn check_type(&self, ur_type: &UrType) -> Result<()> {
-        if let Some(ref expected) = self.expected_type {
-            if ur_type != expected {
-                return Err(Error::UnexpectedType {
-                    expected: String::from(expected.as_str()),
-                    found: String::from(ur_type.as_str()),
-                });
-            }
+        if let Some(ref expected) = self.expected_type
+            && ur_type != expected
+        {
+            return Err(Error::UnexpectedType {
+                expected: String::from(expected.as_str()),
+                found: String::from(ur_type.as_str()),
+            });
         }
-        if let Some(ref seen) = self.seen_type {
-            if ur_type != seen {
-                return Err(Error::UnexpectedType {
-                    expected: String::from(seen.as_str()),
-                    found: String::from(ur_type.as_str()),
-                });
-            }
+        if let Some(ref seen) = self.seen_type
+            && ur_type != seen
+        {
+            return Err(Error::UnexpectedType {
+                expected: String::from(seen.as_str()),
+                found: String::from(ur_type.as_str()),
+            });
         }
         Ok(())
     }
@@ -885,7 +885,7 @@ mod tests {
         let ur = encode(&[], &UrType::bytes());
         let (kind, payload) = decode(&ur).unwrap();
         assert_eq!(kind, Kind::SinglePart);
-        assert!(payload.is_empty());
+        assert_eq!(payload, Vec::<u8>::new());
     }
 
     #[test]
