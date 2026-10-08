@@ -28,6 +28,9 @@ jobs:
     with:
       # rust-version omitted: rust-toolchain.toml pins the toolchain.
       deny: true
+      # rustdoc runs with all features, matching docs.rs
+      # ([package.metadata.docs.rs] all-features = true).
+      doc: true
 
   rust-minimal:
     uses: qntx/workflows/.github/workflows/ci-rust.yml@v2
@@ -35,7 +38,6 @@ jobs:
       contents: read
     with:
       features: --no-default-features
-      doc: true
       package-check: true
 
   portable:
