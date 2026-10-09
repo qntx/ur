@@ -452,27 +452,62 @@ fn payload_of(case: &Value) -> Vec<u8> {
 }
 
 #[test]
+fn official_bytemoji_table() {
+    let doc = vdoc!("official/bytemoji.json");
+    for case in doc["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        if let Some(table) = case["table"].as_str() {
+            assert_eq!(
+                crate::constants::BYTEMOJIS.concat(),
+                table,
+                "{name}: BYTEMOJIS table vs BCR-2024-008 reference string"
+            );
+            continue;
+        }
+        let digest: [u8; 4] = hex::decode(case["digestHex"].as_str().unwrap())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        assert_eq!(
+            crate::bytemoji::identifier(digest),
+            case["bytemojis"].as_str().unwrap(),
+            "{name}"
+        );
+    }
+}
+
+#[test]
 fn official_ur_single() {
     let doc = vdoc!("official/ur/single.json");
     for case in doc["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
         let ur = case["ur"].as_str().unwrap();
         let ur_type = crate::ur::UrType::new(case["urType"].as_str().unwrap()).unwrap();
-        let parsed = crate::ur::parse(ur).unwrap();
-        assert_eq!(parsed.ur_type, ur_type, "{name}");
+        let parsed = crate::ur::parse(ur, &crate::fountain::DecoderLimits::default()).unwrap();
         if case["kind"].as_str() == Some("multi") {
-            assert_eq!(parsed.kind, crate::ur::Kind::MultiPart, "{name}");
+            let crate::ur::ParsedUr::Multi {
+                ur_type: parsed_type,
+                part,
+            } = parsed
+            else {
+                panic!("{name}: expected multi");
+            };
+            assert_eq!(parsed_type, ur_type, "{name}");
             let seq = case["seqNum"].as_u64().unwrap() as u32;
             let count = case["seqLen"].as_u64().unwrap() as u32;
-            assert_eq!(parsed.indices, Some((seq, count)), "{name}");
-            let (kind, payload) = crate::ur::decode(ur).unwrap();
-            assert_eq!(kind, crate::ur::Kind::MultiPart, "{name}");
-            assert!(!payload.is_empty(), "{name}");
+            assert_eq!(part.sequence(), seq, "{name}");
+            assert_eq!(part.sequence_count(), count, "{name}");
         } else {
-            assert_eq!(parsed.kind, crate::ur::Kind::SinglePart, "{name}");
-            let payload = crate::ur::decode_message(ur).unwrap();
+            let crate::ur::ParsedUr::Single {
+                ur_type: parsed_type,
+                message,
+            } = parsed
+            else {
+                panic!("{name}: expected single");
+            };
+            assert_eq!(parsed_type, ur_type, "{name}");
             if let Some(expected) = case["cborHex"].as_str() {
-                assert_eq!(hex::encode(&payload), expected, "{name}");
+                assert_eq!(hex::encode(&message), expected, "{name}");
             }
             if case["payload"].is_object() {
                 let bstr = &case["payload"]["cborBstr"];
@@ -480,9 +515,9 @@ fn official_ur_single() {
                     bstr["seed"].as_str().unwrap(),
                     bstr["length"].as_u64().unwrap() as usize,
                 ));
-                assert_eq!(payload, expected, "{name}");
+                assert_eq!(message, expected, "{name}");
             }
-            assert_eq!(crate::ur::encode(&payload, &ur_type), ur, "{name}");
+            assert_eq!(crate::ur::encode(&ur_type, &message), ur, "{name}");
         }
     }
 }
@@ -496,13 +531,13 @@ fn official_ur_multipart() {
         let max = case["maxFragmentLength"].as_u64().unwrap() as usize;
         let payload = payload_of(case);
         let first_seq = case["firstSeqNum"].as_u64().unwrap_or(0) as u32;
-        let mut enc = crate::ur::Encoder::with_options(
+        let mut enc = crate::ur::Encoder::new(
+            ur_type,
             payload.clone(),
             crate::fountain::EncoderOptions {
                 first_sequence: first_seq,
                 ..crate::fountain::EncoderOptions::new(max)
             },
-            &ur_type,
         )
         .unwrap();
         if let Some(parts_file) = case["partsFile"].as_str() {
@@ -514,13 +549,13 @@ fn official_ur_multipart() {
                 .map(String::from)
                 .collect();
             let got: Vec<String> = (0..case["partCount"].as_u64().unwrap())
-                .map(|_| enc.next_part().unwrap())
+                .map(|_| enc.next().unwrap())
                 .collect();
             assert_eq!(got, expected, "{name}");
         } else {
             let mut dec = crate::ur::Decoder::default();
             while !matches!(dec.state(), crate::fountain::State::Complete(_)) {
-                dec.receive(&enc.next_part().unwrap()).unwrap();
+                dec.receive(&enc.next().unwrap()).unwrap();
             }
             assert_eq!(
                 dec.into_decoded().unwrap().message(),

@@ -5,7 +5,7 @@ import { UrError } from "../src/error.ts";
 import type { ReceiveResult } from "../src/fountain/index.ts";
 import { Ur } from "../src/typed/ur.ts";
 import type { DecodedUr } from "../src/ur/index.ts";
-import { Encoder, UrDecoder, UrType } from "../src/ur/index.ts";
+import { UrDecoder, UrEncoder, parseUrType } from "../src/ur/index.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
@@ -17,6 +17,14 @@ function errorOf(fn: () => void): UrError {
     throw error;
   }
   throw new Error("expected UrError");
+}
+
+function nextUr(encoder: UrEncoder): string {
+  const { done, value } = encoder.next();
+  if (done === true || value === undefined) {
+    throw new Error("ur encoder exhausted");
+  }
+  return value;
 }
 
 function frameError(result: ReceiveResult): UrError | undefined {
@@ -56,15 +64,15 @@ function largeTestUr(): Ur {
   for (let i = 0; i < bytes.length; i++) {
     bytes[i] = i & 0xff;
   }
-  return Ur.create("test", bytes);
+  return Ur.fromCbor("test", bytes);
 }
 
 test("K==1 emits single-part", () => {
-  const ur = Ur.create("test", cbor([1, 2, 3]));
+  const ur = Ur.fromCbor("test", cbor([1, 2, 3]));
   const encoder = ur.encoder({ maxFragmentLength: 64 });
   expect(encoder.isSinglePart).toBe(true);
   expect(encoder.fragmentCount).toBe(1);
-  const part = encoder.nextPart();
+  const part = nextUr(encoder);
   expect(part).not.toContain("/1-1/");
   expect(part).toBe("ur:test/lsadaoaxjygonesw");
 });
@@ -75,31 +83,31 @@ test("drop-odd-parts roundtrip same Cbor", () => {
   expect(encoder.isSinglePart).toBe(false);
   const decoder = new UrDecoder();
   while (decoder.state.phase !== "complete") {
-    feedUr(decoder, encoder.nextPart());
-    encoder.nextPart();
+    feedUr(decoder, nextUr(encoder));
+    nextUr(encoder);
   }
   const recovered = completedUr(decoder);
   expect(cborEquals(recovered.cbor, ur.cbor)).toBe(true);
-  expect(recovered.type.equals(ur.type)).toBe(true);
+  expect(recovered.type).toBe(ur.type);
 });
 
 test("accept mismatch is UnexpectedType and nonfatal", () => {
-  const ur = Ur.create("alpha", cbor([1, 2, 3]));
+  const ur = Ur.fromCbor("alpha", cbor([1, 2, 3]));
   const encoder = ur.encoder({ maxFragmentLength: 64 });
-  const decoder = new UrDecoder({ accept: [UrType.parse("beta")] });
-  const result = decoder.receive(encoder.nextPart());
+  const decoder = new UrDecoder({ accept: [parseUrType("beta")] });
+  const result = decoder.receive(nextUr(encoder));
   expect(result.status).toBe("rejected");
   expect(frameError(result)?.info).toStrictEqual({
     code: "UnexpectedType",
-    expected: [UrType.parse("beta")],
-    found: UrType.parse("alpha"),
+    expected: [parseUrType("beta")],
+    found: parseUrType("alpha"),
   });
   expect(decoder.state.phase).toBe("empty");
 });
 
 test("maxUriLength fails on a longer URI", () => {
-  const ur = Ur.create("test", cbor([1, 2, 3]));
-  const part = ur.encoder({ maxFragmentLength: 64 }).nextPart();
+  const ur = Ur.fromCbor("test", cbor([1, 2, 3]));
+  const part = nextUr(ur.encoder({ maxFragmentLength: 64 }));
   const decoder = new UrDecoder({ limits: { maxUriLength: 8 } });
   expect(part.length).toBeGreaterThan(8);
   const result = decoder.receive(part);
@@ -116,9 +124,11 @@ test("maxUriLength fails on a longer URI", () => {
 });
 
 test("non-dCBOR complete payload is CborDecode", () => {
-  const encoder = Encoder.bytes(new TextEncoder().encode("hello"), 64);
+  const encoder = new UrEncoder(parseUrType("bytes"), new TextEncoder().encode("hello"), {
+    maxFragmentLength: 64,
+  });
   const decoder = new UrDecoder();
-  feedUr(decoder, encoder.nextPart());
+  feedUr(decoder, nextUr(encoder));
   const decoded = completedDecoded(decoder);
   expect(errorOf(() => Ur.fromDecoded(decoded)).code).toBe("CborDecode");
 });
@@ -129,9 +139,9 @@ test("uppercase fountain parts roundtrip", () => {
   expect(encoder.isSinglePart).toBe(false);
   const decoder = new UrDecoder();
   while (decoder.state.phase !== "complete") {
-    feedUr(decoder, encoder.nextPart().toUpperCase());
+    feedUr(decoder, nextUr(encoder).toUpperCase());
   }
   const recovered = completedUr(decoder);
   expect(cborEquals(recovered.cbor, ur.cbor)).toBe(true);
-  expect(recovered.type.equals(ur.type)).toBe(true);
+  expect(recovered.type).toBe(ur.type);
 });

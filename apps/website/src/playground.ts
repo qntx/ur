@@ -42,8 +42,11 @@ export function encodePsbtParts(bytes: Uint8Array): string[] {
   });
   const n = encoder.isSinglePart ? 1 : encoder.fragmentCount;
   const parts: string[] = [];
-  for (let i = 0; i < n; i++) {
-    parts.push(encoder.nextPart());
+  for (const part of encoder) {
+    parts.push(part);
+    if (parts.length >= n) {
+      break;
+    }
   }
   return parts;
 }

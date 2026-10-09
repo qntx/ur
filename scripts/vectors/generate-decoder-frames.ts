@@ -16,7 +16,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import * as bytewords from "../../packages/ur/src/bytewords/index.ts";
+import { decodeBytewords, encodeBytewords } from "../../packages/ur/src/bytewords/index.ts";
 import { checksum } from "../../packages/ur/src/consensus/crc32.ts";
 import { FragmentChooser } from "../../packages/ur/src/consensus/index.ts";
 import {
@@ -26,13 +26,21 @@ import {
   encodePart,
 } from "../../packages/ur/src/fountain/index.ts";
 import type { DecoderLimits, Part, ReceiveResult } from "../../packages/ur/src/fountain/index.ts";
-import { Encoder, UrDecoder, UrType, encode } from "../../packages/ur/src/ur/index.ts";
+import { UrDecoder, UrEncoder, encodeUr, parseUrType } from "../../packages/ur/src/ur/index.ts";
 import { makeMessage } from "../../packages/ur/tests/message.ts";
 
 const VECTORS = join(import.meta.dirname, "..", "..", "vectors");
 
 function hex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function nextUr(encoder: UrEncoder): string {
+  const { value, done } = encoder.next();
+  if (done === true || value === undefined) {
+    throw new Error("ur encoder exhausted");
+  }
+  return value;
 }
 
 function unhex(s: string): Uint8Array {
@@ -642,52 +650,52 @@ function oneOfOneCase(): UrCaseSpec {
   if (value === undefined) {
     throw new Error("1-1 case");
   }
-  const uri = `ur:bytes/1-1/${bytewords.encode(encodePart(value), "minimal")}`;
+  const uri = `ur:bytes/1-1/${encodeBytewords(encodePart(value), "minimal")}`;
   return { name: "one-of-one", frames: [{ text: uri }] };
 }
 
 function multipartCase(message: Uint8Array, upper: boolean): UrCaseSpec {
-  const enc = Encoder.bytes(message, 10);
+  const enc = new UrEncoder(parseUrType("bytes"), message, { maxFragmentLength: 10 });
   return {
     name: upper ? "multipart-uppercase" : "multipart-in-order",
     frames: [0, 1, 2].map(() => {
-      const uri = enc.nextPart();
+      const uri = nextUr(enc);
       return { text: upper ? uri.toUpperCase() : uri };
     }),
   };
 }
 
 function wrongTypeCase(message: Uint8Array): UrCaseSpec {
-  const alpha = Encoder.create(message, 10, UrType.parse("alpha"));
-  const beta = Encoder.create(message, 10, UrType.parse("beta"));
+  const alpha = new UrEncoder(parseUrType("alpha"), message, { maxFragmentLength: 10 });
+  const beta = new UrEncoder(parseUrType("beta"), message, { maxFragmentLength: 10 });
   return {
     name: "wrong-type-after-lock",
     frames: [
-      { text: alpha.nextPart() },
-      { text: beta.nextPart(), expect: { status: "rejected", code: "UnexpectedType" } },
-      { text: alpha.nextPart() },
-      { text: alpha.nextPart() },
+      { text: nextUr(alpha) },
+      { text: nextUr(beta), expect: { status: "rejected", code: "UnexpectedType" } },
+      { text: nextUr(alpha) },
+      { text: nextUr(alpha) },
     ],
   };
 }
 
 function acceptRejectCase(message: Uint8Array): UrCaseSpec {
-  const enc = Encoder.bytes(message, 10);
+  const enc = new UrEncoder(parseUrType("bytes"), message, { maxFragmentLength: 10 });
   return {
     name: "accept-list-rejects",
     accept: ["seed"],
     frames: [
-      { text: enc.nextPart(), expect: { status: "rejected", code: "UnexpectedType" } },
-      { text: enc.nextPart(), expect: { status: "rejected", code: "UnexpectedType" } },
+      { text: nextUr(enc), expect: { status: "rejected", code: "UnexpectedType" } },
+      { text: nextUr(enc), expect: { status: "rejected", code: "UnexpectedType" } },
     ],
   };
 }
 
 // header seq/count mismatches part CBOR fields
 function headerMismatchCase(message: Uint8Array): UrCaseSpec {
-  const enc = Encoder.bytes(message, 10);
-  enc.nextPart();
-  const uri = enc.nextPart();
+  const enc = new UrEncoder(parseUrType("bytes"), message, { maxFragmentLength: 10 });
+  enc.next();
+  const uri = nextUr(enc);
   const mismatched = uri.replace("/2-3/", "/2-9/");
   if (mismatched === uri) {
     throw new Error("header-mismatch case: replace failed");
@@ -700,7 +708,7 @@ function headerMismatchCase(message: Uint8Array): UrCaseSpec {
 
 // bytewords checksum corruption on a single-part URI
 function bytewordsChecksumCase(): UrCaseSpec {
-  const uri = encode(makeMessage("Wolf", 20), UrType.bytes());
+  const uri = encodeUr(parseUrType("bytes"), makeMessage("Wolf", 20));
   const corrupted = `${uri.slice(0, -2)}${uri.endsWith("ae") ? "ad" : "ae"}`;
   return {
     name: "bytewords-checksum",
@@ -714,10 +722,13 @@ function uriTooLongCase(): UrCaseSpec {
     limits: { maxUriLength: 40 },
     frames: [
       {
-        text: encode(makeMessage("Wolf", 20), UrType.bytes()),
+        text: encodeUr(parseUrType("bytes"), makeMessage("Wolf", 20)),
         expect: { status: "fatal", code: "ResourceLimit", limit: "uriLength" },
       },
-      { text: encode(makeMessage("Wolf", 4), UrType.bytes()), expect: { status: "duplicate" } },
+      {
+        text: encodeUr(parseUrType("bytes"), makeMessage("Wolf", 4)),
+        expect: { status: "duplicate" },
+      },
     ],
   };
 }
@@ -735,17 +746,17 @@ function garbageCase(): UrCaseSpec {
 
 // single-part URI after multipart collection starts
 function singleAfterMultipartCase(message: Uint8Array): UrCaseSpec {
-  const enc = Encoder.bytes(message, 10);
+  const enc = new UrEncoder(parseUrType("bytes"), message, { maxFragmentLength: 10 });
   return {
     name: "single-after-multipart",
     frames: [
-      { text: enc.nextPart() },
+      { text: nextUr(enc) },
       {
-        text: encode(makeMessage("Wolf", 4), UrType.bytes()),
+        text: encodeUr(parseUrType("bytes"), makeMessage("Wolf", 4)),
         expect: { status: "rejected", code: "InconsistentPart" },
       },
-      { text: enc.nextPart() },
-      { text: enc.nextPart() },
+      { text: nextUr(enc) },
+      { text: nextUr(enc) },
     ],
   };
 }
@@ -754,7 +765,7 @@ function postCompletionCase(): UrCaseSpec {
   return {
     name: "post-completion-duplicate",
     frames: [
-      { text: encode(makeMessage("Wolf", 8), UrType.bytes()) },
+      { text: encodeUr(parseUrType("bytes"), makeMessage("Wolf", 8)) },
       { text: "ur:bytes/aeadaeta", expect: { status: "duplicate" } },
     ],
   };
@@ -763,7 +774,10 @@ function postCompletionCase(): UrCaseSpec {
 {
   const message = makeMessage("Wolf", 30);
   UR_CASES.push(
-    { name: "single-part", frames: [{ text: encode(makeMessage("Wolf", 20), UrType.bytes()) }] },
+    {
+      name: "single-part",
+      frames: [{ text: encodeUr(parseUrType("bytes"), makeMessage("Wolf", 20)) }],
+    },
     oneOfOneCase(),
     multipartCase(message, false),
     multipartCase(message, true),
@@ -783,7 +797,7 @@ function postCompletionCase(): UrCaseSpec {
 function runUrCase(spec: UrCaseSpec): Record<string, unknown> {
   const decoder = new UrDecoder({
     ...(spec.limits === undefined ? {} : { limits: spec.limits }),
-    ...(spec.accept === undefined ? {} : { accept: spec.accept.map((t) => UrType.parse(t)) }),
+    ...(spec.accept === undefined ? {} : { accept: spec.accept.map((t) => parseUrType(t)) }),
   });
   const frames: Array<Record<string, unknown>> = [];
   let completeAt: number | undefined;
@@ -820,11 +834,11 @@ function runUrCase(spec: UrCaseSpec): Record<string, unknown> {
 // verify each completing multipart case reproduces the encoded message.
 {
   const message = makeMessage("Wolf", 30);
-  const enc = Encoder.bytes(message, 10);
-  const parts = [enc.nextPart(), enc.nextPart(), enc.nextPart()];
+  const enc = new UrEncoder(parseUrType("bytes"), message, { maxFragmentLength: 10 });
+  const parts = [nextUr(enc), nextUr(enc), nextUr(enc)];
   const reencoded = parts.map((u) => {
     const body = u.slice(u.lastIndexOf("/") + 1);
-    return decodePart(bytewords.decode(body, "minimal"));
+    return decodePart(decodeBytewords(body, "minimal"));
   });
   const naive = new NaiveDecoder();
   const [head] = reencoded;

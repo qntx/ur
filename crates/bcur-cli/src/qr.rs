@@ -3,8 +3,8 @@
 use std::io::{self, Write as _};
 use std::time::Duration;
 
-use bcur::qr_string;
 use bcur::ur::Encoder;
+use bcur::ur::to_qr_string;
 use crossterm::cursor::MoveTo;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::execute;
@@ -66,16 +66,16 @@ pub(crate) fn animate_encoder(
     interval_ms: u64,
 ) -> Result<()> {
     let mut pending = first_part;
+    let mut shown = 0_u64;
     run_animation(interval_ms, || {
         let part = match pending.take() {
             Some(p) => p,
-            None => encoder.next_part()?,
+            None => encoder
+                .next()
+                .ok_or_else(|| Error::msg("fountain encoder exhausted"))?,
         };
-        let status = format!(
-            "seq={} K={}  q quit",
-            encoder.current_index(),
-            encoder.fragment_count()
-        );
+        shown = shown.saturating_add(1);
+        let status = format!("frame {shown} K={}  q quit", encoder.fragment_count());
         Ok((part, status))
     })
 }
@@ -155,7 +155,7 @@ fn key_means_quit(key: &event::KeyEvent) -> bool {
 }
 
 fn render_qr(ur: &str) -> Result<String> {
-    let payload = qr_string(ur);
+    let payload = to_qr_string(ur);
     let code = QrCode::with_error_correction_level(payload.as_bytes(), EcLevel::Q)
         .map_err(|e| Error::qr(format!("QR encode failed: {e}")))?;
     Ok(code

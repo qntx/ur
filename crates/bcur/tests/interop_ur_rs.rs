@@ -15,8 +15,10 @@
 
 use std::collections::BTreeSet;
 
-use bcur::ur::{Decoder, Encoder};
-use bcur::{Kind, State, UrType, decode, encode};
+use bcur::fountain::EncoderOptions;
+use bcur::ur::{Decoder, Encoder, ParsedUr};
+use bcur::ur_type;
+use bcur::{State, UrType};
 
 macro_rules! vector {
     ($path:literal) => {
@@ -57,9 +59,11 @@ fn published_single_containing(needle: &str) -> &'static str {
 #[test]
 fn single_part_wolf_uri_matches_ur_rs() {
     let golden = published_single_containing("hdeymejtswhh");
-    let (kind, payload) = decode(golden).unwrap();
-    assert_eq!(kind, Kind::SinglePart);
-    assert_eq!(encode(&payload, &UrType::bytes()), golden);
+    let parsed = bcur::ur::parse(golden, &bcur::DecoderLimits::default()).unwrap();
+    let ParsedUr::Single { message, .. } = parsed else {
+        unreachable!("expected single");
+    };
+    assert_eq!(bcur::ur::encode(&ur_type!("bytes"), &message), golden);
 }
 
 #[test]
@@ -73,15 +77,15 @@ fn multipart_encoder_matches_ur_rs_first_and_last() {
     assert!(matches!(decoder.state(), State::Complete(_)));
     let payload = decoder.into_decoded().unwrap().into_parts().1;
 
-    let mut encoder = Encoder::bytes(&payload, 30).unwrap();
+    let mut encoder = Encoder::new(ur_type!("bytes"), payload, EncoderOptions::new(30)).unwrap();
     assert_eq!(encoder.fragment_count(), 9);
     let first = *uris.first().expect("20-URI table");
     let last = *uris.last().expect("20-URI table");
-    assert_eq!(encoder.next_part().unwrap(), first);
+    assert_eq!(encoder.next().unwrap(), first);
     for _ in 0..18 {
-        let _ = encoder.next_part().unwrap();
+        let _ = encoder.next().unwrap();
     }
-    assert_eq!(encoder.next_part().unwrap(), last);
+    assert_eq!(encoder.next().unwrap(), last);
 }
 
 #[test]
@@ -112,22 +116,29 @@ fn crypto_request_single_part_matches_ur_rs() {
         .unwrap();
     let data = e.into_writer();
 
-    let encoded = encode(&data, &UrType::new("crypto-request").unwrap());
+    let encoded = bcur::ur::encode(&UrType::new("crypto-request").unwrap(), &data);
     assert_eq!(
         encoded,
         "ur:crypto-request/oeadtpdagdaobncpftlnylfgfgmuztihbawfsgrtflaotaadwkoyadtaaohdhdcxvsdkfgkepezepefrrffmbnnbmdvahnptrdtpbtuyimmemweootjshsmhlunyeslnameyhsdi"
     );
-    assert_eq!(decode(&encoded).unwrap(), (Kind::SinglePart, data));
+    let parsed = bcur::ur::parse(&encoded, &bcur::DecoderLimits::default()).unwrap();
+    let ParsedUr::Single { message, .. } = parsed else {
+        unreachable!("expected single");
+    };
+    assert_eq!(message, data);
 }
 
 #[test]
 fn multipart_roundtrip_lossy_channel() {
     let data = b"Ten chars!".repeat(20);
-    let mut encoder = Encoder::bytes(&data, 10).unwrap();
+    let mut encoder =
+        Encoder::new(ur_type!("bytes"), data.clone(), EncoderOptions::new(10)).unwrap();
     let mut decoder = Decoder::default();
+    let mut index = 0_u32;
     while !matches!(decoder.state(), State::Complete(_)) {
-        let part = encoder.next_part().unwrap();
-        if encoder.current_index() & 1 != 0 {
+        let part = encoder.next().unwrap();
+        index = index.saturating_add(1);
+        if index & 1 != 0 {
             decoder.receive(&part).unwrap();
         }
     }

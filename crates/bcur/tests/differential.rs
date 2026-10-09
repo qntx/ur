@@ -17,10 +17,9 @@
 use serde_json::Value;
 use sha2::Digest;
 
-use bcur::bytewords::{self, Style};
-use bcur::fountain::{self, EncoderOptions};
-use bcur::ur::Decoder;
-use bcur::{Decoded, Error, Limit, Received, State, UrType};
+use bcur::fountain::EncoderOptions;
+use bcur::ur::{Decoded, Decoder, Encoder};
+use bcur::{Error, Limit, Received, State, UrType};
 
 fn load_file() -> Value {
     let path = std::env::var("BCUR_DIFFERENTIAL").expect(
@@ -44,9 +43,7 @@ fn cases(file: &Value) -> &[Value] {
     file.get("cases").and_then(Value::as_array).unwrap()
 }
 
-/// Rebuilds what `ur::Encoder::next_part` emits, from public pieces:
-/// `K == 1` yields the single-part `ur::<type>/<body>`; otherwise
-/// `ur::<type>/<seq>-<count>/<minimal-bytewords part CBOR>`.
+/// Replays the recorded encoder options through the public `ur::Encoder`.
 fn encode_all(case: &Value, message: &[u8]) -> Vec<String> {
     let ur_type = UrType::new(json_str(case, "urType")).unwrap();
     let options = case.get("options").unwrap();
@@ -65,23 +62,9 @@ fn encode_all(case: &Value, message: &[u8]) -> Vec<String> {
         .unwrap(),
     };
     let m = case.get("encoded").and_then(Value::as_array).unwrap().len();
-    let mut encoder = fountain::Encoder::new(message.to_vec(), opts).unwrap();
-    (0..m)
-        .map(|_| {
-            if encoder.fragment_count() == 1 {
-                bcur::encode(message, &ur_type)
-            } else {
-                let part = encoder.next().expect("encoder stream exhausted");
-                let body = bytewords::encode(&part.to_cbor(), Style::Minimal);
-                format!(
-                    "ur:{}/{}-{}/{}",
-                    ur_type.as_str(),
-                    part.sequence(),
-                    part.sequence_count(),
-                    body
-                )
-            }
-        })
+    Encoder::new(ur_type, message.to_vec(), opts)
+        .unwrap()
+        .take(m)
         .collect()
 }
 

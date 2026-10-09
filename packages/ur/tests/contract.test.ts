@@ -7,20 +7,40 @@ import { expect, test } from "vite-plus/test";
 
 import {
   DEFAULT_LIMITS,
-  Encoder,
   FountainEncoder,
   UrDecoder,
+  UrEncoder,
   UrError,
-  UrType,
-  bytewords,
-  decode,
+  decodeBytewords,
   decodePart,
-  encode,
+  encodeBytewords,
   encodePart,
+  encodeUr,
+  parseUr,
+  parseUrType,
 } from "../src/index.ts";
-import type { DecoderLimits, DecodedUr, ReceiveResult } from "../src/index.ts";
+import type { ParsedUr, DecoderLimits, DecodedUr, ReceiveResult } from "../src/index.ts";
 import { Ur } from "../src/typed/index.ts";
 import { vectorJson, vectorLines, vectorText } from "./vectors.ts";
+
+function nextUr(encoder: UrEncoder): string {
+  const { value, done } = encoder.next();
+  if (done === true || value === undefined) {
+    throw new Error("ur encoder exhausted");
+  }
+  return value;
+}
+
+function bytesEncoder(data: Uint8Array, maxFragmentLength: number): UrEncoder {
+  return new UrEncoder(parseUrType("bytes"), data, { maxFragmentLength });
+}
+
+function parsedMessage(parsed: ParsedUr): Uint8Array {
+  if (parsed.kind !== "single") {
+    throw new Error(`expected single, got ${parsed.kind}`);
+  }
+  return parsed.message;
+}
 
 function assertLineFile(raw: string): void {
   expect(raw.endsWith("\n")).toBe(true);
@@ -141,12 +161,12 @@ type PartCborDecodeCase = {
 test("bytewords contract", () => {
   const spec = vectorJson<BytewordsSpec>("bytewords/contract.json");
   const input = new Uint8Array(Buffer.from(spec.inputHex, "hex"));
-  expect(bytewords.encode(input, "standard")).toBe(spec.standard);
-  expect(bytewords.encode(input, "uri")).toBe(spec.uri);
-  expect(bytewords.encode(input, "minimal")).toBe(spec.minimal);
-  expect(bytewords.decode(spec.standard, "standard")).toStrictEqual(input);
-  expect(bytewords.decode(spec.uri, "uri")).toStrictEqual(input);
-  expect(bytewords.decode(spec.minimal, "minimal")).toStrictEqual(input);
+  expect(encodeBytewords(input, "standard")).toBe(spec.standard);
+  expect(encodeBytewords(input, "uri")).toBe(spec.uri);
+  expect(encodeBytewords(input, "minimal")).toBe(spec.minimal);
+  expect(decodeBytewords(spec.standard, "standard")).toStrictEqual(input);
+  expect(decodeBytewords(spec.uri, "uri")).toStrictEqual(input);
+  expect(decodeBytewords(spec.minimal, "minimal")).toStrictEqual(input);
 });
 
 test("part cbor contract", () => {
@@ -192,18 +212,18 @@ test.each(partCborDecodeReject)("part cbor decode contract rejects: $name", (c) 
 test("k1 contract", () => {
   const spec = vectorJson<K1Spec>("ur/k1.json");
   const payload = new TextEncoder().encode(spec.payloadUtf8);
-  const urType = UrType.parse(spec.type);
-  const encoder = Encoder.create(payload, 64, urType);
+  const urType = parseUrType(spec.type);
+  const encoder = new UrEncoder(urType, payload, { maxFragmentLength: 64 });
   expect(encoder.isSinglePart).toBe(true);
-  const outbound = encoder.nextPart();
+  const outbound = nextUr(encoder);
   expect(outbound).not.toContain(spec.outboundMustNotContain);
   expect(spec.outboundEqualsSinglePartEncode).toBe(true);
-  expect(outbound).toBe(encode(payload, urType));
+  expect(outbound).toBe(encodeUr(urType, payload));
   expect(spec.inboundFountain11Accepted).toBe(true);
   const fountain = new FountainEncoder(payload, { maxFragmentLength: 64 });
   const part = must(fountain.next().value);
-  const body = bytewords.encode(encodePart(part), "minimal");
-  const uri = `ur:${urType.value}/1-1/${body}`;
+  const body = encodeBytewords(encodePart(part), "minimal");
+  const uri = `ur:${urType}/1-1/${body}`;
   const decoder = new UrDecoder();
   expect(decoder.receive(uri).status).toBe("accepted");
   expect(completedValue(decoder).message).toStrictEqual(payload);
@@ -212,12 +232,12 @@ test("k1 contract", () => {
 test("l4 test array contract", () => {
   const spec = vectorJson<L4Spec>("typed/test-array.json");
   const cborBytes = new Uint8Array(Buffer.from(spec.cborHex, "hex"));
-  const urType = UrType.parse(spec.type);
-  expect(encode(cborBytes, urType)).toBe(spec.uri);
-  expect(Ur.create(spec.type, [1, 2, 3]).string()).toBe(spec.uri);
-  const decoded = decode(spec.uriUpper);
-  expect(decoded.kind).toBe("single");
-  expect(decoded.payload).toStrictEqual(cborBytes);
+  const urType = parseUrType(spec.type);
+  expect(encodeUr(urType, cborBytes)).toBe(spec.uri);
+  expect(Ur.fromCbor(spec.type, [1, 2, 3]).toString()).toBe(spec.uri);
+  const parsed = parseUr(spec.uriUpper);
+  expect(parsed.kind).toBe("single");
+  expect(parsedMessage(parsed)).toStrictEqual(cborBytes);
 });
 
 test("decoder limits contract", () => {
@@ -229,27 +249,27 @@ test("decoder limits contract", () => {
 });
 
 test("resource limits fail the session", () => {
-  const uriEncoder = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(8)), 10);
+  const uriEncoder = bytesEncoder(new TextEncoder().encode("Ten chars!".repeat(8)), 10);
   const uriDecoder = new UrDecoder({ limits: { maxUriLength: 16 } });
-  assertSessionFails(uriDecoder, uriEncoder.nextPart(), "uriLength");
+  assertSessionFails(uriDecoder, nextUr(uriEncoder), "uriLength");
 
-  const fragmentEncoder = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(16)), 10);
+  const fragmentEncoder = bytesEncoder(new TextEncoder().encode("Ten chars!".repeat(16)), 10);
   expect(fragmentEncoder.fragmentCount).toBeGreaterThan(1);
   const fragmentDecoder = new UrDecoder({ limits: { maxFragmentCount: 1 } });
-  assertSessionFails(fragmentDecoder, fragmentEncoder.nextPart(), "fragmentCount");
+  assertSessionFails(fragmentDecoder, nextUr(fragmentEncoder), "fragmentCount");
 });
 
 test("nonfatal errors leave state", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(6));
-  const a = Encoder.create(data, 10, UrType.parse("alpha"));
-  const b = Encoder.create(data, 10, UrType.parse("beta"));
+  const a = new UrEncoder(parseUrType("alpha"), data, { maxFragmentLength: 10 });
+  const b = new UrEncoder(parseUrType("beta"), data, { maxFragmentLength: 10 });
   const decoder = new UrDecoder();
-  decoder.receive(a.nextPart());
-  const mismatch = decoder.receive(b.nextPart());
+  decoder.receive(nextUr(a));
+  const mismatch = decoder.receive(nextUr(b));
   expect(mismatch.status).toBe("rejected");
   expect(frameError(mismatch)?.code).toBe("UnexpectedType");
   expect(decoder.state.phase).toBe("collecting");
-  expect(decoder.receive(a.nextPart()).status).not.toBe("rejected");
+  expect(decoder.receive(nextUr(a)).status).not.toBe("rejected");
 
   // A completed session whose bytes are not well-formed dCBOR fails the
   // typed conversion, not the decode itself.
@@ -269,9 +289,9 @@ test("multipart 20 contract", () => {
     decoder.receive(uri);
   }
   const payload = completedValue(decoder).message;
-  const encoder = Encoder.bytes(payload, 30);
+  const encoder = bytesEncoder(payload, 30);
   expect(encoder.fragmentCount).toBe(9);
-  expect(encoder.nextPart()).toBe(uris[0]);
+  expect(nextUr(encoder)).toBe(uris[0]);
 });
 
 test("published singles contract", () => {
@@ -280,6 +300,6 @@ test("published singles contract", () => {
   const uris = vectorLines("ur/published-singles.txt");
   expect(uris).toHaveLength(3);
   for (const uri of uris) {
-    expect(decode(uri).kind).toBe("single");
+    expect(parseUr(uri).kind).toBe("single");
   }
 });

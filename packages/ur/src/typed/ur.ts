@@ -2,9 +2,8 @@ import { cbor, decodeCbor, encodeCbor, CborError } from "@blockchaincommons/dcbo
 import type { Cbor, CborInput } from "@blockchaincommons/dcbor";
 
 import { fail } from "../error.ts";
-import type { FountainEncoderOptions } from "../fountain/index.ts";
-import { Encoder, UrType, decodeWithType, encode, toQrString } from "../ur/index.ts";
-import type { DecodedUr } from "../ur/index.ts";
+import { UrEncoder, encodeUr, parseUr, parseUrType, toQrString } from "../ur/index.ts";
+import type { DecodedUr, UrEncoderOptions, UrType } from "../ur/index.ts";
 
 export function mapCborDecode<T>(run: () => T): T {
   try {
@@ -28,10 +27,6 @@ export function mapCborType<T>(run: () => T): T {
   }
 }
 
-function parseType(type: UrType | string): UrType {
-  return typeof type === "string" ? UrType.parse(type) : type;
-}
-
 /** Uniform Resource whose payload is deterministic CBOR. */
 export class Ur {
   readonly type: UrType;
@@ -42,29 +37,30 @@ export class Ur {
     this.cbor = cborValue;
   }
 
-  static create(type: UrType | string, input: CborInput): Ur {
+  static fromCbor(type: UrType | string, input: CborInput): Ur {
     // copy: caller mutation must not change the stored bstr
     const prepared = input instanceof Uint8Array ? new Uint8Array(input) : input;
     return new Ur(
-      parseType(type),
+      parseUrType(type),
       mapCborType(() => cbor(prepared)),
     );
   }
 
-  /** Wrap already-encoded dCBOR bytes. Used by fromUrString. */
+  /** Wrap already-encoded dCBOR bytes. */
   static fromCborData(type: UrType | string, data: Uint8Array): Ur {
     // copy: caller mutation must not change the stored bstr
     const bytes = new Uint8Array(data);
     const value = mapCborDecode(() => decodeCbor(bytes));
-    return new Ur(parseType(type), value);
+    return new Ur(parseUrType(type), value);
   }
 
-  static fromUrString(uri: string): Ur {
-    const { type, kind, payload } = decodeWithType(uri);
-    if (kind !== "single") {
+  /** Parse a **single-part** UR string; the message must be dCBOR. */
+  static parse(text: string): Ur {
+    const parsed = parseUr(text);
+    if (parsed.kind !== "single") {
       fail("NotSinglePart");
     }
-    return Ur.fromCborData(type, payload);
+    return Ur.fromCborData(parsed.type, parsed.message);
   }
 
   /** Wrap a completed {@link UrDecoder} result; the message must be dCBOR. */
@@ -72,26 +68,20 @@ export class Ur {
     return Ur.fromCborData(decoded.type, decoded.message);
   }
 
-  string(): string {
-    const bytes = mapCborType(() => encodeCbor(this.cbor));
-    return encode(bytes, this.type);
+  toCborData(): Uint8Array {
+    return mapCborType(() => encodeCbor(this.cbor));
   }
 
-  qrString(): string {
-    return toQrString(this.string());
+  toString(): string {
+    return encodeUr(this.type, this.toCborData());
+  }
+
+  toQrString(): string {
+    return toQrString(this.toString());
   }
 
   /** L3 encoder over this UR's dCBOR bytes. */
-  encoder(options: FountainEncoderOptions): Encoder {
-    const bytes = mapCborType(() => encodeCbor(this.cbor));
-    const { maxFragmentLength, ...rest } = options;
-    return Encoder.create(bytes, maxFragmentLength, this.type, rest);
-  }
-
-  checkType(expected: UrType | string): void {
-    const want = parseType(expected);
-    if (!this.type.equals(want)) {
-      fail({ code: "UnexpectedType", expected: [want], found: this.type });
-    }
+  encoder(options: UrEncoderOptions): UrEncoder {
+    return new UrEncoder(this.type, this.toCborData(), options);
   }
 }

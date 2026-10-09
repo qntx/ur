@@ -1,126 +1,93 @@
-import * as bytewords from "../bytewords/index.ts";
+import { encodeBytewords } from "../bytewords/index.ts";
 import { UrError, fail } from "../error.ts";
 import type { UrErrorInfo } from "../error.ts";
-import {
-  FountainDecoder,
-  FountainEncoder,
-  decodePart,
-  encodePart,
-  mergeLimits,
+import { FountainDecoder, FountainEncoder, encodePart, mergeLimits } from "../fountain/index.ts";
+import type {
+  DecoderLimits,
+  DecoderState,
+  FountainEncoderOptions,
+  Part,
+  Progress,
+  ReceiveResult,
 } from "../fountain/index.ts";
-import type { DecoderLimits, DecoderState, Progress, ReceiveResult } from "../fountain/index.ts";
-import { parse } from "./parse.ts";
-import type { Kind, ParsedUr } from "./parse.ts";
-import { UrType } from "./type.ts";
+import { parseUr } from "./parse.ts";
+import type { UrType } from "./type.ts";
 
 export type { DecoderLimits } from "../fountain/index.ts";
-export { normalizeUr, parse, parseNormalized } from "./parse.ts";
-export type { Kind, ParsedUr } from "./parse.ts";
-export { UrType } from "./type.ts";
+export { parseUr, type ParsedUr } from "./parse.ts";
+export { isUrType, parseUrType, type UrType } from "./type.ts";
 
-/** Encode a single-part UR. Empty data is allowed. */
-export function encode(data: Uint8Array, type: UrType): string {
-  const body = bytewords.encode(data, "minimal");
-  return `ur:${type.value}/${body}`;
-}
-
-/**
- * Decode payload from a single- or multi-part UR. Multi-part returns the CBOR-encoded fountain part
- * bytes, not the message.
- */
-export function decode(uri: string): { kind: Kind; payload: Uint8Array } {
-  const parsed = parse(uri);
-  const payload = bytewords.decode(parsed.body, "minimal");
-  return { kind: parsed.kind, payload };
-}
-
-/** Like {@link decode} but retains the normalized type. */
-export function decodeWithType(uri: string): {
-  type: UrType;
-  kind: Kind;
-  payload: Uint8Array;
-} {
-  const parsed = parse(uri);
-  const payload = bytewords.decode(parsed.body, "minimal");
-  return { type: parsed.type, kind: parsed.kind, payload };
-}
-
-/** Decode a single-part UR payload. Multi-part URIs throw `NotSinglePart`. */
-export function decodeMessage(uri: string): Uint8Array {
-  const { kind, payload } = decode(uri);
-  if (kind !== "single") {
-    fail("NotSinglePart");
-  }
-  return payload;
+/** Encode a single-part UR. Empty `message` is allowed. */
+export function encodeUr(type: UrType, message: Uint8Array): string {
+  const body = encodeBytewords(message, "minimal");
+  return `ur:${type}/${body}`;
 }
 
 /** Uppercase UR string for denser QR alphanumeric mode. */
-export function toQrString(uri: string): string {
-  return uri.toUpperCase();
+export function toQrString(ur: string): string {
+  return ur.toUpperCase();
 }
 
-/** UR encoder. `K == 1` emits single-part; otherwise fountain. */
-export class Encoder {
-  private readonly fountain: FountainEncoder;
-  private readonly urType: UrType;
-  private readonly message: Uint8Array;
-  private singleEmitted = false;
+/** {@link UrEncoder} options (fountain encoder options verbatim). */
+export type UrEncoderOptions = FountainEncoderOptions;
 
-  private constructor(fountain: FountainEncoder, urType: UrType, message: Uint8Array) {
-    this.fountain = fountain;
-    this.urType = urType;
-    this.message = message;
+/**
+ * UR string encoder. `K == 1` emits the same single-part UR on every step; larger messages emit
+ * `ur:<type>/<seq>-<count>/<bytewords>` fountain parts until sequence `0xFFFFFFFF`, where iteration
+ * ends.
+ */
+export class UrEncoder implements IterableIterator<string> {
+  readonly #type: UrType;
+  readonly #fountain: FountainEncoder;
+  readonly #single: string | undefined;
+  #emitted = false;
+
+  constructor(type: UrType, message: Uint8Array, options: UrEncoderOptions) {
+    this.#type = type;
+    this.#fountain = new FountainEncoder(message, options);
+    // copy: later mutation of the caller buffer must not change K==1 output
+    this.#single =
+      this.#fountain.fragmentCount === 1 ? encodeUr(type, new Uint8Array(message)) : undefined;
   }
 
-  static create(
-    message: Uint8Array,
-    maxFragmentLength: number,
-    type: UrType,
-    options?: { minFragmentLength?: number; firstSequence?: number },
-  ): Encoder {
-    return new Encoder(
-      new FountainEncoder(message, { maxFragmentLength, ...options }),
-      type,
-      // copy: later mutation of the caller buffer must not change K==1 output
-      new Uint8Array(message),
-    );
-  }
-
-  static bytes(
-    message: Uint8Array,
-    maxFragmentLength: number,
-    options?: { minFragmentLength?: number; firstSequence?: number },
-  ): Encoder {
-    return Encoder.create(message, maxFragmentLength, UrType.bytes(), options);
-  }
-
-  get isSinglePart(): boolean {
-    return this.fountain.fragmentCount === 1;
+  get type(): UrType {
+    return this.#type;
   }
 
   get fragmentCount(): number {
-    return this.fountain.fragmentCount;
+    return this.#fountain.fragmentCount;
   }
 
-  get currentIndex(): number {
-    return this.isSinglePart ? (this.singleEmitted ? 1 : 0) : this.fountain.sequence;
+  get isSinglePart(): boolean {
+    return this.#fountain.fragmentCount === 1;
   }
 
-  get complete(): boolean {
-    return this.isSinglePart ? this.singleEmitted : this.fountain.isComplete;
+  get isComplete(): boolean {
+    return this.#single === undefined ? this.#fountain.isComplete : this.#emitted;
   }
 
-  nextPart(): string {
-    if (this.isSinglePart) {
-      this.singleEmitted = true;
-      return encode(this.message, this.urType);
+  /** Fragment indexes mixed into the most recently produced part. */
+  get lastFragmentIndexes(): ReadonlyArray<number> {
+    return this.#fountain.lastFragmentIndexes;
+  }
+
+  next(): IteratorResult<string, undefined> {
+    const single = this.#single;
+    if (single !== undefined) {
+      this.#emitted = true;
+      return { value: single, done: false };
     }
-    const { value: part } = this.fountain.next();
-    if (part === undefined) {
-      fail("Internal");
+    const { value: part, done } = this.#fountain.next();
+    if (done === true || part === undefined) {
+      return { value: undefined, done: true };
     }
-    const body = bytewords.encode(encodePart(part), "minimal");
-    return `ur:${this.urType.value}/${part.sequence}-${part.sequenceCount}/${body}`;
+    const body = encodeBytewords(encodePart(part), "minimal");
+    const uri = `ur:${this.#type}/${part.sequence}-${part.sequenceCount}/${body}`;
+    return { value: uri, done: false };
+  }
+
+  [Symbol.iterator](): this {
+    return this;
   }
 }
 
@@ -170,9 +137,6 @@ export class UrDecoder {
       this.#processed += 1;
       return { status: "duplicate" };
     }
-    if (text.length > this.#limits.maxUriLength) {
-      return this.#fail({ code: "ResourceLimit", limit: "uriLength" });
-    }
     try {
       return this.#receiveParsed(text);
     } catch (error) {
@@ -185,49 +149,40 @@ export class UrDecoder {
   }
 
   #receiveParsed(text: string): ReceiveResult {
-    const parsed = parse(text);
+    const parsed = parseUr(text, this.#limits);
     this.#checkType(parsed.type);
-    return parsed.kind === "single" ? this.#receiveSingle(parsed) : this.#receiveFountain(parsed);
+    return parsed.kind === "single"
+      ? this.#receiveSingle(parsed.type, parsed.message)
+      : this.#receiveFountain(parsed.type, parsed.part);
   }
 
   /** Type admission: `accept` list (when non-empty), then the locked type. */
   #checkType(type: UrType): void {
-    if (this.#accept.length > 0 && !this.#accept.some((t) => t.equals(type))) {
+    if (this.#accept.length > 0 && !this.#accept.some((t) => t === type)) {
       fail({ code: "UnexpectedType", expected: this.#accept, found: type });
     }
     const locked = this.#lockedType;
-    if (locked !== undefined && !locked.equals(type)) {
+    if (locked !== undefined && locked !== type) {
       fail({ code: "UnexpectedType", expected: [locked], found: type });
     }
   }
 
-  #receiveSingle(parsed: ParsedUr): ReceiveResult {
+  #receiveSingle(type: UrType, message: Uint8Array): ReceiveResult {
     // A single-part URI inside a collecting fountain session is inconsistent;
     // the reverse order is unreachable (a completed session is terminal).
     if (this.#fountain.state.phase !== "empty") {
       fail("InconsistentPart");
     }
-    const data = bytewords.decode(parsed.body, "minimal");
-    if (data.length > this.#limits.maxMessageLength) {
+    if (message.length > this.#limits.maxMessageLength) {
       return this.#fail({ code: "ResourceLimit", limit: "messageLength" });
     }
-    this.#lockedType ??= parsed.type;
-    this.#terminal = { phase: "complete", value: { type: parsed.type, message: data } };
+    this.#lockedType ??= type;
+    this.#terminal = { phase: "complete", value: { type, message } };
     this.#processed += 1;
     return { status: "accepted" };
   }
 
-  #receiveFountain(parsed: ParsedUr): ReceiveResult {
-    const decoded = bytewords.decode(parsed.body, "minimal");
-    const part = decodePart(decoded, this.#limits);
-    const { indices } = parsed;
-    if (
-      indices === undefined ||
-      part.sequence !== indices.seq ||
-      part.sequenceCount !== indices.count
-    ) {
-      fail("InvalidIndices");
-    }
+  #receiveFountain(type: UrType, part: Part): ReceiveResult {
     const result = this.#fountain.receive(part);
     if (result.status === "rejected") {
       return result;
@@ -236,13 +191,13 @@ export class UrDecoder {
       this.#terminal = { phase: "failed", error: result.error };
       return result;
     }
-    this.#lockedType ??= parsed.type;
+    this.#lockedType ??= type;
     this.#processed += 1;
     const fountainState = this.#fountain.state;
     if (fountainState.phase === "complete") {
       this.#terminal = {
         phase: "complete",
-        value: { type: parsed.type, message: fountainState.value },
+        value: { type, message: fountainState.value },
       };
     }
     return result;

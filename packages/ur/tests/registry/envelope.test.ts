@@ -110,14 +110,14 @@ test("IETF Alice knows Bob node write golden", () => {
 test("untagged text node is WrongType", () => {
   const value = cbor(["Alice", { knows: "Bob" }]);
   expect(cborErrorOf(() => assertEnvelopeContent(value)).code).toBe("WrongType");
-  const err = urErrorOf(() => fromUr(Ur.create("envelope", value), envelopeCodec));
+  const err = urErrorOf(() => fromUr(Ur.fromCbor("envelope", value), envelopeCodec));
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "WrongType" });
 });
 
 test("array of length 1 is CborType WrongType", () => {
-  const err = urErrorOf(() => fromUr(Ur.create("envelope", cbor([aliceLeaf()])), envelopeCodec));
+  const err = urErrorOf(() => fromUr(Ur.fromCbor("envelope", cbor([aliceLeaf()])), envelopeCodec));
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "WrongType" });

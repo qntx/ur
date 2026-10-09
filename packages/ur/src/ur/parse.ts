@@ -1,27 +1,25 @@
+import { decodeBytewords } from "../bytewords/index.ts";
 import { fail } from "../error.ts";
-import { UrType } from "./type.ts";
+import { decodePart, mergeLimits } from "../fountain/index.ts";
+import type { DecoderLimits, Part } from "../fountain/index.ts";
+import { parseUrType } from "./type.ts";
+import type { UrType } from "./type.ts";
 
-export type Kind = "single" | "multi";
+/** A decoded UR: a single-part message or one validated fountain part. */
+export type ParsedUr =
+  | Readonly<{ kind: "single"; type: UrType; message: Uint8Array }>
+  | Readonly<{ kind: "multi"; type: UrType; part: Part }>;
 
-export type ParsedUr = {
-  type: UrType;
-  kind: Kind;
-  indices?: { seq: number; count: number };
-  body: string;
-};
-
-/** Lowercase a UR string for case-insensitive QR transport. */
-export function normalizeUr(uri: string): string {
-  return uri.toLowerCase();
-}
-
-/** Parse a UR (full-URI case fold). Does not decode bytewords. */
-export function parse(uri: string): ParsedUr {
-  return parseNormalized(normalizeUr(uri));
-}
-
-/** Parse an already-lowercased (or body-normalized) UR. */
-export function parseNormalized(uri: string): ParsedUr {
+/**
+ * Parse and decode a UR string. Case-insensitive for the URI and bytewords content. `limits` bounds
+ * the URI length and the multi-part CBOR fields. Throws `UrError`.
+ */
+export function parseUr(text: string, limits?: Partial<DecoderLimits>): ParsedUr {
+  const merged = mergeLimits(limits);
+  if (text.length > merged.maxUriLength) {
+    fail({ code: "ResourceLimit", limit: "uriLength" });
+  }
+  const uri = text.toLowerCase();
   if (!uri.startsWith("ur:")) {
     fail("InvalidScheme");
   }
@@ -30,29 +28,22 @@ export function parseNormalized(uri: string): ParsedUr {
   if (slash === -1) {
     fail("TypeUnspecified");
   }
-  const typeStr = rest0.slice(0, slash);
+  const type = parseUrType(rest0.slice(0, slash));
   const rest = rest0.slice(slash + 1);
-  const urType = UrType.parse(typeStr);
 
   const lastSlash = rest.lastIndexOf("/");
   if (lastSlash === -1) {
-    return {
-      type: urType,
-      kind: "single",
-      body: rest.toLowerCase(),
-    };
+    return { kind: "single", type, message: decodeBytewords(rest, "minimal") };
   }
-  const indicesStr = rest.slice(0, lastSlash);
-  const body = rest.slice(lastSlash + 1).toLowerCase();
-  const indices = decodeIndices(indicesStr);
-  return {
-    type: urType,
-    kind: "multi",
-    indices,
-    body,
-  };
+  const { seq, count } = decodeIndices(rest.slice(0, lastSlash));
+  const part = decodePart(decodeBytewords(rest.slice(lastSlash + 1), "minimal"), merged);
+  if (part.sequence !== seq || part.sequenceCount !== count) {
+    fail("InvalidIndices");
+  }
+  return { kind: "multi", type, part };
 }
 
+/** UR-ADR-029: `seq = 1*DIGIT "-" 1*DIGIT`, both in `1..=0xFFFFFFFF`. */
 function decodeIndices(indices: string): { seq: number; count: number } {
   const dash = indices.indexOf("-");
   if (dash === -1) {
@@ -65,13 +56,14 @@ function decodeIndices(indices: string): { seq: number; count: number } {
   }
   const seq = Number(a);
   const count = Number(b);
-  if (!Number.isSafeInteger(seq) || !Number.isSafeInteger(count)) {
-    fail("InvalidIndices");
-  }
-  if (seq === 0 || count === 0) {
-    fail("InvalidIndices");
-  }
-  if (seq > 0xff_ff_ff_ff || count > 0xff_ff_ff_ff) {
+  if (
+    !Number.isSafeInteger(seq) ||
+    !Number.isSafeInteger(count) ||
+    seq === 0 ||
+    count === 0 ||
+    seq > 0xff_ff_ff_ff ||
+    count > 0xff_ff_ff_ff
+  ) {
     fail("InvalidIndices");
   }
   return { seq, count };

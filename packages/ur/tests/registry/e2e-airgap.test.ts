@@ -1,11 +1,19 @@
 import { bytesToHex, decodeCbor, expectBytes, hexToBytes } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
 
-import { UrType, fromUr, psbtCodec, seedCodec, toUr } from "../../src/registry/index.ts";
+import { fromUr, parseUrType, psbtCodec, seedCodec, toUr } from "../../src/registry/index.ts";
 import { Ur } from "../../src/typed/index.ts";
 import type { DecodedUr } from "../../src/ur/index.ts";
 import { UrDecoder } from "../../src/ur/index.ts";
 import { psbt167 } from "./goldens.ts";
+
+function nextUr(encoder: { next: () => IteratorResult<string, undefined> }): string {
+  const { done, value } = encoder.next();
+  if (done === true || value === undefined) {
+    throw new Error("ur encoder exhausted");
+  }
+  return value;
+}
 
 /** Feeds one part; frame errors become thrown errors. */
 function feedUr(decoder: UrDecoder, text: string): void {
@@ -31,8 +39,8 @@ test("64-byte seed is single-part through Ur.encoder", () => {
   const ur = toUr({ payload }, seedCodec);
   const enc = ur.encoder({ maxFragmentLength: 200 });
   expect(enc.isSinglePart).toBe(true);
-  const dec = new UrDecoder({ accept: [UrType.parse("seed")] });
-  const result = dec.receive(enc.nextPart());
+  const dec = new UrDecoder({ accept: [parseUrType("seed")] });
+  const result = dec.receive(nextUr(enc));
   expect(result.status).toBe("accepted");
   const recovered = fromUr(Ur.fromDecoded(completedDecoded(dec)), seedCodec);
   expect(bytesToHex(recovered.payload)).toBe(bytesToHex(payload));
@@ -44,9 +52,9 @@ test("167-byte PSBT multipart at maxFragmentLength 50", () => {
   expect(ur.encoder({ maxFragmentLength: 200 }).isSinglePart).toBe(true);
   const enc = ur.encoder({ maxFragmentLength: 50 });
   expect(enc.isSinglePart).toBe(false);
-  const decoder = new UrDecoder({ accept: [UrType.parse("psbt")] });
+  const decoder = new UrDecoder({ accept: [parseUrType("psbt")] });
   while (decoder.state.phase !== "complete") {
-    feedUr(decoder, enc.nextPart());
+    feedUr(decoder, nextUr(enc));
   }
   const recovered = fromUr(Ur.fromDecoded(completedDecoded(decoder)), psbtCodec);
   expect(bytesToHex(recovered.bytes)).toBe(bytesToHex(bytes));

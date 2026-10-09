@@ -1,0 +1,40 @@
+{
+  "capability": "bytemoji.identifier",
+  "cases": [
+    {
+      "name": "reference string",
+      "table": "😀😂😆😉🙄😋😎😍😘😭🫠🥱🤩😶🤨🫥🥵🥶😳🤪😵😡🤢😇🤠🤡🥳🥺😬🤑🙃🤯😈👹👺💀👻👽😺😹😻😽🙀😿🫶🤲🙌🤝👍👎👈👆💪👄🦷👂👃🧠👀🤚🦶🍎🍊🍋🍌🍉🍇🍓🫐🍒🍑🍍🥝🍆🥑🥦🍅🌽🥕🫒🧄🥐🥯🍞🧀🥚🍗🌭🍔🍟🍕🌮🥙🍱🍜🍤🍚🥠🍨🍦🎂🪴🌵🌱💐🍁🍄🌹🌺🌼🌻🌸💨🌊💧💦🌀🌈🌞🌝🌛🌜🌙🌎💫⭐🪐🌐💛💔💘💖💕🏁🚩💬💯🚫🔴🔷🟩🛑🔺🚗🚑🚒🚜🛵🚨🚀🚁🛟🚦🏰🎡🎢🎠🏠🔔🔑🚪🪑🎈💌📦📫📖📚📌🧮🔒💎📷⏰⏳📡💡💰🧲🧸🎁🎀🎉🪭👑🫖🔭🛁🏆🥁🎷🎺🏀🏈🎾🏓✨🔥💥👕👚👖🩳👗👔🧢👓🧶🧵💍👠👟🧦🧤👒👜🐱🐶🐭🐹🐰🦊🐻🐼🐨🐯🦁🐮🐷🐸🐵🐔🐥🦆🦉🐴🦄🐝🐛🦋🐌🐞🐢🐺🐍🪽🐙🦑🪼🦞🦀🐚🦭🐟🐬🐳"
+    },
+    {
+      "bytemojis": "🌊 😹 🌽 🐞",
+      "bytewords": "jugs deli gift when",
+      "digestHex": "71274df1",
+      "name": "bcr-2024-008 OIB"
+    },
+    {
+      "bytemojis": "😀 😂 😆 😉",
+      "digestHex": "00010203",
+      "name": "0,1,2,3"
+    },
+    {
+      "bytemojis": "😀 😀 😀 😀",
+      "digestHex": "00000000",
+      "name": "zero digest"
+    },
+    {
+      "bytemojis": "🐳 🐳 🐳 🐳",
+      "digestHex": "ffffffff",
+      "name": "max digest"
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "crossChecked": [
+      "bc-ur-rust 2f8b4e728945f9dc248eba71911b89371f076924 src/bytewords.rs"
+    ],
+    "kind": "official",
+    "name": "BCR-2024-008",
+    "path": "papers/bcr-2024-008-bytemoji.md",
+    "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+  }
+}

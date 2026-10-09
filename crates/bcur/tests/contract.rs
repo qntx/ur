@@ -13,9 +13,11 @@
 use serde_json::Value;
 
 use bcur::bytewords::{self, Style};
+use bcur::fountain::EncoderOptions;
 use bcur::fountain::{self, Part};
-use bcur::ur::{Decoder, Encoder};
-use bcur::{DecoderLimits, ErrorKind, Kind, Limit, Received, State, UrType, decode, encode};
+use bcur::ur::{Decoder, Encoder, ParsedUr};
+use bcur::ur_type;
+use bcur::{DecoderLimits, ErrorKind, Limit, Received, State, UrType};
 
 macro_rules! vector {
     ($path:literal) => {
@@ -233,23 +235,23 @@ fn k1_contract() {
     let spec = json(vector!("ur/k1.json"));
     let payload = json_str(&spec, "payloadUtf8").as_bytes();
     let ur_type = UrType::new(json_str(&spec, "type")).unwrap();
-    let mut encoder = Encoder::new(payload, 64, &ur_type).unwrap();
+    let mut encoder =
+        Encoder::new(ur_type.clone(), payload.to_vec(), EncoderOptions::new(64)).unwrap();
     assert!(encoder.is_single_part());
-    let outbound = encoder.next_part().unwrap();
+    let outbound = encoder.next().unwrap();
     assert!(!outbound.contains(json_str(&spec, "outboundMustNotContain")));
     assert_eq!(
         spec.get("outboundEqualsSinglePartEncode")
             .and_then(Value::as_bool),
         Some(true)
     );
-    assert_eq!(outbound, encode(payload, &ur_type));
+    assert_eq!(outbound, bcur::ur::encode(&ur_type, payload));
     assert_eq!(
         spec.get("inboundFountain11Accepted")
             .and_then(Value::as_bool),
         Some(true)
     );
-    let mut fountain =
-        fountain::Encoder::new(payload.to_vec(), fountain::EncoderOptions::new(64)).unwrap();
+    let mut fountain = fountain::Encoder::new(payload.to_vec(), EncoderOptions::new(64)).unwrap();
     let part = fountain.next().unwrap();
     let body = bytewords::encode(&part.to_cbor(), Style::Minimal);
     let uri = format!("ur:{}/1-1/{body}", ur_type.as_str());
@@ -265,17 +267,19 @@ fn l4_test_array_contract() {
     let cbor = hex::decode(json_str(&spec, "cborHex")).unwrap();
     let ur_type = UrType::new(json_str(&spec, "type")).unwrap();
     let uri = json_str(&spec, "uri");
-    assert_eq!(encode(&cbor, &ur_type), uri);
+    assert_eq!(bcur::ur::encode(&ur_type, &cbor), uri);
 
     #[cfg(feature = "dcbor")]
     {
-        let ur = bcur::Ur::new("test", vec![1, 2, 3]).unwrap();
-        assert_eq!(ur.string(), uri);
+        let ur = bcur::Ur::new(ur_type!("test"), vec![1, 2, 3]);
+        assert_eq!(ur.to_string(), uri);
     }
 
-    let (kind, data) = decode(json_str(&spec, "uriUpper")).unwrap();
-    assert_eq!(kind, Kind::SinglePart);
-    assert_eq!(data, cbor);
+    let parsed = bcur::ur::parse(json_str(&spec, "uriUpper"), &DecoderLimits::default()).unwrap();
+    let ParsedUr::Single { message, .. } = parsed else {
+        unreachable!("expected single");
+    };
+    assert_eq!(message, cbor);
 }
 
 #[test]
@@ -300,8 +304,9 @@ fn decoder_limits_contract() {
 #[test]
 fn resource_limits_fail_session() {
     let uri_payload = b"Ten chars!".repeat(8);
-    let mut uri_enc = Encoder::bytes(&uri_payload, 10).unwrap();
-    let uri_part = uri_enc.next_part().unwrap();
+    let mut uri_enc =
+        Encoder::new(ur_type!("bytes"), uri_payload, EncoderOptions::new(10)).unwrap();
+    let uri_part = uri_enc.next().unwrap();
     assert_session_fails(
         Limit::UriLength,
         Decoder::new(DecoderLimits {
@@ -312,9 +317,10 @@ fn resource_limits_fail_session() {
     );
 
     let fragment_payload = b"Ten chars!".repeat(16);
-    let mut fragment_enc = Encoder::bytes(&fragment_payload, 10).unwrap();
+    let mut fragment_enc =
+        Encoder::new(ur_type!("bytes"), fragment_payload, EncoderOptions::new(10)).unwrap();
     assert!(fragment_enc.fragment_count() > 1);
-    let fragment_part = fragment_enc.next_part().unwrap();
+    let fragment_part = fragment_enc.next().unwrap();
     assert_session_fails(
         Limit::FragmentCount,
         Decoder::new(DecoderLimits {
@@ -328,22 +334,22 @@ fn resource_limits_fail_session() {
 #[test]
 fn nonfatal_errors_leave_state() {
     let data = b"Ten chars!".repeat(6);
-    let mut a = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
-    let mut b = Encoder::new(&data, 10, &UrType::new("beta").unwrap()).unwrap();
+    let mut a = Encoder::new(ur_type!("alpha"), data.clone(), EncoderOptions::new(10)).unwrap();
+    let mut b = Encoder::new(ur_type!("beta"), data, EncoderOptions::new(10)).unwrap();
     let mut decoder = Decoder::default();
-    decoder.receive(&a.next_part().unwrap()).unwrap();
+    decoder.receive(&a.next().unwrap()).unwrap();
     assert!(matches!(
-        decoder.receive(&b.next_part().unwrap()),
+        decoder.receive(&b.next().unwrap()),
         Err(ref e) if e.kind() == ErrorKind::UnexpectedType && !e.is_fatal()
     ));
     assert!(matches!(decoder.state(), State::Collecting(_)));
-    assert!(decoder.receive(&a.next_part().unwrap()).is_ok());
+    assert!(decoder.receive(&a.next().unwrap()).is_ok());
 
     // A completed session whose bytes are not well-formed dCBOR fails the
     // typed conversion, not the decode itself.
     #[cfg(feature = "dcbor")]
     {
-        let uri = encode(b"\xff", &UrType::bytes());
+        let uri = bcur::ur::encode(&ur_type!("bytes"), b"\xff");
         let mut d = Decoder::default();
         d.receive(&uri).unwrap();
         let decoded = d.into_decoded().unwrap();
@@ -367,10 +373,10 @@ fn multipart_20_contract() {
     }
     assert!(matches!(decoder.state(), State::Complete(_)));
     let payload = decoder.into_decoded().unwrap().into_parts().1;
-    let mut encoder = Encoder::bytes(&payload, 30).unwrap();
+    let mut encoder = Encoder::new(ur_type!("bytes"), payload, EncoderOptions::new(30)).unwrap();
     assert_eq!(encoder.fragment_count(), 9);
     assert_eq!(
-        encoder.next_part().unwrap(),
+        encoder.next().unwrap(),
         *uris.first().expect("20-URI table")
     );
 }
@@ -382,7 +388,7 @@ fn published_singles_contract() {
     let uris = data_lines(raw);
     assert_eq!(uris.len(), 3, "ur/published-singles.txt");
     for uri in uris {
-        let (kind, _) = decode(uri).unwrap();
-        assert_eq!(kind, Kind::SinglePart);
+        let parsed = bcur::ur::parse(uri, &DecoderLimits::default()).unwrap();
+        assert!(matches!(parsed, ParsedUr::Single { .. }));
     }
 }

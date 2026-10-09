@@ -71,8 +71,8 @@ function describe(info: UrErrorInfo): string {
     return `${MESSAGES.ResourceLimit}: ${info.limit}`;
   }
   if (info.code === "UnexpectedType") {
-    const names = info.expected.map((t) => t.value).join(", ");
-    return `${MESSAGES.UnexpectedType}: expected ${names}, found ${info.found.value}`;
+    const names = info.expected.join(", ");
+    return `${MESSAGES.UnexpectedType}: expected ${names}, found ${info.found}`;
   }
   return MESSAGES[info.code];
 }

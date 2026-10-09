@@ -2,8 +2,9 @@
 
 use std::path::PathBuf;
 
-use bcur::ur::Encoder;
-use bcur::{UrType, encode};
+use bcur::UrType;
+use bcur::fountain::EncoderOptions;
+use bcur::ur::{Encoder, encode};
 use clap::Args;
 
 use crate::error::{Error, Result};
@@ -47,7 +48,7 @@ pub(crate) fn run(args: &EncodeArgs) -> Result<()> {
     let max_chars = resolve_max_chars(args)?;
     let data = read_bytes(args.input.as_deref(), args.hex)?;
     let ur_type = UrType::new(&args.ur_type)?;
-    let single = encode(&data, &ur_type);
+    let single = encode(&ur_type, &data);
     let use_single = !args.animate && single.len() <= max_chars;
 
     if use_single {
@@ -72,10 +73,10 @@ pub(crate) fn run(args: &EncodeArgs) -> Result<()> {
     if fragment_len == 0 {
         return Err(Error::msg("--max-fragment must be greater than zero"));
     }
-    let mut encoder = Encoder::new(&data, fragment_len, &ur_type)?;
+    let mut encoder = Encoder::new(ur_type, data, EncoderOptions::new(fragment_len))?;
 
     if args.qr {
-        let first = encoder.next_part()?;
+        let first = next_part(&mut encoder)?;
         if first.len() > max_chars {
             return Err(Error::msg(format!(
                 "first part is {} chars (limit {max_chars}); lower --max-fragment or raise --max-chars",
@@ -87,7 +88,7 @@ pub(crate) fn run(args: &EncodeArgs) -> Result<()> {
         let k = encoder.fragment_count();
         let n = args.count.unwrap_or_else(|| k.saturating_mul(3).max(20));
         for _ in 0..n {
-            println!("{}", encoder.next_part()?);
+            println!("{}", next_part(&mut encoder)?);
         }
     }
     Ok(())
@@ -140,6 +141,18 @@ fn fit_fragment_len(data: &[u8], ur_type: &UrType, max_chars: usize) -> Result<u
 }
 
 fn measure_part(data: &[u8], ur_type: &UrType, fragment_len: usize) -> Result<usize> {
-    let mut encoder = Encoder::new(data, fragment_len, ur_type)?;
-    Ok(encoder.next_part()?.len())
+    let mut encoder = Encoder::new(
+        ur_type.clone(),
+        data.to_vec(),
+        EncoderOptions::new(fragment_len),
+    )?;
+    Ok(next_part(&mut encoder)?.len())
+}
+
+/// First UR string of an encoder; unreachable `None` means the fountain
+/// stream ran to sequence `0xFFFFFFFF`.
+fn next_part(encoder: &mut Encoder) -> Result<String> {
+    encoder
+        .next()
+        .ok_or_else(|| Error::msg("fountain encoder exhausted"))
 }
