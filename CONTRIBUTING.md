@@ -36,6 +36,7 @@ Run before opening a pull request:
 ```bash
 bun run lint && bun run typecheck && bun run test   # lint includes taplo, version,
                                                     # layer and parity checks
+bun run test:parity                                 # seeded TS→Rust differential replay
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo clippy --workspace --all-targets --no-default-features -- -D warnings
