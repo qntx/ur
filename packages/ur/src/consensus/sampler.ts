@@ -10,7 +10,7 @@ function at(list: ReadonlyArray<number>, i: number): number {
 }
 
 /** Walker's alias method with reverse-index ordered partition (ur-rs / bcur). */
-export class Weighted {
+export class Sampler {
   private readonly aliases: number[];
   private readonly probs: number[];
 
@@ -19,7 +19,7 @@ export class Weighted {
     this.probs = probs;
   }
 
-  static new(weightsIn: number[]): Weighted {
+  static new(weightsIn: number[]): Sampler {
     const weights = [...weightsIn];
     for (const w of weights) {
       if (w < 0) {
@@ -72,14 +72,14 @@ export class Weighted {
       probs[i] = 1;
     }
 
-    return new Weighted(aliases, probs);
+    return new Sampler(aliases, probs);
   }
 
   next(xoshiro: Xoshiro256): number {
-    const r1 = xoshiro.nextDouble();
-    const r2 = xoshiro.nextDouble();
     const n = this.probs.length;
-    const i = Math.trunc(n * r1);
+    // `nextInt` handles the `r1 == 1.0` edge by clamping to `n - 1` (same deviation as `nextInt`).
+    const i = xoshiro.nextInt(0, n - 1);
+    const r2 = xoshiro.nextDouble();
     if (r2 < at(this.probs, i)) {
       return i;
     }

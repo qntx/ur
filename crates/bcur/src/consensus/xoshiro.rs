@@ -2,11 +2,9 @@
 
 use alloc::vec::Vec;
 
-use bitcoin_hashes::sha256;
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_xoshiro::rand_core::{Rng, SeedableRng};
-
-use super::Weighted;
+use sha2::{Digest, Sha256};
 
 /// Xoshiro256** wrapper with UR-compatible seeding and helpers.
 pub(crate) struct Xoshiro256 {
@@ -21,9 +19,8 @@ impl From<Xoshiro256StarStar> for Xoshiro256 {
 
 impl From<&[u8]> for Xoshiro256 {
     fn from(bytes: &[u8]) -> Self {
-        // `sha256::Hash::hash` is an inherent method on this type.
-        let hash = sha256::Hash::hash(bytes);
-        Self::from(hash.to_byte_array())
+        let hash = Sha256::digest(bytes);
+        Self::from(<[u8; 32]>::from(hash))
     }
 }
 
@@ -35,22 +32,18 @@ impl From<&str> for Xoshiro256 {
 
 impl From<[u8; 32]> for Xoshiro256 {
     fn from(value: [u8; 32]) -> Self {
-        // Pack each 8-byte big-endian chunk into little-endian seed words
+        // Read each 8-byte big-endian chunk into a little-endian seed word
         // (matches ur-rs / URKit seed layout).
-        let mut s = [0_u8; 32];
-        for i in 0..4 {
-            let mut v: u64 = 0;
-            for n in 0..8 {
-                let idx = 8 * i + n;
-                v <<= 8;
-                v |= u64::from(value.get(idx).copied().unwrap_or(0));
-            }
-            let bytes = v.to_le_bytes();
-            if let Some(slot) = s.get_mut(8 * i..8 * i + 8) {
-                slot.copy_from_slice(&bytes);
-            }
+        let mut seed = [0_u8; 32];
+        for (dst, src) in seed
+            .as_chunks_mut::<8>()
+            .0
+            .iter_mut()
+            .zip(value.as_chunks::<8>().0)
+        {
+            *dst = u64::from_be_bytes(*src).to_le_bytes();
         }
-        Xoshiro256StarStar::from_seed(s).into()
+        Xoshiro256StarStar::from_seed(seed).into()
     }
 }
 
@@ -64,54 +57,61 @@ impl Xoshiro256 {
     }
 
     /// UR-spec integer in `[low, high]` via double scaling (not rejection sampling).
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        clippy::cast_precision_loss,
-        reason = "normative UR RNG path: float scaling matches ur-rs/URKit bit-for-bit"
-    )]
+    /// Deliberate deviation: clamp to `high` when `next_double()` rounds to 1.0
+    /// (raw >= `2^64 - 2^10`); the reference implementations index out of bounds there.
     pub(crate) fn next_int(&mut self, low: u64, high: u64) -> u64 {
-        (self.next_double() * ((high - low + 1) as f64)) as u64 + low
+        scaled_int(self.next_double(), low, high)
     }
 
-    /// Remove-based shuffle (not Fisher–Yates) for UR interop.
-    pub(crate) fn shuffled<T>(&mut self, mut items: Vec<T>) -> Vec<T> {
-        let mut out = Vec::with_capacity(items.len());
-        while !items.is_empty() {
-            let high = (items.len() - 1) as u64;
-            let raw = self.next_int(0, high);
-            let index = usize::try_from(raw).unwrap_or(0);
-            // `index` is always in `0..items.len()` by construction of `next_int`.
-            let item = items.remove(index.min(items.len().saturating_sub(1)));
-            out.push(item);
+    /// Random index into a pool of `len` items (the `nextInt(0..<len)` pick
+    /// inside the remove-shuffle). In bounds by `next_int`'s clamp.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "fragment counts are u32-bounded, so the clamped result always fits usize"
+    )]
+    pub(crate) fn next_index(&mut self, len: usize) -> usize {
+        self.next_int(0, len as u64 - 1) as usize
+    }
+
+    /// Remove-based shuffle (not Fisher–Yates); stops after `count` picks.
+    pub(crate) fn shuffled<T>(&mut self, mut items: Vec<T>, count: usize) -> Vec<T> {
+        let mut out = Vec::with_capacity(count.min(items.len()));
+        while !items.is_empty() && out.len() < count {
+            let index = self.next_index(items.len());
+            out.push(items.remove(index));
         }
         out
     }
-
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "degree weights use f64 reciprocals as specified by URKit/ur-rs"
-    )]
-    pub(crate) fn choose_degree(&mut self, length: usize) -> u32 {
-        let degree_weights: Vec<f64> = (1..=length).map(|x| 1.0 / x as f64).collect();
-        let sampler = Weighted::new(degree_weights);
-        sampler.next(self) + 1
-    }
 }
 
+/// `value / 2^64` with a single round-to-nearest-even conversion; division by
+/// `2^64` is exact.
 #[allow(
     clippy::cast_precision_loss,
-    reason = "IEEE-754 unit interval extraction is part of the UR RNG definition"
+    reason = "the u64 -> f64 conversion is the normative UR `Double(next())`"
 )]
-fn unit_interval(value: u64) -> f64 {
-    const SCALE: f64 = 1.0 / ((1_u64 << 53) as f64);
-    ((value >> 11) as f64) * SCALE
+pub(crate) fn unit_interval(value: u64) -> f64 {
+    const TWO_POW_64: f64 = 18_446_744_073_709_551_616.0;
+    value as f64 / TWO_POW_64
+}
+
+/// `floor(d * (high - low + 1)) + low`, clamped to `high` when `d` is 1.0 —
+/// the deliberate deviation documented on [`Xoshiro256::next_int`].
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "normative UR RNG path: float scaling matches ur-rs/URKit bit-for-bit"
+)]
+pub(crate) fn scaled_int(d: f64, low: u64, high: u64) -> u64 {
+    let span = high - low + 1;
+    ((d * span as f64) as u64).min(span - 1) + low
 }
 
 #[cfg(test)]
 pub(crate) mod test_utils {
     use super::*;
-    use crate::crc32;
+    use crate::consensus::{Sampler, crc32};
 
     impl Xoshiro256 {
         #[allow(
@@ -128,6 +128,17 @@ pub(crate) mod test_utils {
 
         pub(crate) fn from_crc(bytes: &[u8]) -> Self {
             Self::from(crc32::checksum(bytes).to_be_bytes().as_slice())
+        }
+
+        /// One-shot degree pick for vector runners; production callers hold a
+        /// cached [`Sampler`] on `FragmentChooser` instead.
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "degree weights use f64 reciprocals as specified by URKit/ur-rs"
+        )]
+        pub(crate) fn choose_degree(&mut self, length: usize) -> u32 {
+            let degree_weights: Vec<f64> = (1..=length).map(|x| 1.0 / x as f64).collect();
+            Sampler::new(degree_weights).next(self) + 1
         }
     }
 
@@ -195,7 +206,7 @@ mod tests {
             vec![6, 4, 5, 8, 9, 3, 2, 1, 7, 10],
         ];
         for e in expected {
-            assert_eq!(rng.shuffled(values.clone()), e);
+            assert_eq!(rng.shuffled(values.clone(), values.len()), e);
         }
     }
 }

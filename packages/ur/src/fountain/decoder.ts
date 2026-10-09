@@ -1,7 +1,7 @@
-import { checksum } from "../crc32.ts";
+import { FragmentChooser } from "../consensus/chooser.ts";
+import { checksum } from "../consensus/crc32.ts";
 import { UrError, fail, failPoison } from "../error.ts";
 import type { DecoderPoison } from "../error.ts";
-import { FragmentChooser } from "./choose.ts";
 import { mergeLimits } from "./limits.ts";
 import type { DecoderLimits } from "./limits.ts";
 import { Part } from "./part.ts";

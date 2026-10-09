@@ -1,15 +1,21 @@
 import { expect, test } from "vite-plus/test";
 
-import { checksum } from "../../src/crc32.ts";
+import { checksum } from "../../src/consensus/crc32.ts";
 import {
   FragmentChooser,
+  Sampler,
+  Xoshiro256,
+  scaledInt,
+  unitInterval,
+} from "../../src/consensus/index.ts";
+import {
   FountainDecoder,
   FountainEncoder,
   Part,
   fragmentLength,
   partition,
 } from "../../src/fountain/index.ts";
-import { Weighted, Xoshiro256, makeMessage } from "../../src/rng/index.ts";
+import { makeMessage } from "../message.ts";
 import { vectorJson } from "../vectors.ts";
 
 type Msg = { seed: string; length: number };
@@ -27,6 +33,15 @@ const RNG = vectorJson<{
     expected: Array<number | string>;
   }>;
 }>("official/mur/rng.json");
+const NEXT_DOUBLE = vectorJson<{
+  cases: Array<{
+    name: string;
+    rawHex: string;
+    nextDoubleBitsHex: string;
+    nextIntRange: [number, number];
+    nextInt: number;
+  }>;
+}>("consensus/next-double.json");
 const FRAG_LEN = vectorJson<{
   cases: Array<{
     messageLength: number;
@@ -231,6 +246,13 @@ test.each(RNG.cases)("consensus.xoshiro $name", (c) => {
   expect(runOp(c)).toStrictEqual(c.expected);
 });
 
+test.each(NEXT_DOUBLE.cases)("consensus.xoshiro next-double $name", (c) => {
+  const d = unitInterval(BigInt(`0x${c.rawHex}`));
+  const [bits] = new BigUint64Array(new Float64Array([d]).buffer);
+  expect(bits?.toString(16).padStart(16, "0")).toBe(c.nextDoubleBitsHex);
+  expect(scaledInt(d, c.nextIntRange[0], c.nextIntRange[1])).toBe(c.nextInt);
+});
+
 test.each(FRAG_LEN.cases)("fountain.fragment-length $messageLength@$maxFragmentLength", (c) => {
   // minFragmentLength is not yet supported (F-11); both official cases pass because the
   // minimum bound does not bind (fragmentLength ignores it).
@@ -256,7 +278,7 @@ test.each(degreeNonceCases)("consensus.sampler $name", (c) => {
 });
 
 test.each(samplerRows)("consensus.sampler $name", (c) => {
-  const sampler = Weighted.new(c.probabilities);
+  const sampler = Sampler.new(c.probabilities);
   const rng = Xoshiro256.fromString(c.rngSeed);
   const samples = Array.from({ length: c.count }, () => sampler.next(rng));
   expect({ samples, totals: countsByKey(samples) }).toStrictEqual({

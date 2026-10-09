@@ -1,20 +1,33 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 
-import { checksum } from "../crc32.ts";
-import { Weighted } from "./sampler.ts";
+import { checksum } from "./crc32.ts";
+import { Sampler } from "./sampler.ts";
 
 const MASK64 = (1n << 64n) - 1n;
+const U32_MASK = 0xff_ff_ff_ffn;
 
 function rotl(x: bigint, k: number): bigint {
   const v = x & MASK64;
   return ((v << BigInt(k)) | (v >> BigInt(64 - k))) & MASK64;
 }
 
-function unitInterval(value: bigint): number {
-  // value >> 11 * (1 / 2^53) — must stay in [0, 1)
-  const SCALE = 1 / 2 ** 53;
-  const shifted = Number(value >> 11n);
-  return shifted * SCALE;
+/**
+ * `Double(value) / 2^64` with a single round-to-nearest-even conversion: `hi * 2^32` is exact and
+ * adding `lo` performs the one IEEE-754 rounding; division by `2^64` is exact.
+ */
+export function unitInterval(value: bigint): number {
+  const hi = Number(value >> 32n);
+  const lo = Number(value & U32_MASK);
+  return (hi * 2 ** 32 + lo) / 2 ** 64;
+}
+
+/**
+ * `floor(d * (high - low + 1)) + low`, clamped to `high` when `d` is 1.0 — the deliberate deviation
+ * documented on `Xoshiro256.nextInt`.
+ */
+export function scaledInt(d: number, low: number, high: number): number {
+  const span = high - low + 1;
+  return Math.min(Math.floor(d * span), span - 1) + low;
 }
 
 /** Xoshiro256** with SHA-256 seeding matching URKit / ur-rs / bcur. */
@@ -80,12 +93,12 @@ export class Xoshiro256 {
   }
 
   /**
-   * Inclusive `[low, high]` via double scaling (normative float path). Truncation toward zero
-   * matches Rust `as u64`.
+   * Inclusive `[low, high]` via double scaling (normative float path). Deliberate deviation: clamp
+   * to `high` when `nextDouble()` rounds to 1.0 (raw >= 2^64 - 2^10); the reference implementations
+   * index out of bounds there.
    */
   nextInt(low: number, high: number): number {
-    const span = high - low + 1;
-    return Math.trunc(this.nextDouble() * span) + low;
+    return scaledInt(this.nextDouble(), low, high);
   }
 
   /** Remove-order shuffle (not Fisher–Yates); stops after `count` picks. */
@@ -108,7 +121,7 @@ export class Xoshiro256 {
     for (let x = 1; x <= length; x++) {
       weights.push(1 / x);
     }
-    const sampler = Weighted.new(weights);
+    const sampler = Sampler.new(weights);
     return sampler.next(this) + 1;
   }
 
@@ -123,9 +136,4 @@ export class Xoshiro256 {
     }
     return out;
   }
-}
-
-/** Deterministic test message: seed string → `size` bytes via Xoshiro. */
-export function makeMessage(seed: string, size: number): Uint8Array {
-  return Xoshiro256.fromString(seed).nextBytes(size);
 }

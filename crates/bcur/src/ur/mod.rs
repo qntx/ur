@@ -569,8 +569,8 @@ mod tests {
     use minicbor::bytes::ByteVec;
 
     use super::*;
+    use crate::consensus::xoshiro::test_utils::make_message;
     use crate::fountain::DecoderLimits;
-    use crate::rng::test_utils::make_message;
 
     fn make_message_ur(length: usize, seed: &str) -> Vec<u8> {
         let message = make_message(seed, length);

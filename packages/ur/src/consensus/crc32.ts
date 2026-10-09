@@ -1,4 +1,4 @@
-import { fail } from "./error.ts";
+import { fail } from "../error.ts";
 
 /** CRC-32 ISO-HDLC (polynomial 0xedb88320), matching bcur / ur-rs. */
 

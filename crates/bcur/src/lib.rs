@@ -73,10 +73,9 @@ pub mod bytewords;
 pub mod fountain;
 pub mod ur;
 
+mod consensus;
 mod constants;
-mod crc32;
 mod error;
-mod rng;
 
 pub use error::{CborError, CborErrorKind, Error, ResourceKind, Result};
 pub use fountain::DecoderLimits;

@@ -18,10 +18,10 @@ use alloc::{
     string::String,
     vec::Vec,
 };
+use core::num::NonZeroU32;
 
-use crate::crc32;
+use crate::consensus::{FragmentChooser, choose_fragments, crc32};
 use crate::error::Poison;
-use crate::rng::Xoshiro256;
 use crate::{Error, ResourceKind, Result};
 
 /// Hard limits for adversarial multi-part streams.
@@ -142,6 +142,7 @@ pub struct Encoder {
     sequence_count: u32,
     message_length: u32,
     checksum: u32,
+    chooser: FragmentChooser,
     current_sequence: u32,
 }
 
@@ -165,11 +166,18 @@ impl Encoder {
         let fragments = partition(message.to_vec(), frag_len);
         let sequence_count = u32::try_from(fragments.len())
             .map_err(|_| Error::ResourceLimit(ResourceKind::FragmentCount))?;
+        let checksum = crc32::checksum(message);
         Ok(Self {
             parts: fragments,
             sequence_count,
             message_length,
-            checksum: crc32::checksum(message),
+            checksum,
+            // `fragments` is non-empty because `message` is.
+            chooser: FragmentChooser::new(
+                NonZeroU32::new(sequence_count)
+                    .ok_or(Error::ResourceLimit(ResourceKind::FragmentCount))?,
+                checksum,
+            ),
             current_sequence: 0,
         })
     }
@@ -204,15 +212,14 @@ impl Encoder {
             return Err(Error::SinglePartExhausted);
         }
         self.current_sequence = next_sequence(self.current_sequence)?;
-        let indexes = choose_fragments(
-            self.current_sequence as usize,
-            self.parts.len(),
-            self.checksum,
-        );
+        // `next_sequence` only ever yields values >= 1.
+        let sequence = NonZeroU32::new(self.current_sequence).ok_or(Error::DecoderState)?;
+        let indexes = self.chooser.choose(sequence);
         let first = self.parts.first().ok_or(Error::DecoderState)?;
         let mut mixed = alloc::vec![0_u8; first.len()];
         for item in indexes {
-            let fragment = self.parts.get(item).ok_or(Error::DecoderState)?;
+            let index = usize::try_from(item).map_err(|_| Error::DecoderState)?;
+            let fragment = self.parts.get(index).ok_or(Error::DecoderState)?;
             xor(&mut mixed, fragment)?;
         }
         Ok(Part {
@@ -244,6 +251,7 @@ pub struct Decoder {
     message_length: usize,
     checksum: u32,
     fragment_length: usize,
+    chooser: Option<FragmentChooser>,
     limits: DecoderLimits,
     poisoned: Option<Poison>,
 }
@@ -273,6 +281,7 @@ impl Decoder {
             message_length: 0,
             checksum: 0,
             fragment_length: 0,
+            chooser: None,
             limits,
             poisoned: None,
         }
@@ -347,22 +356,36 @@ impl Decoder {
             self.message_length = ml;
             self.checksum = part.checksum;
             self.fragment_length = frag_len;
+            self.chooser = Some(FragmentChooser::new(
+                NonZeroU32::new(sc).ok_or(Error::EmptyPart)?,
+                part.checksum,
+            ));
         } else if !self.validate(&part) {
             return Err(Error::InconsistentPart);
         }
 
-        let indexes = part.indexes();
+        // Index sets are computed once per part from the per-stream chooser.
+        let indexes: Vec<usize> = self
+            .chooser
+            .as_ref()
+            .ok_or(Error::DecoderState)?
+            .choose(NonZeroU32::new(part.sequence).ok_or(Error::InvalidSequence)?)
+            .into_iter()
+            .map(|i| usize::try_from(i).map_err(|_| Error::DecoderState))
+            .collect::<Result<_>>()?;
         if self.received.contains(&indexes) {
             return Ok(false);
         }
         if self.received.len() >= self.limits.max_received_parts {
             return Err(self.poison(ResourceKind::ReceivedParts));
         }
-        self.received.insert(indexes);
-        if part.is_simple() {
-            self.enqueue_simple(part).map_err(|e| self.escalate(e))?;
+        self.received.insert(indexes.clone());
+        if indexes.len() == 1 {
+            let index = *indexes.first().ok_or(Error::DecoderState)?;
+            self.enqueue_simple(index, part);
         } else {
-            self.process_complex(part).map_err(|e| self.escalate(e))?;
+            self.process_complex(part, indexes)
+                .map_err(|e| self.escalate(e))?;
         }
         // Always drain the reduction queue after ingest so that a complex part
         // reduced to a simple fragment still cascades into the XOR buffer.
@@ -370,14 +393,12 @@ impl Decoder {
         Ok(true)
     }
 
-    fn enqueue_simple(&mut self, part: Part) -> Result<()> {
-        let index = *part.indexes().first().ok_or(Error::DecoderState)?;
+    fn enqueue_simple(&mut self, index: usize, part: Part) {
         if self.decoded.contains_key(&index) {
-            return Ok(());
+            return;
         }
         self.decoded.insert(index, part.clone());
         self.queue.push((index, part));
-        Ok(())
     }
 
     fn process_queue(&mut self) -> Result<()> {
@@ -412,8 +433,7 @@ impl Decoder {
         self.insert_reduced(new_indexes, part)
     }
 
-    fn process_complex(&mut self, mut part: Part) -> Result<()> {
-        let mut indexes = part.indexes();
+    fn process_complex(&mut self, mut part: Part, mut indexes: Vec<usize>) -> Result<()> {
         let known: Vec<usize> = indexes
             .iter()
             .copied()
@@ -606,13 +626,18 @@ impl Part {
     }
 
     /// Indexes of source fragments mixed into this part.
+    ///
+    /// Rebuilds the degree table per call; the decoder hot path holds its own
+    /// per-stream chooser instead of calling this.
     #[must_use]
     pub fn indexes(&self) -> Vec<usize> {
-        choose_fragments(
-            self.sequence as usize,
-            self.sequence_count as usize,
-            self.checksum,
-        )
+        let (Some(sequence), Some(count)) = (
+            NonZeroU32::new(self.sequence),
+            NonZeroU32::new(self.sequence_count),
+        ) else {
+            return Vec::new();
+        };
+        choose_fragments(sequence, count, self.checksum)
     }
 
     /// Whether this part is a single source fragment.
@@ -680,35 +705,6 @@ pub(crate) fn partition(mut data: Vec<u8>, fragment_length: usize) -> Vec<Vec<u8
     data.chunks(fragment_length).map(<[u8]>::to_vec).collect()
 }
 
-#[must_use]
-pub(crate) fn choose_fragments(
-    sequence: usize,
-    fragment_count: usize,
-    checksum: u32,
-) -> Vec<usize> {
-    if sequence == 0 || fragment_count == 0 {
-        return Vec::new();
-    }
-    if sequence <= fragment_count {
-        return alloc::vec![sequence - 1];
-    }
-    // Sequence is already validated as a wire `u32` at the encoder/decoder edge.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "UR wire sequence is u32; callers only pass values that fit"
-    )]
-    let sequence_u32 = sequence as u32;
-    let mut seed = [0u8; 8];
-    seed[0..4].copy_from_slice(&sequence_u32.to_be_bytes());
-    seed[4..8].copy_from_slice(&checksum.to_be_bytes());
-    let mut xoshiro = Xoshiro256::from(seed.as_slice());
-    let degree = xoshiro.choose_degree(fragment_count);
-    let indexes = (0..fragment_count).collect();
-    let mut shuffled = xoshiro.shuffled(indexes);
-    shuffled.truncate(degree as usize);
-    shuffled
-}
-
 fn xor(v1: &mut [u8], v2: &[u8]) -> Result<()> {
     if v1.len() != v2.len() {
         return Err(Error::DecoderState);
@@ -722,7 +718,7 @@ fn xor(v1: &mut [u8], v2: &[u8]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rng::test_utils::make_message;
+    use crate::consensus::xoshiro::test_utils::make_message;
 
     fn testdata_lines(raw: &str) -> Vec<&str> {
         raw.lines()
@@ -869,8 +865,13 @@ mod tests {
         .collect();
         assert_eq!(expected.len(), 30);
         for (i, e) in expected.iter().enumerate() {
-            let mut indexes = choose_fragments(i + 1, fragments.len(), checksum);
-            indexes.sort_unstable();
+            let indexes = choose_fragments(
+                NonZeroU32::new(u32::try_from(i + 1).expect("sequence fits u32"))
+                    .expect("sequence is non-zero"),
+                NonZeroU32::new(u32::try_from(fragments.len()).expect("fragment count fits u32"))
+                    .expect("fragment count is non-zero"),
+                checksum,
+            );
             assert_eq!(&indexes, e);
         }
     }

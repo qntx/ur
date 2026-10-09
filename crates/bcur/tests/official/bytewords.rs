@@ -45,10 +45,7 @@ fn official_bytewords() {
     }
 }
 
-// `decode("", Standard)` yields `Error::InvalidWord` while the official
-// expectation (and the TypeScript implementation) is `InvalidBytewordsChecksum`.
 #[test]
-#[ignore = "F-25: empty bytewords input classifies as InvalidWord, expected InvalidBytewordsChecksum"]
 fn official_bytewords_empty_input() {
     let err = decode("", Style::Standard).unwrap_err();
     assert_eq!(format!("{err:?}"), "InvalidBytewordsChecksum");

@@ -14,12 +14,12 @@
 
 use alloc::{string::String, vec::Vec};
 
+use crate::consensus::crc32;
 use crate::constants::BYTES_INDEXED_BY_HASH;
 /// Minimal two-letter (first+last) table used by UR bodies.
 pub use crate::constants::MINIMALS;
 /// BCR-2020-012 four-letter bytewords table.
 pub use crate::constants::WORDS;
-use crate::crc32;
 use crate::{Error, Result};
 
 /// The three bytewords encoding styles.
@@ -82,6 +82,12 @@ pub fn decode(encoded: &str, style: Style) -> Result<Vec<u8>> {
         Style::Uri => '-',
         Style::Minimal => return decode_minimal(&lowered),
     };
+    // An empty input carries no checksum; classify it like the TypeScript
+    // decoder and the official vectors do, before `split` yields one empty
+    // "word" that would surface as `InvalidWord`.
+    if lowered.is_empty() {
+        return Err(Error::InvalidBytewordsChecksum);
+    }
     decode_parts(lowered.split(separator), false)
 }
 

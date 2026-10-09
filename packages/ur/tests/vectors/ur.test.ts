@@ -1,6 +1,5 @@
 import { expect, test } from "vite-plus/test";
 
-import { makeMessage } from "../../src/rng/index.ts";
 import {
   Decoder,
   Encoder,
@@ -10,6 +9,7 @@ import {
   encode,
   parse,
 } from "../../src/ur/index.ts";
+import { makeMessage } from "../message.ts";
 import { vectorJson, vectorLines } from "../vectors.ts";
 
 type SingleCase = {

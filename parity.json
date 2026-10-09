@@ -45,11 +45,11 @@
       "status": "stable",
       "milestone": "UR3",
       "ts": {
-        "module": "packages/ur/src/fountain/choose.ts",
+        "module": "packages/ur/src/consensus/chooser.ts",
         "tests": ["packages/ur/tests/fountain.test.ts", "packages/ur/tests/vectors/mur.test.ts"]
       },
       "rust": {
-        "module": "crates/bcur/src/fountain/mod.rs",
+        "module": "crates/bcur/src/consensus/chooser.rs",
         "tests": ["crates/bcur/src/fountain/mod.rs", "crates/bcur/src/official_vectors.rs"]
       },
       "vectors": ["vectors/ur-rs/choose-fragments.txt", "vectors/official/mur/chooser.json"]
@@ -60,7 +60,7 @@
       "status": "stable",
       "milestone": "UR3",
       "ts": {
-        "module": "packages/ur/src/fountain/choose.ts",
+        "module": "packages/ur/src/fountain/encoder.ts",
         "tests": ["packages/ur/tests/fountain.test.ts", "packages/ur/tests/vectors/mur.test.ts"]
       },
       "rust": {
@@ -191,11 +191,11 @@
       "status": "stable",
       "milestone": "R0",
       "ts": {
-        "module": "packages/ur/src/crc32.ts",
+        "module": "packages/ur/src/consensus/crc32.ts",
         "tests": ["packages/ur/tests/vectors/mur.test.ts"]
       },
       "rust": {
-        "module": "crates/bcur/src/crc32.rs",
+        "module": "crates/bcur/src/consensus/crc32.rs",
         "tests": ["crates/bcur/src/official_vectors.rs"]
       },
       "vectors": ["vectors/official/mur/crc32.json"]
@@ -206,14 +206,14 @@
       "status": "stable",
       "milestone": "R0",
       "ts": {
-        "module": "packages/ur/src/rng/xoshiro.ts",
+        "module": "packages/ur/src/consensus/xoshiro.ts",
         "tests": ["packages/ur/tests/vectors/mur.test.ts"]
       },
       "rust": {
-        "module": "crates/bcur/src/rng/xoshiro.rs",
-        "tests": ["crates/bcur/src/official_vectors.rs"]
+        "module": "crates/bcur/src/consensus/xoshiro.rs",
+        "tests": ["crates/bcur/src/official_vectors.rs", "crates/bcur/src/consensus/vectors.rs"]
       },
-      "vectors": ["vectors/official/mur/rng.json"]
+      "vectors": ["vectors/official/mur/rng.json", "vectors/consensus/next-double.json"]
     },
     {
       "id": "consensus.sampler",
@@ -221,11 +221,11 @@
       "status": "stable",
       "milestone": "R0",
       "ts": {
-        "module": "packages/ur/src/rng/sampler.ts",
+        "module": "packages/ur/src/consensus/sampler.ts",
         "tests": ["packages/ur/tests/vectors/mur.test.ts"]
       },
       "rust": {
-        "module": "crates/bcur/src/rng/sampler.rs",
+        "module": "crates/bcur/src/consensus/sampler.rs",
         "tests": ["crates/bcur/src/official_vectors.rs"]
       },
       "vectors": ["vectors/official/mur/degree.json"]
@@ -236,11 +236,11 @@
       "status": "stable",
       "milestone": "R0",
       "ts": {
-        "module": "packages/ur/src/rng/xoshiro.ts",
+        "module": "packages/ur/src/consensus/xoshiro.ts",
         "tests": ["packages/ur/tests/vectors/mur.test.ts"]
       },
       "rust": {
-        "module": "crates/bcur/src/rng/xoshiro.rs",
+        "module": "crates/bcur/src/consensus/xoshiro.rs",
         "tests": ["crates/bcur/src/official_vectors.rs"]
       },
       "vectors": ["vectors/official/mur/shuffle.json"]
@@ -251,7 +251,7 @@
       "status": "stable",
       "milestone": "R0",
       "ts": {
-        "module": "packages/ur/src/fountain/choose.ts",
+        "module": "packages/ur/src/fountain/encoder.ts",
         "tests": ["packages/ur/tests/vectors/mur.test.ts"]
       },
       "rust": {

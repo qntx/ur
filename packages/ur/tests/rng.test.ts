@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 
-import { Weighted } from "../src/rng/sampler.ts";
-import { Xoshiro256 } from "../src/rng/xoshiro.ts";
+import { Sampler } from "../src/consensus/sampler.ts";
+import { Xoshiro256 } from "../src/consensus/xoshiro.ts";
 
 test("rng_1", () => {
   const rng = Xoshiro256.fromString("Wolf");
@@ -60,7 +60,7 @@ test("shuffle", () => {
 test("sampler", () => {
   const weights = [1, 2, 4, 8];
   const xoshiro = Xoshiro256.fromString("Wolf");
-  const sampler = Weighted.new(weights);
+  const sampler = Sampler.new(weights);
   const expected = [
     3, 3, 3, 3, 3, 3, 3, 0, 2, 3, 3, 3, 3, 1, 2, 2, 1, 3, 3, 2, 3, 3, 1, 1, 2, 1, 1, 3, 1, 3,
   ];
