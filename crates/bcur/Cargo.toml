@@ -36,6 +36,7 @@ criterion  = { version = "0.8", default-features = false, features = ["cargo_ben
 hex        = { workspace = true }
 minicbor   = { version = "2", features = ["alloc"] }
 serde_json = "1"
+sha2       = { version = "0.10", default-features = false }
 
 [[bench]]
 name    = "bytewords"

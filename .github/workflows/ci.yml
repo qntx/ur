@@ -18,8 +18,12 @@ jobs:
     uses: qntx/workflows/.github/workflows/ci-bun.yml@v2
     permissions:
       contents: read
-    # bun run build → vp run -r build (no Rust)
+    # bun run build → vp run -r build
     # bun run test → vp run -r test
+    # scripts → bun run test:parity (TS generates, Rust replays)
+    with:
+      rust: true
+      scripts: test:parity
 
   rust:
     uses: qntx/workflows/.github/workflows/ci-rust.yml@v2
