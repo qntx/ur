@@ -1,40 +1,60 @@
 //! Uniform Resource encode/decode and multi-part fountain transport.
 //!
 //! ```
+//! use bcur::fountain::EncoderOptions;
 //! use bcur::ur::{Decoder, Encoder};
-//! use bcur::UrType;
+//! use bcur::ur_type;
 //!
 //! let data = b"Ten chars!".repeat(10);
-//! let mut encoder = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
+//! let mut encoder = Encoder::new(ur_type!("alpha"), data.clone(), EncoderOptions::new(10)).unwrap();
 //! let mut decoder = Decoder::default();
-//! while !matches!(decoder.state(), bcur::fountain::State::Complete(_)) {
-//!     decoder.receive(&encoder.next_part().unwrap()).unwrap();
+//! for frame in encoder.by_ref() {
+//!     decoder.receive(&frame).unwrap();
+//!     if matches!(decoder.state(), bcur::State::Complete(_)) {
+//!         break;
+//!     }
 //! }
 //! assert_eq!(decoder.into_decoded().unwrap().message(), data);
 //! ```
 
-use alloc::{string::String, vec::Vec};
+use alloc::{borrow::Cow, format, string::String, vec::Vec};
+use core::{fmt, iter::FusedIterator, str::FromStr};
 
 use crate::bytewords::{self, Style};
 use crate::error::{Error, ErrorKind, Limit, Result};
-use crate::fountain::{self, DecoderLimits, Progress, Received, State};
+use crate::fountain::{self, DecoderLimits, EncoderOptions, Part, Progress, Received, State};
 
-/// Validated UR type token (non-empty, stored lowercase).
+/// Validated UR type token: canonical lowercase ASCII `[a-z0-9-]+`.
 ///
-/// Allowed characters after normalization: ASCII `[a-z0-9-]+`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct UrType(String);
+/// [`UrType::new`] lowercases then validates; [`UrType::new_static`] validates
+/// a `&'static str` at compile time (see [`ur_type!`]).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct UrType(Cow<'static, str>);
 
 impl UrType {
     /// Validates and lowercases a type token.
     ///
     /// # Errors
     ///
-    /// Returns [`ErrorKind::InvalidType`] if empty or containing illegal characters.
+    /// Returns [`ErrorKind::InvalidType`] if empty or containing illegal
+    /// characters.
     pub fn new(s: &str) -> Result<Self> {
         let lower = s.to_ascii_lowercase();
-        validate_type(&lower)?;
-        Ok(Self(lower))
+        if !is_valid_type(&lower) {
+            return Err(Error::new(ErrorKind::InvalidType));
+        }
+        Ok(Self(Cow::Owned(lower)))
+    }
+
+    /// Validates a `&'static str` that is already canonical lowercase.
+    ///
+    /// Usable in `const` context — see [`ur_type!`].
+    #[must_use]
+    pub const fn new_static(s: &'static str) -> Option<Self> {
+        if !is_valid_type_const(s) {
+            return None;
+        }
+        Some(Self(Cow::Borrowed(s)))
     }
 
     /// Returns the string form.
@@ -42,11 +62,44 @@ impl UrType {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+}
 
-    /// Well-known `bytes` type.
-    #[must_use]
-    pub fn bytes() -> Self {
-        Self(String::from("bytes"))
+/// UR type literal validated at compile time: `ur_type!("seed")` expands to
+/// an inline `const` block, so an invalid token is a compile error.
+///
+/// ```
+/// use bcur::ur_type;
+/// const SEED: bcur::UrType = ur_type!("seed");
+/// assert_eq!(SEED.as_str(), "seed");
+/// ```
+///
+/// ```compile_fail
+/// let _invalid = bcur::ur_type!("Not A Type");
+/// ```
+#[macro_export]
+macro_rules! ur_type {
+    ($t:literal) => {
+        const { $crate::UrType::new_static($t).expect("invalid UR type literal") }
+    };
+}
+
+impl fmt::Display for UrType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl AsRef<str> for UrType {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl FromStr for UrType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Self::new(s)
     }
 }
 
@@ -66,178 +119,97 @@ impl TryFrom<String> for UrType {
     }
 }
 
-/// Conversion into a validated [`UrType`].
-///
-/// Implemented for [`UrType`], `&UrType`, [`&str`], and [`String`].
-/// Not for downstream impls (sealed).
-pub trait IntoUrType: sealed::Sealed {
-    /// Validates or clones into a [`UrType`].
-    ///
-    /// # Errors
-    ///
-    /// [`ErrorKind::InvalidType`] for an empty or illegal type token.
-    fn into_ur_type(self) -> Result<UrType>;
+fn is_valid_type(s: &str) -> bool {
+    !s.is_empty()
+        && s.bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
-#[allow(
-    unreachable_pub,
-    reason = "Sealed must be pub so IntoUrType can be public; module is private"
-)]
-mod sealed {
-    use alloc::string::String;
-
-    use super::UrType;
-
-    /// Not implementable outside this crate.
-    pub trait Sealed {}
-    impl Sealed for UrType {}
-    impl Sealed for &UrType {}
-    impl Sealed for &str {}
-    impl Sealed for String {}
-}
-
-impl IntoUrType for UrType {
-    fn into_ur_type(self) -> Result<UrType> {
-        Ok(self)
+const fn is_valid_type_const(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    if bytes.is_empty() {
+        return false;
     }
-}
-
-impl IntoUrType for &UrType {
-    fn into_ur_type(self) -> Result<UrType> {
-        Ok(self.clone())
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if !(b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-') {
+            return false;
+        }
+        i += 1;
     }
+    true
 }
 
-impl IntoUrType for &str {
-    fn into_ur_type(self) -> Result<UrType> {
-        UrType::new(self)
-    }
-}
-
-impl IntoUrType for String {
-    fn into_ur_type(self) -> Result<UrType> {
-        UrType::new(&self)
-    }
-}
-
-/// Whether a decoded UR is single- or multi-part.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Kind {
-    /// Full payload in one URI.
-    SinglePart,
-    /// One fountain part of a multi-part stream.
-    MultiPart,
-}
-
-/// Owned parse of a UR string (body is case-folded to lowercase).
+/// A decoded UR: a single-part message or one validated fountain part.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParsedUr {
-    /// Normalized type.
-    pub ur_type: UrType,
-    /// Single- or multi-part.
-    pub kind: Kind,
-    /// Multi-part path indices `(seq, count)`, if multi-part.
-    pub indices: Option<(u32, u32)>,
-    /// Lowercased bytewords body.
-    pub body: String,
+pub enum ParsedUr {
+    /// `ur:<type>/<bytewords>` with the decoded message bytes.
+    Single {
+        /// Normalized type token.
+        ur_type: UrType,
+        /// Bytewords-decoded message.
+        message: Vec<u8>,
+    },
+    /// `ur:<type>/<seq>-<count>/<bytewords>` with the decoded fountain part.
+    Multi {
+        /// Normalized type token.
+        ur_type: UrType,
+        /// Fountain part decoded from the body (header indices verified
+        /// against the part CBOR fields).
+        part: Part,
+    },
 }
 
-/// Lowercases a UR string for case-insensitive QR transport.
-#[must_use]
-pub fn normalize_ur(uri: &str) -> String {
-    uri.to_ascii_lowercase()
-}
-
-/// Encodes a single-part UR. Empty `data` is allowed.
+/// Parses and decodes a UR string.
 ///
-/// `ur_type` is already validated, so this cannot fail.
-#[must_use]
-pub fn encode(data: &[u8], ur_type: &UrType) -> String {
-    let body = bytewords::encode(data, Style::Minimal);
-    alloc::format!("ur:{}/{body}", ur_type.as_str())
-}
-
-/// Decodes payload bytes from a single- or multi-part UR (type is discarded).
-///
-/// Multi-part returns the CBOR-encoded fountain part bytes, not the message.
+/// Case-insensitive for the URI and the bytewords body. `limits` bounds the
+/// URI length and the multi-part CBOR fields (UR-ADR-029 header grammar).
 ///
 /// # Errors
 ///
-/// Returns parse, type, bytewords, or index errors.
-pub fn decode(uri: &str) -> Result<(Kind, Vec<u8>)> {
-    let (kind, payload, _) = decode_with_indices(uri)?;
-    Ok((kind, payload))
-}
-
-/// Decodes a **single-part** UR to its payload bytes.
-///
-/// Multi-part URIs return [`ErrorKind::NotSinglePart`]; use [`Decoder`] for those.
-///
-/// # Errors
-///
-/// Parse, type, bytewords, or [`ErrorKind::NotSinglePart`].
-pub fn decode_message(uri: &str) -> Result<Vec<u8>> {
-    let (kind, payload) = decode(uri)?;
-    match kind {
-        Kind::SinglePart => Ok(payload),
-        Kind::MultiPart => Err(Error::new(ErrorKind::NotSinglePart)),
+/// Scheme, type, index, bytewords, part-CBOR, or limit errors.
+pub fn parse(text: &str, limits: &DecoderLimits) -> Result<ParsedUr> {
+    if text.len() > limits.max_uri_length {
+        return Err(Error::resource_limit(Limit::UriLength));
     }
-}
-
-/// Like [`decode`] but retains the normalized type.
-///
-/// # Errors
-///
-/// Same as [`decode`].
-pub fn decode_with_type(uri: &str) -> Result<(UrType, Kind, Vec<u8>)> {
-    let parsed = parse(uri)?;
-    let payload = bytewords::decode(&parsed.body, Style::Minimal)?;
-    Ok((parsed.ur_type, parsed.kind, payload))
-}
-
-/// Parses a UR into an owned structure (full-URI case fold).
-///
-/// # Errors
-///
-/// Returns scheme, type, or index errors. Does not decode bytewords.
-pub fn parse(uri: &str) -> Result<ParsedUr> {
-    parse_lowered(&normalize_ur(uri))
-}
-
-fn parse_lowered(uri: &str) -> Result<ParsedUr> {
-    let strip_scheme = uri
+    let uri = text.to_ascii_lowercase();
+    let rest0 = uri
         .strip_prefix("ur:")
         .ok_or_else(|| Error::new(ErrorKind::InvalidScheme))?;
-    let (type_str, rest) = strip_scheme
+    let (type_str, rest) = rest0
         .split_once('/')
         .ok_or_else(|| Error::new(ErrorKind::TypeUnspecified))?;
     let ur_type = UrType::new(type_str)?;
 
     match rest.rsplit_once('/') {
-        None => Ok(ParsedUr {
+        None => Ok(ParsedUr::Single {
             ur_type,
-            kind: Kind::SinglePart,
-            indices: None,
-            body: rest.to_ascii_lowercase(),
+            message: bytewords::decode(rest, Style::Minimal)?,
         }),
         Some((indices, body)) => {
-            let indices = decode_indices(indices)?;
-            Ok(ParsedUr {
-                ur_type,
-                kind: Kind::MultiPart,
-                indices: Some(indices),
-                body: body.to_ascii_lowercase(),
-            })
+            let (seq, count) = decode_indices(indices)?;
+            let cbor = bytewords::decode(body, Style::Minimal)?;
+            let part = Part::from_cbor(&cbor, limits)?;
+            if part.sequence() != seq || part.sequence_count() != count {
+                return Err(Error::new(ErrorKind::InvalidIndices));
+            }
+            Ok(ParsedUr::Multi { ur_type, part })
         }
     }
 }
 
-type DecodedPayload = (Kind, Vec<u8>, Option<(u32, u32)>);
+/// Encodes a single-part UR. Empty `message` is allowed.
+#[must_use]
+pub fn encode(ur_type: &UrType, message: &[u8]) -> String {
+    let body = bytewords::encode(message, Style::Minimal);
+    format!("ur:{}/{body}", ur_type.as_str())
+}
 
-fn decode_with_indices(value: &str) -> Result<DecodedPayload> {
-    let parsed = parse(value)?;
-    let payload = bytewords::decode(&parsed.body, Style::Minimal)?;
-    Ok((parsed.kind, payload, parsed.indices))
+/// Uppercase UR string for denser QR alphanumeric mode.
+#[must_use]
+pub fn to_qr_string(ur: &str) -> String {
+    ur.to_ascii_uppercase()
 }
 
 fn decode_indices(indices: &str) -> Result<(u32, u32)> {
@@ -264,61 +236,53 @@ fn decode_indices(indices: &str) -> Result<(u32, u32)> {
     Ok((idx, idx_total))
 }
 
-fn validate_type(s: &str) -> Result<()> {
-    if s.is_empty() || !s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
-        return Err(Error::new(ErrorKind::InvalidType));
-    }
-    Ok(())
-}
-
-/// UR encoder owning the payload (single-part when `K == 1`).
+/// UR string encoder.
+///
+/// `K == 1` emits the same single-part UR on every step; larger messages emit
+/// `ur:<type>/<seq>-<count>/<bytewords>` fountain parts until sequence
+/// `0xFFFFFFFF`, where iteration ends (UR-ADR-016).
 #[derive(Debug)]
 pub struct Encoder {
     fountain: fountain::Encoder,
     ur_type: UrType,
-    message: Vec<u8>,
-    /// 0 before first emit; 1 after. Only used when `K == 1`.
-    single_emitted: u32,
+    /// `K == 1`: the precomputed single-part URI, emitted forever.
+    single: Option<String>,
+    /// Whether the single-part URI has been emitted at least once.
+    emitted: bool,
 }
 
 impl Encoder {
-    /// Creates an encoder with the well-known `bytes` type.
+    /// Creates an encoder for `message` under `ur_type`.
     ///
     /// # Errors
     ///
     /// Propagates fountain construction errors.
-    pub fn bytes(message: &[u8], max_fragment_length: usize) -> Result<Self> {
-        Self::new(message, max_fragment_length, &UrType::bytes())
-    }
-
-    /// Creates an encoder with a custom type.
-    ///
-    /// When the payload fits in one fragment (`K == 1`), [`Self::next_part`]
-    /// emits a single-part `ur:<type>/<bytewords>` string (BCR-2024-001).
-    ///
-    /// # Errors
-    ///
-    /// Propagates type validation and fountain construction errors.
-    pub fn new(message: &[u8], max_fragment_length: usize, ur_type: &UrType) -> Result<Self> {
-        Self::with_options(
-            message.to_vec(),
-            fountain::EncoderOptions::new(max_fragment_length),
-            ur_type,
-        )
-    }
-
-    /// Crate-internal constructor with full fountain options (vector runners).
-    pub(crate) fn with_options(
-        message: Vec<u8>,
-        options: fountain::EncoderOptions,
-        ur_type: &UrType,
+    pub fn new(
+        ur_type: UrType,
+        message: impl Into<Vec<u8>>,
+        options: EncoderOptions,
     ) -> Result<Self> {
+        let message = message.into();
+        let fountain = fountain::Encoder::new(message.clone(), options)?;
+        let single = (fountain.fragment_count() == 1).then(|| encode(&ur_type, &message));
         Ok(Self {
-            fountain: fountain::Encoder::new(message.clone(), options)?,
-            ur_type: ur_type.clone(),
-            message,
-            single_emitted: 0,
+            fountain,
+            ur_type,
+            single,
+            emitted: false,
         })
+    }
+
+    /// The UR type token this encoder emits.
+    #[must_use]
+    pub const fn ur_type(&self) -> &UrType {
+        &self.ur_type
+    }
+
+    /// Source fragment count `K`.
+    #[must_use]
+    pub const fn fragment_count(&self) -> u32 {
+        self.fountain.fragment_count()
     }
 
     /// Whether this encoder emits a single-part UR (`K == 1`).
@@ -327,61 +291,44 @@ impl Encoder {
         self.fountain.fragment_count() == 1
     }
 
-    /// Emits the next UR string.
-    ///
-    /// Single-fragment messages (`K == 1`) use the single-part form and re-emit
-    /// the same `ur:<type>/<bytewords>` string on every call. The fountain
-    /// encoder is not advanced. Larger messages use fountain
-    /// `ur:<type>/<seq>-<count>/<bytewords>`.
-    ///
-    /// # Errors
-    ///
-    /// Multi-part only: sequence resource limits from the fountain encoder.
-    pub fn next_part(&mut self) -> Result<String> {
-        if self.is_single_part() {
-            self.single_emitted = 1;
-            return Ok(encode(&self.message, &self.ur_type));
+    /// Whether the single-part URI has been emitted, or every source fragment
+    /// has been emitted at least once.
+    #[must_use]
+    pub const fn is_complete(&self) -> bool {
+        if self.single.is_some() {
+            self.emitted
+        } else {
+            self.fountain.is_complete()
         }
-        let part = self.fountain.next().ok_or_else(Error::internal)?;
+    }
+
+    /// Fragment indexes mixed into the most recently produced part.
+    #[must_use]
+    pub fn last_fragment_indexes(&self) -> &[u32] {
+        self.fountain.last_fragment_indexes()
+    }
+}
+
+impl Iterator for Encoder {
+    type Item = String;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(single) = &self.single {
+            self.emitted = true;
+            return Some(single.clone());
+        }
+        let part = self.fountain.next()?;
         let body = bytewords::encode(&part.to_cbor(), Style::Minimal);
-        Ok(alloc::format!(
+        Some(format!(
             "ur:{}/{}-{}/{body}",
             self.ur_type.as_str(),
             part.sequence(),
             part.sequence_count()
         ))
     }
-
-    /// Current emitted part count.
-    ///
-    /// Single-part: `0` before the first emit, then `1`. Multi-part: fountain
-    /// `seqNum`.
-    #[must_use]
-    pub const fn current_index(&self) -> u32 {
-        if self.is_single_part() {
-            self.single_emitted
-        } else {
-            self.fountain.sequence()
-        }
-    }
-
-    /// Whether a single-part UR has been emitted, or every source fragment has
-    /// been emitted at least once.
-    #[must_use]
-    pub const fn complete(&self) -> bool {
-        if self.is_single_part() {
-            self.single_emitted == 1
-        } else {
-            self.fountain.is_complete()
-        }
-    }
-
-    /// Source fragment count `K`.
-    #[must_use]
-    pub const fn fragment_count(&self) -> u32 {
-        self.fountain.fragment_count()
-    }
 }
+
+impl FusedIterator for Encoder {}
 
 /// Reconstructed UR payload and type: the terminal value of [`Decoder`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -482,14 +429,17 @@ impl Decoder {
             self.processed = self.processed.saturating_add(1);
             return Ok(Received::Duplicate);
         }
-        if text.len() > self.limits.max_uri_length {
-            return Err(self.fail(Error::resource_limit(Limit::UriLength)));
-        }
-        let parsed = parse(text)?;
-        self.check_type(&parsed.ur_type)?;
-        match parsed.kind {
-            Kind::SinglePart => self.receive_single(&parsed),
-            Kind::MultiPart => self.receive_fountain(&parsed),
+        let parsed = parse(text, &self.limits).map_err(|e| self.fatalize(e))?;
+        let ur_type = match &parsed {
+            ParsedUr::Single { ur_type, .. } | ParsedUr::Multi { ur_type, .. } => ur_type,
+        };
+        self.check_type(ur_type)?;
+        match parsed {
+            ParsedUr::Single {
+                ur_type: ty,
+                message,
+            } => self.receive_single(ty, message),
+            ParsedUr::Multi { ur_type: ty, part } => self.receive_fountain(ty, &part),
         }
     }
 
@@ -509,42 +459,29 @@ impl Decoder {
         Ok(())
     }
 
-    fn receive_single(&mut self, parsed: &ParsedUr) -> Result<Received> {
+    fn receive_single(&mut self, ur_type: UrType, message: Vec<u8>) -> Result<Received> {
         // A single-part URI inside a collecting fountain session is
         // inconsistent (the reverse order is unreachable: a completed
         // single-part session is already terminal).
         if !matches!(self.fountain.state(), State::Empty) {
             return Err(Error::new(ErrorKind::InconsistentPart));
         }
-        let data = bytewords::decode(&parsed.body, Style::Minimal)?;
-        if data.len() > self.limits.max_message_length {
+        if message.len() > self.limits.max_message_length {
             return Err(self.fail(Error::resource_limit(Limit::MessageLength)));
         }
-        self.locked.get_or_insert_with(|| parsed.ur_type.clone());
-        self.terminal = Some(Terminal::Complete(Decoded {
-            ur_type: parsed.ur_type.clone(),
-            message: data,
-        }));
+        self.locked.get_or_insert_with(|| ur_type.clone());
+        self.terminal = Some(Terminal::Complete(Decoded { ur_type, message }));
         self.processed = self.processed.saturating_add(1);
         Ok(Received::Accepted)
     }
 
-    fn receive_fountain(&mut self, parsed: &ParsedUr) -> Result<Received> {
-        let decoded = bytewords::decode(&parsed.body, Style::Minimal)?;
-        let part =
-            fountain::Part::from_cbor(&decoded, &self.limits).map_err(|e| self.fatalize(e))?;
-        let (seq, count) = parsed
-            .indices
-            .ok_or_else(|| Error::new(ErrorKind::InvalidIndices))?;
-        if part.sequence() != seq || part.sequence_count() != count {
-            return Err(Error::new(ErrorKind::InvalidIndices));
-        }
-        let received = self.fountain.receive(&part).map_err(|e| self.fatalize(e))?;
-        self.locked.get_or_insert_with(|| parsed.ur_type.clone());
+    fn receive_fountain(&mut self, ur_type: UrType, part: &Part) -> Result<Received> {
+        let received = self.fountain.receive(part).map_err(|e| self.fatalize(e))?;
+        self.locked.get_or_insert_with(|| ur_type.clone());
         self.processed = self.processed.saturating_add(1);
         if let State::Complete(message) = self.fountain.state() {
             self.terminal = Some(Terminal::Complete(Decoded {
-                ur_type: parsed.ur_type.clone(),
+                ur_type,
                 message: message.to_vec(),
             }));
         }
@@ -630,19 +567,12 @@ impl Decoder {
     }
 }
 
-/// Uppercase UR string for QR efficiency.
-#[must_use]
-pub fn qr_string(ur: &str) -> String {
-    ur.to_ascii_uppercase()
-}
-
 #[cfg(test)]
 mod tests {
     use minicbor::bytes::ByteVec;
 
     use super::*;
     use crate::consensus::xoshiro::test_utils::make_message;
-    use crate::fountain::DecoderLimits;
 
     fn make_message_ur(length: usize, seed: &str) -> Vec<u8> {
         let message = make_message(seed, length);
@@ -656,30 +586,47 @@ mod tests {
             .collect()
     }
 
+    fn parsed_single(parsed: ParsedUr) -> Vec<u8> {
+        match parsed {
+            ParsedUr::Single { message, .. } => message,
+            ParsedUr::Multi { .. } => unreachable!("expected single"),
+        }
+    }
+
+    fn bytes_encoder(data: &[u8], max_fragment_len: usize) -> Encoder {
+        Encoder::new(
+            ur_type!("bytes"),
+            data.to_vec(),
+            EncoderOptions::new(max_fragment_len),
+        )
+        .unwrap()
+    }
+
     #[test]
     fn test_single_part_ur() {
         let ur = make_message_ur(50, "Wolf");
-        let encoded = encode(&ur, &UrType::bytes());
+        let encoded = encode(&ur_type!("bytes"), &ur);
         let expected = "ur:bytes/hdeymejtswhhylkepmykhhtsytsnoyoyaxaedsuttydmmhhpktpmsrjtgwdpfnsboxgwlbaawzuefywkdplrsrjynbvygabwjldapfcsdwkbrkch";
         assert_eq!(encoded, expected);
-        let decoded = decode(&encoded).unwrap();
-        assert_eq!((Kind::SinglePart, ur), decoded);
+        assert_eq!(
+            parsed_single(parse(&encoded, &DecoderLimits::default()).unwrap()),
+            ur
+        );
     }
 
     #[test]
     fn test_ur_encoder() {
         // Full 20-URI table from ur-rs 0.5 `test_ur_encoder` (MIT).
         let ur = make_message_ur(256, "Wolf");
-        let mut encoder = Encoder::bytes(&ur, 30).unwrap();
+        let mut encoder = bytes_encoder(&ur, 30);
         let expected = testdata_lines(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../vectors/ur-rs/multipart-20.txt"
         )));
         assert_eq!(expected.len(), 20);
         assert_eq!(encoder.fragment_count(), 9);
-        for (index, e) in expected.into_iter().enumerate() {
-            assert_eq!(encoder.current_index() as usize, index);
-            assert_eq!(encoder.next_part().unwrap(), e);
+        for e in expected {
+            assert_eq!(encoder.next().unwrap(), e);
         }
     }
 
@@ -716,57 +663,68 @@ mod tests {
         }
 
         let data = crypto_seed();
-        let encoded = encode(&data, &UrType::new("crypto-request").unwrap());
+        let encoded = encode(&UrType::new("crypto-request").unwrap(), &data);
         let expected = "ur:crypto-request/oeadtpdagdaobncpftlnylfgfgmuztihbawfsgrtflaotaadwkoyadtaaohdhdcxvsdkfgkepezepefrrffmbnnbmdvahnptrdtpbtuyimmemweootjshsmhlunyeslnameyhsdi";
         assert_eq!(encoded, expected);
-        let decoded = decode(&encoded).unwrap();
-        assert_eq!((Kind::SinglePart, data), decoded);
+        assert_eq!(
+            parsed_single(parse(&encoded, &DecoderLimits::default()).unwrap()),
+            data
+        );
     }
 
     #[test]
     fn test_multipart_ur() {
         let ur = make_message_ur(32767, "Wolf");
-        let mut encoder = Encoder::bytes(&ur, 1000).unwrap();
+        let mut encoder = bytes_encoder(&ur, 1000);
         let mut decoder = Decoder::default();
         loop {
             assert!(matches!(
                 decoder.state(),
                 State::Empty | State::Collecting(_)
             ));
-            decoder.receive(&encoder.next_part().unwrap()).unwrap();
+            decoder.receive(&encoder.next().unwrap()).unwrap();
             if matches!(decoder.state(), State::Complete(_)) {
                 break;
             }
         }
         let decoded = decoder.into_decoded().unwrap();
-        assert_eq!(decoded.ur_type(), &UrType::bytes());
+        assert_eq!(decoded.ur_type(), &ur_type!("bytes"));
         assert_eq!(decoded.message(), ur.as_slice());
     }
 
     #[test]
     fn test_data_encode() {
         assert_eq!(
-            encode(b"data", &UrType::bytes()),
+            encode(&ur_type!("bytes"), b"data"),
             "ur:bytes/iehsjyhspmwfwfia"
         );
     }
 
     #[test]
     fn test_case_fold() {
-        let lower = encode(b"data", &UrType::bytes());
-        let upper = qr_string(&lower);
-        assert_eq!(decode(&upper).unwrap(), decode(&lower).unwrap());
+        let lower = encode(&ur_type!("bytes"), b"data");
+        let upper = to_qr_string(&lower);
+        assert_eq!(
+            parse(&upper, &DecoderLimits::default()).unwrap(),
+            parse(&lower, &DecoderLimits::default()).unwrap()
+        );
     }
 
     #[test]
     fn test_type_stickiness() {
         let data = b"Ten chars!".repeat(5);
-        let mut enc_a = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
-        let mut enc_b = Encoder::new(&data, 10, &UrType::new("beta").unwrap()).unwrap();
+        let mut enc_a = Encoder::new(
+            UrType::new("alpha").unwrap(),
+            data.clone(),
+            EncoderOptions::new(10),
+        )
+        .unwrap();
+        let mut enc_b =
+            Encoder::new(UrType::new("beta").unwrap(), data, EncoderOptions::new(10)).unwrap();
         let mut decoder = Decoder::default();
-        decoder.receive(&enc_a.next_part().unwrap()).unwrap();
+        decoder.receive(&enc_a.next().unwrap()).unwrap();
         assert!(matches!(
-            decoder.receive(&enc_b.next_part().unwrap()),
+            decoder.receive(&enc_b.next().unwrap()),
             Err(ref e) if e.kind() == ErrorKind::UnexpectedType
         ));
     }
@@ -774,7 +732,7 @@ mod tests {
     #[test]
     fn test_invalid_scheme() {
         assert!(matches!(
-            decode("uhr:bytes/aeadaolazmjendeoti"),
+            parse("uhr:bytes/aeadaolazmjendeoti", &DecoderLimits::default()),
             Err(ref e) if e.kind() == ErrorKind::InvalidScheme
         ));
     }
@@ -782,17 +740,17 @@ mod tests {
     #[test]
     fn test_custom_encoder() {
         let data = b"Ten chars!";
-        let mut encoder = Encoder::with_options(
+        let mut encoder = Encoder::new(
+            UrType::new("my-scheme").unwrap(),
             data.to_vec(),
-            fountain::EncoderOptions {
+            EncoderOptions {
                 min_fragment_len: 5,
-                ..fountain::EncoderOptions::new(5)
+                ..EncoderOptions::new(5)
             },
-            &UrType::new("my-scheme").unwrap(),
         )
         .unwrap();
         assert_eq!(
-            encoder.next_part().unwrap(),
+            encoder.next().unwrap(),
             "ur:my-scheme/1-2/lpadaobkcywkwmhfwnfeghihjtcxiansvomopr"
         );
     }
@@ -807,7 +765,7 @@ mod tests {
         assert!(matches!(decoder.state(), State::Complete(_)));
         let decoded = decoder.into_decoded().unwrap();
         assert_eq!(decoded.message(), b"data");
-        assert_eq!(decoded.ur_type(), &UrType::bytes());
+        assert_eq!(decoded.ur_type(), &ur_type!("bytes"));
     }
 
     #[test]
@@ -823,40 +781,34 @@ mod tests {
     #[test]
     fn test_encoder_k1_is_single_part() {
         let data = b"hello";
-        let mut encoder = Encoder::bytes(data, 64).unwrap();
+        let mut encoder = bytes_encoder(data, 64);
         assert!(encoder.is_single_part());
-        let part = encoder.next_part().unwrap();
+        let part = encoder.next().unwrap();
         assert!(!part.contains("/1-1/"));
-        assert_eq!(part, encode(data, &UrType::bytes()));
+        assert_eq!(part, encode(&ur_type!("bytes"), data));
         let mut decoder = Decoder::default();
         decoder.receive(&part).unwrap();
         assert_eq!(decoder.into_decoded().unwrap().message(), data.as_slice());
     }
 
     #[test]
-    fn test_encoder_k1_next_part_is_idempotent() {
+    fn test_encoder_k1_repeats_forever() {
         let data = b"hello";
-        let mut encoder = Encoder::bytes(data, 64).unwrap();
-        assert!(!encoder.complete());
-        assert_eq!(encoder.current_index(), 0);
-        let first = encoder.next_part().unwrap();
-        assert_eq!(first, encode(data, &UrType::bytes()));
-        assert_eq!(encoder.current_index(), 1);
-        assert!(encoder.complete());
-        let second = encoder.next_part().unwrap();
-        assert_eq!(second, first);
-        assert_eq!(encoder.current_index(), 1);
+        let mut encoder = bytes_encoder(data, 64);
+        assert!(!encoder.is_complete());
+        let first = encoder.next().unwrap();
+        assert_eq!(first, encode(&ur_type!("bytes"), data));
+        assert!(encoder.is_complete());
         for _ in 0..10 {
-            assert_eq!(encoder.next_part().unwrap(), first);
-            assert_eq!(encoder.current_index(), 1);
-            assert!(encoder.complete());
+            assert_eq!(encoder.next().unwrap(), first);
+            assert!(encoder.is_complete());
         }
     }
 
     #[test]
     fn test_foreign_1_1_fountain_uri_decodes() {
         let mut fountain =
-            fountain::Encoder::new(b"hello".to_vec(), fountain::EncoderOptions::new(64)).unwrap();
+            fountain::Encoder::new(b"hello".to_vec(), EncoderOptions::new(64)).unwrap();
         let part = fountain.next().unwrap();
         let body = bytewords::encode(&part.to_cbor(), Style::Minimal);
         let uri = alloc::format!("ur:bytes/1-1/{body}");
@@ -867,16 +819,19 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_message_rejects_multipart() {
+    fn test_parse_identifies_multipart() {
         let data = b"Ten chars!".repeat(8);
-        let mut encoder = Encoder::bytes(&data, 10).unwrap();
-        let part = encoder.next_part().unwrap();
+        let mut encoder = bytes_encoder(&data, 10);
+        let parsed = parse(&encoder.next().unwrap(), &DecoderLimits::default()).unwrap();
+        assert!(matches!(parsed, ParsedUr::Multi { .. }));
         assert_eq!(
-            decode_message(&part).unwrap_err().kind(),
-            ErrorKind::NotSinglePart
-        );
-        assert_eq!(
-            decode_message(&encode(b"data", &UrType::bytes())).unwrap(),
+            parsed_single(
+                parse(
+                    &encode(&ur_type!("bytes"), b"data"),
+                    &DecoderLimits::default()
+                )
+                .unwrap()
+            ),
             b"data"
         );
     }
@@ -884,16 +839,22 @@ mod tests {
     #[test]
     fn test_garbage_does_not_pin_type() {
         let data = b"Ten chars!".repeat(6);
-        let mut encoder = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
+        let mut encoder = Encoder::new(
+            UrType::new("alpha").unwrap(),
+            data.clone(),
+            EncoderOptions::new(10),
+        )
+        .unwrap();
         let mut decoder = Decoder::default();
         assert!(decoder.receive("ur:beta/1-2/zzzz").is_err());
         assert!(matches!(decoder.state(), State::Empty));
-        decoder.receive(&encoder.next_part().unwrap()).unwrap();
+        decoder.receive(&encoder.next().unwrap()).unwrap();
         assert!(matches!(decoder.state(), State::Collecting(_)));
         // A different type after the lock is rejected.
-        let mut other = Encoder::new(&data, 10, &UrType::new("beta").unwrap()).unwrap();
+        let mut other =
+            Encoder::new(UrType::new("beta").unwrap(), data, EncoderOptions::new(10)).unwrap();
         assert!(matches!(
-            decoder.receive(&other.next_part().unwrap()),
+            decoder.receive(&other.next().unwrap()),
             Err(ref e) if e.kind() == ErrorKind::UnexpectedType
         ));
     }
@@ -901,10 +862,11 @@ mod tests {
     #[test]
     fn test_single_after_multi_is_inconsistent() {
         let data = b"Ten chars!".repeat(6);
-        let mut encoder = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
+        let mut encoder =
+            Encoder::new(UrType::new("alpha").unwrap(), data, EncoderOptions::new(10)).unwrap();
         let mut decoder = Decoder::default();
-        decoder.receive(&encoder.next_part().unwrap()).unwrap();
-        let single = encode(b"x", &UrType::new("alpha").unwrap());
+        decoder.receive(&encoder.next().unwrap()).unwrap();
+        let single = encode(&UrType::new("alpha").unwrap(), b"x");
         assert!(matches!(
             decoder.receive(&single),
             Err(ref e) if e.kind() == ErrorKind::InconsistentPart && !e.is_fatal()
@@ -916,56 +878,73 @@ mod tests {
     #[test]
     fn test_bc_ur_example() {
         // CBOR array [1, 2, 3] as single-part ur:test (bc-ur golden)
-        // We only check roundtrip of raw CBOR bytes through bytewords path
-        // using the known string from bc-ur docs when payload is correct CBOR.
         let cbor = hex::decode("83010203").unwrap(); // array(3) [1,2,3]
-        let ur = encode(&cbor, &UrType::new("test").unwrap());
+        let ur = encode(&UrType::new("test").unwrap(), &cbor);
         assert_eq!(ur, "ur:test/lsadaoaxjygonesw");
-        let (kind, data) = decode(&ur).unwrap();
-        assert_eq!(kind, Kind::SinglePart);
-        assert_eq!(data, cbor);
+        assert_eq!(
+            parsed_single(parse(&ur, &DecoderLimits::default()).unwrap()),
+            cbor
+        );
     }
 
     #[test]
-    fn test_parse_and_decode_with_type() {
-        let ur = encode(b"data", &UrType::bytes());
-        let parsed = parse(&ur).unwrap();
-        assert_eq!(parsed.kind, Kind::SinglePart);
-        assert_eq!(parsed.ur_type.as_str(), "bytes");
-        assert!(parsed.indices.is_none());
-
-        let (ty, kind, payload) = decode_with_type(&ur).unwrap();
-        assert_eq!(ty.as_str(), "bytes");
-        assert_eq!(kind, Kind::SinglePart);
-        assert_eq!(payload, b"data");
+    fn test_parse_shape() {
+        let ur = encode(&ur_type!("bytes"), b"data");
+        let parsed = parse(&ur, &DecoderLimits::default()).unwrap();
+        let ParsedUr::Single { ur_type, message } = parsed else {
+            unreachable!("expected single");
+        };
+        assert_eq!(ur_type.as_str(), "bytes");
+        assert_eq!(message, b"data");
     }
 
     #[test]
-    fn test_into_ur_type_accepts_owned_and_borrowed() {
-        let t = UrType::new("bytes").unwrap();
-        assert_eq!(t.clone().into_ur_type().unwrap(), t);
-        assert_eq!(IntoUrType::into_ur_type(&t).unwrap(), t);
-        assert_eq!("bytes".into_ur_type().unwrap(), t);
-        assert_eq!(String::from("bytes").into_ur_type().unwrap(), t);
-        assert!(matches!("".into_ur_type(), Err(ref e) if e.kind() == ErrorKind::InvalidType));
+    fn test_ur_type_conversions() {
+        let t = UrType::new("BYTES").unwrap();
+        assert_eq!(t.as_str(), "bytes");
+        assert_eq!("bytes".parse::<UrType>().unwrap(), t);
+        assert_eq!(UrType::try_from("bytes").unwrap(), t);
+        assert_eq!(UrType::try_from(String::from("bytes")).unwrap(), t);
+        let as_ref: &str = t.as_ref();
+        assert_eq!(as_ref, "bytes");
+        assert_eq!(t.to_string(), "bytes");
+        assert!(matches!(
+            "".parse::<UrType>(),
+            Err(ref e) if e.kind() == ErrorKind::InvalidType
+        ));
+    }
+
+    #[test]
+    fn test_new_static_and_macro() {
+        const T: UrType = ur_type!("seed");
+        assert_eq!(T.as_str(), "seed");
+        assert!(UrType::new_static("SEED").is_none());
+        assert!(UrType::new_static("not_a_type").is_none());
+        assert!(UrType::new_static("").is_none());
+        assert!(UrType::new_static("crypto-request").is_some());
     }
 
     #[test]
     fn test_invalid_type_and_indices() {
-        assert!(matches!(UrType::new(""), Err(ref e) if e.kind() == ErrorKind::InvalidType));
-        assert!(
-            matches!(UrType::new("Bad_Type"), Err(ref e) if e.kind() == ErrorKind::InvalidType)
-        );
         assert!(matches!(
-            parse("ur:bytes/0-1/aeadaolazmjendeoti"),
+            UrType::new(""),
+            Err(ref e) if e.kind() == ErrorKind::InvalidType
+        ));
+        assert!(matches!(
+            UrType::new("Bad_Type"),
+            Err(ref e) if e.kind() == ErrorKind::InvalidType
+        ));
+        let limits = DecoderLimits::default();
+        assert!(matches!(
+            parse("ur:bytes/0-1/aeadaolazmjendeoti", &limits),
             Err(ref e) if e.kind() == ErrorKind::InvalidIndices
         ));
         assert!(matches!(
-            parse("ur:bytes/1-0/aeadaolazmjendeoti"),
+            parse("ur:bytes/1-0/aeadaolazmjendeoti", &limits),
             Err(ref e) if e.kind() == ErrorKind::InvalidIndices
         ));
         assert!(matches!(
-            parse("ur:bytes/foo/aeadaolazmjendeoti"),
+            parse("ur:bytes/foo/aeadaolazmjendeoti", &limits),
             Err(ref e) if e.kind() == ErrorKind::InvalidIndices
         ));
     }
@@ -973,8 +952,9 @@ mod tests {
     #[test]
     fn test_accept_list_and_uri_limit() {
         let data = b"Ten chars!".repeat(5);
-        let mut enc = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
-        let part = enc.next_part().unwrap();
+        let mut enc =
+            Encoder::new(UrType::new("alpha").unwrap(), data, EncoderOptions::new(10)).unwrap();
+        let part = enc.next().unwrap();
 
         let mut decoder = Decoder::default().accept([UrType::new("beta").unwrap()]);
         assert!(matches!(
@@ -999,67 +979,69 @@ mod tests {
     #[test]
     fn test_multipart_index_mismatch() {
         let data = b"Ten chars!".repeat(5);
-        let mut enc = Encoder::bytes(&data, 10).unwrap();
-        let part = enc.next_part().unwrap();
-        // Corrupt path indices while keeping a valid multi-part shape.
-        let corrupted = part.replacen("/1-", "/2-", 1);
+        let mut enc = bytes_encoder(&data, 10);
+        let part = enc.next().unwrap();
+        let corrupted = part.replace("/1-", "/2-");
         let mut decoder = Decoder::default();
         assert!(matches!(
             decoder.receive(&corrupted),
-            Err(ref e) if e.kind() == ErrorKind::InvalidIndices
+            Err(ref e) if e.kind() == ErrorKind::InvalidIndices && !e.is_fatal()
         ));
     }
 
     #[test]
     fn test_empty_single_part() {
-        let ur = encode(&[], &UrType::bytes());
-        let (kind, payload) = decode(&ur).unwrap();
-        assert_eq!(kind, Kind::SinglePart);
-        assert_eq!(payload, Vec::<u8>::new());
+        let ur = encode(&ur_type!("bytes"), &[]);
+        assert_eq!(
+            parsed_single(parse(&ur, &DecoderLimits::default()).unwrap()),
+            Vec::<u8>::new()
+        );
+        let mut decoder = Decoder::default();
+        decoder.receive(&ur).unwrap();
+        assert_eq!(decoder.into_decoded().unwrap().message(), b"".as_slice());
     }
 
     #[test]
     fn test_parse_folds_body() {
-        let parsed = parse("ur:bytes/IEHSJYHSPMWFWFIA").unwrap();
-        assert_eq!(parsed.body, "iehsjyhspmwfwfia");
-        assert_eq!(parsed.ur_type.as_str(), "bytes");
+        let lower = encode(&ur_type!("bytes"), b"data");
+        let upper = lower.to_ascii_uppercase();
+        assert_eq!(
+            parsed_single(parse(&upper, &DecoderLimits::default()).unwrap()),
+            b"data"
+        );
     }
 
     #[test]
     fn test_uri_len_resource_limit_fails() {
         let data = b"Ten chars!".repeat(5);
-        let mut enc = Encoder::bytes(&data, 10).unwrap();
-        let part = enc.next_part().unwrap();
-
+        let mut enc = bytes_encoder(&data, 10);
+        let part = enc.next().unwrap();
+        let short = "ur:bytes/iehsjyhspmwfwfia";
+        assert!(part.len() > short.len());
         let limits = DecoderLimits {
-            max_uri_length: 8,
+            max_uri_length: short.len(),
             ..DecoderLimits::default()
         };
         let mut decoder = Decoder::new(limits);
         assert!(matches!(
             decoder.receive(&part),
-            Err(ref e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(Limit::UriLength)
+            Err(ref e) if e.kind() == ErrorKind::ResourceLimit
+                && e.limit() == Some(Limit::UriLength)
+                && e.is_fatal()
         ));
         assert!(matches!(decoder.state(), State::Failed(_)));
-        // Terminal: every further frame is a duplicate, no parse.
-        assert_eq!(decoder.receive(&part).unwrap(), Received::Duplicate);
-        assert_eq!(decoder.receive("garbage").unwrap(), Received::Duplicate);
-        assert!(matches!(
-            decoder.into_decoded().unwrap_err().kind(),
-            ErrorKind::ResourceLimit
-        ));
+        assert_eq!(decoder.receive(short).unwrap(), Received::Duplicate);
     }
 
     #[test]
     fn test_decoder_progress_accessors() {
-        let ur = make_message_ur(256, "Wolf");
-        let mut encoder = Encoder::bytes(&ur, 30).unwrap();
+        let data = b"Ten chars!".repeat(8);
+        let mut encoder = bytes_encoder(&data, 10);
         let mut decoder = Decoder::default();
         assert!(matches!(decoder.state(), State::Empty));
         assert_eq!(decoder.progress().fragment_count(), 0);
-        assert_eq!(decoder.progress().ratio(), 0.0);
 
-        decoder.receive(&encoder.next_part().unwrap()).unwrap();
+        decoder.receive(&encoder.next().unwrap()).unwrap();
         assert_eq!(
             decoder.progress().fragment_count(),
             encoder.fragment_count()
@@ -1071,7 +1053,7 @@ mod tests {
 
         let mut prev_rank = 1;
         while !matches!(decoder.state(), State::Complete(_)) {
-            decoder.receive(&encoder.next_part().unwrap()).unwrap();
+            decoder.receive(&encoder.next().unwrap()).unwrap();
             let now = decoder.progress().rank();
             assert!(now >= prev_rank);
             assert!(now <= decoder.progress().fragment_count());

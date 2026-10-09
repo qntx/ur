@@ -1,18 +1,33 @@
 import { expect, test } from "vite-plus/test";
 
+import { UrError } from "../../src/error.ts";
 import type { DecoderLimits, ReceiveResult } from "../../src/fountain/index.ts";
-import type { DecodedUr } from "../../src/ur/index.ts";
-import {
-  Encoder,
-  UrDecoder,
-  UrType,
-  decode,
-  decodeMessage,
-  encode,
-  parse,
-} from "../../src/ur/index.ts";
+import type { DecodedUr, ParsedUr } from "../../src/ur/index.ts";
+import { UrDecoder, UrEncoder, encodeUr, parseUr, parseUrType } from "../../src/ur/index.ts";
 import { makeMessage } from "../message.ts";
 import { vectorJson, vectorLines } from "../vectors.ts";
+
+function parsedPart(parsed: ParsedUr) {
+  if (parsed.kind !== "multi") {
+    throw new Error(`expected multi, got ${parsed.kind}`);
+  }
+  return parsed.part;
+}
+
+function parsedMessage(parsed: ParsedUr): Uint8Array {
+  if (parsed.kind !== "single") {
+    throw new Error(`expected single, got ${parsed.kind}`);
+  }
+  return parsed.message;
+}
+
+function nextUr(encoder: UrEncoder): string {
+  const { value, done } = encoder.next();
+  if (done === true || value === undefined) {
+    throw new Error("ur encoder exhausted");
+  }
+  return value;
+}
 
 type SingleCase = {
   name: string;
@@ -83,7 +98,7 @@ const multiCases = SINGLE.filter((c) => c.kind === "multi");
 // payload assertion still documents the wire value while the encode round-trip checks it.
 const singleRows = SINGLE.filter((c) => c.kind !== "multi").map((c) => ({
   ...c,
-  expected: expectedPayload(c) ?? decodeMessage(c.ur),
+  expected: expectedPayload(c) ?? parsedMessage(parseUr(c.ur)),
 }));
 const partsFileRows = MULTIPART.filter((c) => c.partsFile !== undefined).map((c) => ({
   ...c,
@@ -96,29 +111,31 @@ const roundTripRows = MULTIPART.filter((c) => c.partsFile === undefined).map((c)
 }));
 
 test.each(multiCases)("ur.parse $name", (c) => {
-  const parsed = parse(c.ur);
-  expect(parsed.type.value).toBe(c.urType);
-  expect(parsed.kind).toBe("multi");
-  expect(parsed.indices).toStrictEqual({ seq: c.seqNum, count: c.seqLen });
-  // The fragment decodes as fountain-part CBOR.
-  decode(c.ur);
+  const parsed = parseUr(c.ur);
+  expect(parsed.type).toBe(c.urType);
+  const part = parsedPart(parsed);
+  expect({ seq: part.sequence, count: part.sequenceCount }).toStrictEqual({
+    seq: c.seqNum,
+    count: c.seqLen,
+  });
 });
 
 test.each(singleRows)("ur.parse $name", (c) => {
-  const parsed = parse(c.ur);
-  expect(parsed.type.value).toBe(c.urType);
+  const parsed = parseUr(c.ur);
+  expect(parsed.type).toBe(c.urType);
   expect(parsed.kind).toBe("single");
-  const payload = decodeMessage(c.ur);
-  expect(payload).toStrictEqual(c.expected);
-  expect(encode(payload, UrType.parse(c.urType))).toBe(c.ur);
+  expect(parsedMessage(parsed)).toStrictEqual(c.expected);
+  expect(encodeUr(parseUrType(c.urType), c.expected)).toBe(c.ur);
 });
 
 test.each(partsFileRows)("ur.encoder $name", (c) => {
   const payload = payloadOf(c);
-  const encoder = Encoder.create(payload, c.maxFragmentLength, UrType.parse(c.urType));
+  const encoder = new UrEncoder(parseUrType(c.urType), payload, {
+    maxFragmentLength: c.maxFragmentLength,
+  });
   const expected = vectorLines(c.partsFile);
   expect(c.partCount).toBe(expected.length);
-  const parts = Array.from({ length: expected.length }, () => encoder.nextPart());
+  const parts = Array.from({ length: expected.length }, () => nextUr(encoder));
   expect(parts).toStrictEqual(expected);
 });
 
@@ -139,16 +156,17 @@ function completedDecoded(decoder: UrDecoder): DecodedUr {
 
 test.each(roundTripRows)("ur.encoder $name", (c) => {
   const payload = payloadOf(c);
-  const encoder = Encoder.create(payload, c.maxFragmentLength, UrType.parse(c.urType), {
+  const encoder = new UrEncoder(parseUrType(c.urType), payload, {
+    maxFragmentLength: c.maxFragmentLength,
     firstSequence: c.firstSeqNum,
   });
   const decoder = new UrDecoder();
   while (decoder.state.phase !== "complete") {
-    feedUr(decoder, encoder.nextPart());
+    feedUr(decoder, nextUr(encoder));
   }
   const value = completedDecoded(decoder);
   expect(value.message).toStrictEqual(payload);
-  expect(value.type.value).toBe(c.urType);
+  expect(value.type).toBe(c.urType);
 });
 
 const UR_FRAMES = vectorJson<{
@@ -193,7 +211,7 @@ function replayFrames(c: UrFrameCase): {
 } {
   const decoder = new UrDecoder({
     ...(c.limits === undefined ? {} : { limits: c.limits }),
-    ...(c.accept === undefined ? {} : { accept: c.accept.map((t) => UrType.parse(t)) }),
+    ...(c.accept === undefined ? {} : { accept: c.accept.map((t) => parseUrType(t)) }),
   });
   let completedAt: number | undefined;
   for (const [i, frame] of c.frames.entries()) {
@@ -211,4 +229,49 @@ test.each(UR_FRAMES.cases)("ur.decoder frames $name", (c) => {
   const { decoder, completedAt } = replayFrames(c);
   expect(completedAt).toBe(c.completeAt);
   expect(completedMessageHex(decoder)).toBe(c.messageHex);
+});
+
+type HeaderCase = {
+  name: string;
+  uri: string;
+  expect: string;
+  seq?: number;
+  count?: number;
+};
+
+const HEADER = vectorJson<{ cases: HeaderCase[] }>("ur/header.json").cases;
+
+function parseOutcome(uri: string): { code: string; seq?: number; count?: number } {
+  try {
+    const parsed = parseUr(uri);
+    if (parsed.kind !== "multi") {
+      return { code: "single" };
+    }
+    return { code: "ok", seq: parsed.part.sequence, count: parsed.part.sequenceCount };
+  } catch (error) {
+    if (error instanceof UrError) {
+      return { code: error.code };
+    }
+    throw error;
+  }
+}
+
+const okRows = HEADER.filter((c) => c.expect === "ok").map((c) => ({
+  ...c,
+  seq: c.seq ?? 0,
+  count: c.count ?? 0,
+}));
+const errRows = HEADER.filter((c) => c.expect !== "ok");
+
+test.each(okRows)("ur.parse header $name", (c) => {
+  const outcome = parseOutcome(c.uri);
+  expect({ code: outcome.code, seq: outcome.seq, count: outcome.count }).toStrictEqual({
+    code: "ok",
+    seq: c.seq,
+    count: c.count,
+  });
+});
+
+test.each(errRows)("ur.parse header $name", (c) => {
+  expect(parseOutcome(c.uri).code).toBe(c.expect);
 });

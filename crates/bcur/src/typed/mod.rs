@@ -5,16 +5,16 @@
 //! type token.
 //!
 //! ```
-//! use bcur::Ur;
+//! use bcur::{Ur, ur_type};
 //!
-//! let ur = Ur::new("test", vec![1, 2, 3]).unwrap();
-//! assert_eq!(ur.string(), "ur:test/lsadaoaxjygonesw");
+//! let ur = Ur::new(ur_type!("test"), vec![1, 2, 3]);
+//! assert_eq!(ur.to_string(), "ur:test/lsadaoaxjygonesw");
 //! ```
 
 mod traits;
 mod ur_value;
 
-pub use traits::{UrCodable, UrDecodable, UrEncodable};
+pub use traits::{UrDecodable, UrEncodable};
 pub use ur_value::Ur;
 
 use crate::error::{Error, ErrorKind, Result};

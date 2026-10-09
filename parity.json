@@ -122,7 +122,8 @@
       "vectors": [
         "vectors/ur/published-singles.txt",
         "vectors/official/published-from-refs.txt",
-        "vectors/official/ur/single.json"
+        "vectors/official/ur/single.json",
+        "vectors/ur/header.json"
       ]
     },
     {
@@ -390,6 +391,51 @@
       },
       "rust": null,
       "vectors": []
+    },
+    {
+      "id": "bytewords.identifier",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R2",
+      "ts": {
+        "module": "packages/ur/src/bytewords/index.ts",
+        "tests": ["packages/ur/tests/vectors/bytewords.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/bytewords/mod.rs",
+        "tests": ["crates/bcur/tests/official/bytewords.rs", "crates/bcur/src/bytewords/mod.rs"]
+      },
+      "vectors": ["vectors/official/bytewords-identifier.json"]
+    },
+    {
+      "id": "bytemoji.identifier",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R2",
+      "ts": {
+        "module": "packages/ur/src/bytewords/index.ts",
+        "tests": ["packages/ur/tests/vectors/bytewords.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/bytemoji.rs",
+        "tests": ["crates/bcur/src/official_vectors.rs", "crates/bcur/tests/official/bytewords.rs"]
+      },
+      "vectors": ["vectors/official/bytemoji.json"]
+    },
+    {
+      "id": "ur.type",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R2",
+      "ts": {
+        "module": "packages/ur/src/ur/type.ts",
+        "tests": ["packages/ur/tests/ur.test.ts", "packages/ur/tests/vectors/ur.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/ur/mod.rs",
+        "tests": ["crates/bcur/src/ur/mod.rs", "crates/bcur/tests/official/ur.rs"]
+      },
+      "vectors": ["vectors/official/ur/single.json", "vectors/ur/header.json"]
     }
   ]
 }

@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "capability": "ur.parse",
+  "source": {
+    "kind": "spec",
+    "name": "UR-ADR-029 part header grammar",
+    "path": "docs/internal/decisions.mdx",
+    "note": "seq = 1*DIGIT \"-\" 1*DIGIT; both values in 1..=0xFFFFFFFF; no sign or whitespace; leading zeros allowed. The body below is a real sequence=1, count=3 fountain part (30 x 0x07 bytes, maxFragmentLength 10); mismatch cases reuse it so the URI header and the part CBOR fields disagree."
+  },
+  "cases": [
+    {
+      "name": "canonical 1-3",
+      "uri": "ur:bytes/1-3/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "ok",
+      "seq": 1,
+      "count": 3
+    },
+    {
+      "name": "leading zeros accepted",
+      "uri": "ur:bytes/01-03/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "ok",
+      "seq": 1,
+      "count": 3
+    },
+    {
+      "name": "header matches a later part",
+      "uri": "ur:bytes/02-03/lpaoaxcsckcydrwkstjsgeatatatatatatatatatatehrncmmo",
+      "expect": "ok",
+      "seq": 2,
+      "count": 3
+    },
+    {
+      "name": "plus sign on sequence",
+      "uri": "ur:bytes/+1-3/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "plus sign on count",
+      "uri": "ur:bytes/1-+3/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "leading whitespace",
+      "uri": "ur:bytes/ 1-3/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "inner whitespace",
+      "uri": "ur:bytes/1- 3/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "trailing whitespace",
+      "uri": "ur:bytes/1-3 /lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "zero sequence",
+      "uri": "ur:bytes/0-3/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "zero count",
+      "uri": "ur:bytes/1-0/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "sequence overflows u32",
+      "uri": "ur:bytes/4294967296-1/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "count overflows u32",
+      "uri": "ur:bytes/1-4294967296/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "three segments",
+      "uri": "ur:bytes/1-2-3/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "no dash",
+      "uri": "ur:bytes/1/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "leading dash",
+      "uri": "ur:bytes/-1/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "trailing dash",
+      "uri": "ur:bytes/1-/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "empty indices",
+      "uri": "ur:bytes//lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "letters in indices",
+      "uri": "ur:bytes/seq-3/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "header disagrees with part cbor",
+      "uri": "ur:bytes/2-3/lpadaxcsckcydrwkstjsgeatatatatatatatatatatnnchhphd",
+      "expect": "InvalidIndices"
+    },
+    {
+      "name": "empty whole body",
+      "uri": "ur:bytes/",
+      "expect": "InvalidBytewordsChecksum"
+    }
+  ]
+}

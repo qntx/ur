@@ -1,7 +1,7 @@
 import { bytesToHex, decodeCbor, encodeCbor, hexToBytes } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
 
-import { decode as decodeBytewords } from "../../src/bytewords/index.ts";
+import { decodeBytewords } from "../../src/bytewords/index.ts";
 import {
   hdKeyCodec,
   hdKeyDigest,

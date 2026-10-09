@@ -11,7 +11,13 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-import { Encoder, UrDecoder, UrType, encode, toQrString } from "../../packages/ur/src/index.ts";
+import {
+  UrDecoder,
+  UrEncoder,
+  encodeUr,
+  parseUrType,
+  toQrString,
+} from "../../packages/ur/src/index.ts";
 import type { ReceiveResult } from "../../packages/ur/src/index.ts";
 
 const MAX_U32 = 0xffffffff;
@@ -181,18 +187,20 @@ function encoderOptions(options: CaseOptions): {
  * identical single-part URIs).
  */
 export function encodeAll(spec: CaseSpec, message: Uint8Array): string[] {
-  const encoder = Encoder.create(
-    message,
-    spec.options.maxFragmentLength,
-    UrType.parse(spec.urType),
-    encoderOptions(spec.options),
-  );
+  const encoder = new UrEncoder(parseUrType(spec.urType), message, {
+    maxFragmentLength: spec.options.maxFragmentLength,
+    ...encoderOptions(spec.options),
+  });
   const target = encoder.isSinglePart
     ? 6
     : Math.min(3 * encoder.fragmentCount + 20, MAX_U32 - spec.options.firstSequence);
   const encoded: string[] = [];
   while (encoded.length < target) {
-    encoded.push(encoder.nextPart());
+    const { value, done } = encoder.next();
+    if (done === true) {
+      break;
+    }
+    encoded.push(value);
   }
   return encoded;
 }
@@ -235,7 +243,7 @@ export function swapHeader(frame: string): string {
 export function foreignFrame(rng: Rng, urType: string): string {
   const other = UR_TYPES.filter((t) => t !== urType);
   const payload = new Uint8Array([rng.int(0, 255), rng.int(0, 255)]);
-  return encode(payload, UrType.parse(rng.pick(other)));
+  return encodeUr(parseUrType(rng.pick(other)), payload);
 }
 
 /** Over-long URI: trips `ResourceLimit: uriLength` — a fatal outcome. */
@@ -354,7 +362,7 @@ export function decodeFrames(frames: ReadonlyArray<string>): DecodedRun {
     phase: state.phase,
     ...(state.phase === "complete"
       ? {
-          decodedType: state.value.type.value,
+          decodedType: state.value.type,
           messageSha256: createHash("sha256").update(state.value.message).digest("hex"),
         }
       : {}),

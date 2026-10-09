@@ -136,11 +136,11 @@ test("toUr copies caller keyData and chainCode", () => {
   const ur = toUr({ kind: "master", keyData, chainCode }, hdKeyCodec);
   keyData[0] = 0;
   chainCode[0] = 0;
-  expect(ur.string()).toBe(hdkey1.ur);
+  expect(ur.toString()).toBe(hdkey1.ur);
 });
 
 test("fromUr copies decoded keyData and chainCode", () => {
-  const ur = Ur.fromUrString(hdkey1.ur);
+  const ur = Ur.parse(hdkey1.ur);
   const decoded = asMaster(fromUr(ur, hdKeyCodec));
   decoded.keyData[0] = 0;
   decoded.chainCode[0] = 0;
@@ -154,7 +154,7 @@ test("is-master false is CborType", () => {
   map.set(1, false);
   map.set(3, hexToBytes(hdkey1.keyDataHex));
   map.set(4, hexToBytes(hdkey1.chainCodeHex));
-  const err = errorOf(() => fromUr(Ur.create("hdkey", map), hdKeyCodec));
+  const err = errorOf(() => fromUr(Ur.fromCbor("hdkey", map), hdKeyCodec));
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "WrongType" });
@@ -166,7 +166,7 @@ test("master with key 2 or 5 is CborType", () => {
   withPrivate.set(2, true);
   withPrivate.set(3, hexToBytes(hdkey1.keyDataHex));
   withPrivate.set(4, hexToBytes(hdkey1.chainCodeHex));
-  const privateErr = errorOf(() => fromUr(Ur.create("hdkey", withPrivate), hdKeyCodec));
+  const privateErr = errorOf(() => fromUr(Ur.fromCbor("hdkey", withPrivate), hdKeyCodec));
   expect(privateErr.code).toBe("CborType");
 
   const withUseInfo = new CborMap();
@@ -174,7 +174,7 @@ test("master with key 2 or 5 is CborType", () => {
   withUseInfo.set(3, hexToBytes(hdkey1.keyDataHex));
   withUseInfo.set(4, hexToBytes(hdkey1.chainCodeHex));
   withUseInfo.set(5, 0);
-  const useInfoErr = errorOf(() => fromUr(Ur.create("hdkey", withUseInfo), hdKeyCodec));
+  const useInfoErr = errorOf(() => fromUr(Ur.fromCbor("hdkey", withUseInfo), hdKeyCodec));
   expect(useInfoErr.code).toBe("CborType");
 });
 
@@ -194,7 +194,7 @@ test("v1 crypto-hdkey vector 2 nested v1 tags decode, re-encode v2", () => {
 
 test("v2 hdkey token with nested v1 304/305 tags decodes", () => {
   const body = decodeCbor(hexToBytes(hdkey2V1CborHex));
-  const decoded = asDerived(fromUr(Ur.create("hdkey", body), hdKeyCodec));
+  const decoded = asDerived(fromUr(Ur.fromCbor("hdkey", body), hdKeyCodec));
   expect(decoded).toStrictEqual(asDerived(fromUrString(hdkey2.ur, hdKeyCodec)));
 });
 
@@ -204,7 +204,7 @@ test("nested v1 origin tag 304 decodes", () => {
   map.set(3, hexToBytes(hdkey2.keyDataHex));
   map.set(4, hexToBytes(hdkey2.chainCodeHex));
   map.set(6, taggedValue(304, keypathCodec.untaggedCbor(key.origin!)));
-  const decoded = asDerived(fromUr(Ur.create("hdkey", map), hdKeyCodec));
+  const decoded = asDerived(fromUr(Ur.fromCbor("hdkey", map), hdKeyCodec));
   expect(decoded.origin?.components).toStrictEqual(key.origin?.components);
 });
 
@@ -212,7 +212,7 @@ test("derived extra map key is CborType", () => {
   const map = new CborMap();
   map.set(3, hexToBytes(hdkey2.keyDataHex));
   map.set(11, 0);
-  const err = errorOf(() => fromUr(Ur.create("hdkey", map), hdKeyCodec));
+  const err = errorOf(() => fromUr(Ur.fromCbor("hdkey", map), hdKeyCodec));
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "WrongType" });

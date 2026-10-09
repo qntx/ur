@@ -9,21 +9,25 @@
 
 //! Print fountain progress while emitting multi-part UR strings.
 
-use bcur::State;
+use bcur::fountain::EncoderOptions;
 use bcur::ur::{Decoder, Encoder};
+use bcur::{State, ur_type};
 
 fn main() {
     let data = b"Progress demo payload - multi-part UR scan simulation.".repeat(4);
-    let mut encoder = Encoder::bytes(&data, 16).expect("encoder");
+    let mut encoder =
+        Encoder::new(ur_type!("bytes"), data.clone(), EncoderOptions::new(16)).expect("encoder");
     let mut decoder = Decoder::default();
+    let mut emitted = 0_u32;
 
     loop {
-        let part = encoder.next_part().expect("part");
+        let part = encoder.next().expect("part");
+        emitted = emitted.saturating_add(1);
         decoder.receive(&part).expect("receive");
         let p = decoder.progress();
         println!(
-            "seq={} rank={}/{} recovered={} processed={}",
-            encoder.current_index(),
+            "emitted={} rank={}/{} recovered={} processed={}",
+            emitted,
             p.rank(),
             p.fragment_count(),
             p.recovered(),

@@ -1,11 +1,11 @@
 import {
-  Encoder,
   UrDecoder,
-  UrType,
+  UrEncoder,
   decodeBytewords,
-  decodeMessage,
-  encode,
   encodeBytewords,
+  encodeUr,
+  parseUr,
+  parseUrType,
 } from "../../src/index.ts";
 import {
   Ur,
@@ -58,6 +58,14 @@ function must<T>(value: T | undefined): T {
   return value;
 }
 
+function nextPart(encoder: UrEncoder): string {
+  const { value, done } = encoder.next();
+  if (done === true) {
+    throw new Error("smoke: encoder exhausted");
+  }
+  return value;
+}
+
 export function main(): void {
   // Bytewords: fixed vector plus a round trip.
   eq(encodeBytewords(new Uint8Array([0]), "minimal"), "aetdaowslg", "bytewords minimal vector");
@@ -69,21 +77,27 @@ export function main(): void {
   );
 
   // Single-part UR encode/decode.
-  const uri = encode(payload, UrType.bytes());
+  const uri = encodeUr(parseUrType("bytes"), payload);
   assert(uri.startsWith("ur:bytes/"), "single-part prefix");
-  eq(bytesToHex(decodeMessage(uri)), bytesToHex(payload), "single-part round trip");
+  const parsed = parseUr(uri);
+  eq(parsed.kind, "single", "single-part kind");
+  eq(
+    bytesToHex(parsed.kind === "single" ? parsed.message : new Uint8Array()),
+    bytesToHex(payload),
+    "single-part round trip",
+  );
 
-  // Multi-part root transport: Encoder -> Decoder over a few hundred bytes.
+  // Multi-part root transport: UrEncoder -> UrDecoder over a few hundred bytes.
   const message = new Uint8Array(300);
   for (let i = 0; i < message.length; i++) {
     message[i] = i & 0xff;
   }
-  const encoder = Encoder.create(message, 30, UrType.bytes());
+  const encoder = new UrEncoder(parseUrType("bytes"), message, { maxFragmentLength: 30 });
   assert(!encoder.isSinglePart, "multipart encoder");
   assert(encoder.fragmentCount > 1, "multipart fragment count");
   const decoder = new UrDecoder();
   for (let i = 0; i < 1000 && decoder.state.phase !== "complete"; i++) {
-    const result = decoder.receive(encoder.nextPart());
+    const result = decoder.receive(nextPart(encoder));
     assert(result.status === "accepted" || result.status === "duplicate", "multipart frame ok");
   }
   assert(decoder.state.phase === "complete", "multipart decoder completes");
@@ -110,7 +124,7 @@ export function main(): void {
   assert(!psbtEncoder.isSinglePart, "psbt multipart encoder");
   const psbtDecoder = new UrDecoder();
   for (let i = 0; i < 1000 && psbtDecoder.state.phase !== "complete"; i++) {
-    const result = psbtDecoder.receive(psbtEncoder.nextPart());
+    const result = psbtDecoder.receive(nextPart(psbtEncoder));
     assert(result.status === "accepted" || result.status === "duplicate", "psbt frame ok");
   }
   assert(psbtDecoder.state.phase === "complete", "psbt decoder completes");

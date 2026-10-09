@@ -6,8 +6,10 @@ export {
   fromUrString,
   Ur,
   firstTagUrType,
+  isUrType,
+  parseUrType,
   tagUrTypes,
-  UrType,
+  type UrType,
 } from "../typed/index.ts";
 export { UrError, type UrErrorCode, type UrErrorInfo, type UrLimit } from "../error.ts";
 

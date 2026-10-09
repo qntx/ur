@@ -4,7 +4,7 @@ import { expect, test } from "vite-plus/test";
 
 import {
   Ur,
-  UrType,
+  parseUrType,
   UrError,
   firstTagUrType,
   fromUr,
@@ -44,7 +44,7 @@ function errorOf(fn: () => void): UrError {
 test("toUr uses first tag name and untagged text body", () => {
   const note = new Note("hi");
   const ur = toUr(note, noteCodec);
-  expect(ur.type.value).toBe("note");
+  expect(ur.type).toBe("note");
   const body = encodeCbor(ur.cbor);
   expect(body[0]! & 0xe0).toBe(0x60);
   expect(body[0]).not.toBe(0xd9);
@@ -60,7 +60,7 @@ test("unnamed or empty first tag is InvalidType", () => {
 
 test("tagUrTypes parses every tag name in order", () => {
   const types = tagUrTypes([Tag.from(40_000, "note"), Tag.from(300, "crypto-note")]);
-  expect(types.map((t) => t.value)).toStrictEqual(["note", "crypto-note"]);
+  expect(types).toStrictEqual(["note", "crypto-note"]);
 });
 
 test("tagUrTypes empty list or unnamed tag is InvalidType", () => {
@@ -74,12 +74,12 @@ test("tagUrTypes empty list or unnamed tag is InvalidType", () => {
 
 test("fromUr type mismatch is UnexpectedType", () => {
   const note = new Note("hi");
-  const err = errorOf(() => fromUr(Ur.create("bytes", noteCodec.untaggedCbor(note)), noteCodec));
+  const err = errorOf(() => fromUr(Ur.fromCbor("bytes", noteCodec.untaggedCbor(note)), noteCodec));
   expect(err.code).toBe("UnexpectedType");
   expect(err.info).toStrictEqual({
     code: "UnexpectedType",
-    expected: [UrType.parse("note")],
-    found: UrType.parse("bytes"),
+    expected: [parseUrType("note")],
+    found: parseUrType("bytes"),
   });
 });
 
@@ -90,15 +90,15 @@ test("fromUr accepts every tag name and writes the first", () => {
   };
   const note = new Note("hi");
   const body = aliased.untaggedCbor(note);
-  expect(fromUr(Ur.create("crypto-note", body), aliased).text).toBe("hi");
-  expect(toUr(note, aliased).type.value).toBe("note");
+  expect(fromUr(Ur.fromCbor("crypto-note", body), aliased).text).toBe("hi");
+  expect(toUr(note, aliased).type).toBe("note");
 
-  const err = errorOf(() => fromUr(Ur.create("bytes", body), aliased));
+  const err = errorOf(() => fromUr(Ur.fromCbor("bytes", body), aliased));
   expect(err.code).toBe("UnexpectedType");
   expect(err.info).toStrictEqual({
     code: "UnexpectedType",
-    expected: [UrType.parse("note"), UrType.parse("crypto-note")],
-    found: UrType.parse("bytes"),
+    expected: [parseUrType("note"), parseUrType("crypto-note")],
+    found: parseUrType("bytes"),
   });
 });
 

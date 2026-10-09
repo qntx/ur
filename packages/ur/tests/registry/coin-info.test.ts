@@ -68,7 +68,7 @@ test("network is int32", () => {
 test("extra map key is CborType", () => {
   const map = new CborMap();
   map.set(3, 0);
-  const err = errorOf(() => fromUr(Ur.create("coin-info", map), coinInfoCodec));
+  const err = errorOf(() => fromUr(Ur.fromCbor("coin-info", map), coinInfoCodec));
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "WrongType" });
@@ -77,7 +77,7 @@ test("extra map key is CborType", () => {
 test("v1 crypto-coin-info decodes and re-encodes as v2", () => {
   // No official standalone v1 coin-info UR exists; v1/v2 bodies share the CDDL (BCR-2020-006).
   const info: CoinInfo = { type: CoinType.eth, network: Network.btcTestnet };
-  const v1Uri = Ur.create("crypto-coin-info", coinInfoCodec.untaggedCbor(info)).string();
+  const v1Uri = Ur.fromCbor("crypto-coin-info", coinInfoCodec.untaggedCbor(info)).toString();
   const v2 = fromUrString(toUrString(info, coinInfoCodec), coinInfoCodec);
   expect(fromUrString(v1Uri, coinInfoCodec)).toStrictEqual(v2);
   expect(fromUrString(v1Uri.toUpperCase(), coinInfoCodec)).toStrictEqual(v2);

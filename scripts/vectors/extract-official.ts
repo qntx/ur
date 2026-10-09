@@ -47,11 +47,13 @@ declare const Bun: {
 const RESEARCH_SHA = "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850";
 const URKIT_SHA = "ebba59b2e1538cb368d98147dd58c452e6d1dc47";
 const BCUR_SHA = "4479fb81b2350ae8bafa042a5572b9c64c2c32ca";
+const BCUR_RS_SHA = "2f8b4e728945f9dc248eba71911b89371f076924";
 
 const URKIT_FOUNTAIN = `URKit ${URKIT_SHA} Tests/URKitTests/FountainCodesTests.swift`;
 const URKIT_BYTEWORDS = `URKit ${URKIT_SHA} Tests/URKitTests/BytewordsTests.swift`;
 const URKIT_UR = `URKit ${URKIT_SHA} Tests/URKitTests/URTests.swift`;
 const BCUR_TEST = `bc-ur ${BCUR_SHA} test/test.cpp`;
+const BCUR_RS_BYTEWORDS = `bc-ur-rust ${BCUR_RS_SHA} src/bytewords.rs`;
 
 const VECTORS = join(import.meta.dirname, "../../vectors");
 
@@ -963,21 +965,165 @@ function registry(urtDoc: string, hdkeyDoc: string, sskrDoc: string, urDoc: stri
   );
 }
 
+/* ------------------------------------------------- identifier/bytemoji */
+
+/** The 256-word table from the BCR-2020-012 `0xNN:` word list. */
+function docWordTable(bwDoc: string): string[] {
+  const block = codeBlockContaining(bwDoc, "0x00: able acid also apex");
+  const words: string[] = [];
+  for (const m of block.matchAll(/0x([0-9a-f]{2}):((?: [a-z]{4}){8})/g)) {
+    const base = Number.parseInt(req(m[1], "word row base"), 16);
+    const row = req(m[2], "word row").trim().split(" ");
+    for (const [i, w] of row.entries()) {
+      words[base + i] = w;
+    }
+  }
+  expect(
+    words.length === 256 && words.every((w) => w !== undefined),
+    `BCR-2020-012: word table must hold 256 entries, got ${words.length}`,
+  );
+  return words;
+}
+
+/**
+ * The 256-emoji table: BCR-2024-008 reference string cross-checked against the paper's 16x16 table
+ * and the pinned bc-ur-rust `BYTEMOJIS` constant.
+ */
+function docBytemojis(bytemojiDoc: string, bcRs: string): string[] {
+  const refBlock = codeBlockAfter(bytemojiDoc, "### Reference String");
+  const ref = [...new Intl.Segmenter().segment(refBlock.trim())].map((s) => s.segment);
+  expect(ref.length === 256, `BCR-2024-008: reference string has ${ref.length} emojis`);
+
+  const tableRows = bytemojiDoc.split("\n").filter((l) => /^\| [0-9A-F] \|/.test(l));
+  expect(tableRows.length === 16, `BCR-2024-008: expected 16 table rows, got ${tableRows.length}`);
+  const table: string[] = [];
+  for (const row of tableRows) {
+    const cells = row
+      .split("|")
+      .map((c) => c.trim())
+      .filter((c) => c.length > 0);
+    const emojis = cells.slice(1);
+    expect(emojis.length === 16, `BCR-2024-008: row needs 16 emojis, got ${emojis.length}`);
+    table.push(...emojis);
+  }
+  crossChecked(ref, [table], "BCR-2024-008 reference string vs table");
+
+  const rsBlock = bcRs.slice(
+    bcRs.indexOf("pub const BYTEMOJIS"),
+    bcRs.indexOf("];", bcRs.indexOf("pub const BYTEMOJIS")),
+  );
+  const rsEmojis = [...rsBlock.matchAll(/"([^"]+)"/g)].map((m) => req(m[1], "emoji literal"));
+  expect(rsEmojis.length === 256, `bc-ur-rust BYTEMOJIS: got ${rsEmojis.length}`);
+  crossChecked(ref, [rsEmojis], "BCR-2024-008 vs bc-ur-rust BYTEMOJIS");
+  return ref;
+}
+
+function identifiers(bwDoc: string, bytemojiDoc: string, bcRs: string): void {
+  const words = docWordTable(bwDoc);
+  const emojis = docBytemojis(bytemojiDoc, bcRs);
+  const identifier = (digest: number[]): string =>
+    digest.map((b) => req(words[b], `word ${b}`)).join(" ");
+  const bytemoji = (digest: number[]): string =>
+    digest.map((b) => req(emojis[b], `emoji ${b}`)).join(" ");
+
+  // BCR-2024-008 OIB example prints the same digest three ways.
+  const oib = codeBlockContaining(bytemojiDoc, "JUGS DELI GIFT WHEN");
+  const oibHex = req(/^([0-9a-f]{2} ){3}[0-9a-f]{2}$/im.exec(oib)?.[0], "OIB hex line").replaceAll(
+    " ",
+    "",
+  );
+  const oibWords = req(/([A-Z]{4} ){3}[A-Z]{4}/.exec(oib)?.[0], "OIB bytewords line");
+  const oibEmojiLine = req(
+    oib
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.length > 0 && !/^[0-9a-f* ]+$/i.test(l) && !/[a-z]/.test(l)),
+    "OIB bytemoji line",
+  );
+  const oibDigest = [...oibHex.matchAll(/[0-9a-f]{2}/g)].map((m) => Number.parseInt(m[0], 16));
+  crossChecked(
+    identifier(oibDigest),
+    [oibWords.toLowerCase()],
+    "BCR-2024-008 OIB bytewords vs doc table",
+  );
+  crossChecked(oibEmojiLine, [bytemoji(oibDigest)], "BCR-2024-008 OIB bytemoji vs doc table");
+
+  // bc-ur-rust test literals anchor the bytewords form independently.
+  const rs0123 = req(
+    /encode_to_words\(&\[0, 1, 2, 3\]\),\s*"([^"]+)"/.exec(bcRs)?.[1],
+    "bc-ur-rust identifier literal",
+  );
+  crossChecked(identifier([0, 1, 2, 3]), [rs0123], "identifier 0,1,2,3 vs bc-ur-rust");
+
+  writeVector(
+    "official/bytewords-identifier.json",
+    "bytewords.identifier",
+    researchSource("BCR-2024-008 + BCR-2020-012", "papers/bcr-2024-008-bytemoji.md", [
+      "papers/bcr-2020-012-bytewords.md",
+      BCUR_RS_BYTEWORDS,
+    ]),
+    [
+      { name: "word table", words },
+      { name: "bcr-2024-008 OIB", digestHex: oibHex, identifier: identifier(oibDigest) },
+      { name: "bc-ur-rust 0,1,2,3", digestHex: "00010203", identifier: rs0123 },
+      { name: "zero digest", digestHex: "00000000", identifier: identifier([0, 0, 0, 0]) },
+      { name: "max digest", digestHex: "ffffffff", identifier: identifier([255, 255, 255, 255]) },
+    ],
+  );
+
+  writeVector(
+    "official/bytemoji.json",
+    "bytemoji.identifier",
+    researchSource("BCR-2024-008", "papers/bcr-2024-008-bytemoji.md", [BCUR_RS_BYTEWORDS]),
+    [
+      { name: "reference string", table: refBlockJoin(emojis) },
+      {
+        name: "bcr-2024-008 OIB",
+        digestHex: oibHex,
+        bytemojis: oibEmojiLine,
+        bytewords: identifier(oibDigest),
+      },
+      { name: "0,1,2,3", digestHex: "00010203", bytemojis: bytemoji([0, 1, 2, 3]) },
+      { name: "zero digest", digestHex: "00000000", bytemojis: bytemoji([0, 0, 0, 0]) },
+      { name: "max digest", digestHex: "ffffffff", bytemojis: bytemoji([255, 255, 255, 255]) },
+    ],
+  );
+}
+
+/** Concatenated emoji table exactly as BCR-2024-008 prints it. */
+function refBlockJoin(emojis: string[]): string {
+  return emojis.join("");
+}
+
 /* -------------------------------------------------------------------- */
 
-const [murDoc, bwDoc, urDoc, urtDoc, hdkeyDoc, sskrDoc, kitFountain, kitBw, kitUr, cpp] =
-  await Promise.all([
-    fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2024-001-multipart-ur.md"),
-    fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-012-bytewords.md"),
-    fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-005-ur.md"),
-    fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-006-urtypes.md"),
-    fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-007-hdkey.md"),
-    fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-011-sskr.md"),
-    fetchRaw("BlockchainCommons/URKit", URKIT_SHA, "Tests/URKitTests/FountainCodesTests.swift"),
-    fetchRaw("BlockchainCommons/URKit", URKIT_SHA, "Tests/URKitTests/BytewordsTests.swift"),
-    fetchRaw("BlockchainCommons/URKit", URKIT_SHA, "Tests/URKitTests/URTests.swift"),
-    fetchRaw("BlockchainCommons/bc-ur", BCUR_SHA, "test/test.cpp"),
-  ]);
+const [
+  murDoc,
+  bwDoc,
+  urDoc,
+  urtDoc,
+  hdkeyDoc,
+  sskrDoc,
+  bytemojiDoc,
+  kitFountain,
+  kitBw,
+  kitUr,
+  cpp,
+  bcRs,
+] = await Promise.all([
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2024-001-multipart-ur.md"),
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-012-bytewords.md"),
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-005-ur.md"),
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-006-urtypes.md"),
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-007-hdkey.md"),
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-011-sskr.md"),
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2024-008-bytemoji.md"),
+  fetchRaw("BlockchainCommons/URKit", URKIT_SHA, "Tests/URKitTests/FountainCodesTests.swift"),
+  fetchRaw("BlockchainCommons/URKit", URKIT_SHA, "Tests/URKitTests/BytewordsTests.swift"),
+  fetchRaw("BlockchainCommons/URKit", URKIT_SHA, "Tests/URKitTests/URTests.swift"),
+  fetchRaw("BlockchainCommons/bc-ur", BCUR_SHA, "test/test.cpp"),
+  fetchRaw("BlockchainCommons/bc-ur-rust", BCUR_RS_SHA, "src/bytewords.rs"),
+]);
 
 const multipartTable = readFileSync(join(VECTORS, "ur-rs/multipart-20.txt"), "utf8")
   .split("\n")
@@ -988,6 +1134,7 @@ mur(murDoc, kitFountain, cpp);
 bytewords(bwDoc, kitBw, cpp);
 ur(kitUr, cpp, urDoc, multipartTable);
 registry(urtDoc, hdkeyDoc, sskrDoc, urDoc);
+identifiers(bwDoc, bytemojiDoc, bcRs);
 
 console.log(`wrote ${written.length} vector files:`);
 for (const w of written) {

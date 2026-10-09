@@ -1,26 +1,20 @@
 import { fail } from "../error.ts";
 
-/** Validated UR type token (stored lowercase, `[a-z0-9-]+`). */
-export class UrType {
-  readonly value: string;
+declare const urTypeBrand: unique symbol;
 
-  private constructor(value: string) {
-    this.value = value;
-  }
+/** Validated UR type token: canonical lowercase `[a-z0-9-]+`. */
+export type UrType = string & { readonly [urTypeBrand]: true };
 
-  static parse(s: string): UrType {
-    const lower = s.toLowerCase();
-    if (lower.length === 0 || !/^[a-z0-9-]+$/.test(lower)) {
-      fail("InvalidType");
-    }
-    return new UrType(lower);
+/** Validate and lowercase a UR type token. Throws `UrError(InvalidType)`. */
+export function parseUrType(text: string): UrType {
+  const lower = text.toLowerCase();
+  if (lower.length === 0 || !/^[a-z0-9-]+$/.test(lower)) {
+    fail("InvalidType");
   }
+  return lower as UrType; // oxlint-disable-line typescript/no-unsafe-type-assertion -- the brand is exactly this validation
+}
 
-  static bytes(): UrType {
-    return new UrType("bytes");
-  }
-
-  equals(other: UrType): boolean {
-    return this.value === other.value;
-  }
+/** True iff `text` is already a canonical lowercase UR type token (no folding). */
+export function isUrType(text: string): text is UrType {
+  return /^[a-z0-9-]+$/.test(text);
 }

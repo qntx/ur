@@ -1,7 +1,8 @@
 //! Official UR vectors exercised through the public `ur` API. Cases that need
 //! the crate-internal message generator live in `src/official_vectors.rs`.
 
-use bcur::ur::{Kind, UrType, decode, decode_message, encode, parse};
+use bcur::ur::{ParsedUr, UrType, encode, parse};
+use bcur::{DecoderLimits, ur_type};
 use serde_json::Value;
 
 use crate::{hex, vector};
@@ -10,23 +11,34 @@ fn run_case(case: &Value) {
     let name = case["name"].as_str().unwrap();
     let ur = case["ur"].as_str().unwrap();
     let ur_type = UrType::new(case["urType"].as_str().unwrap()).unwrap();
-    let parsed = parse(ur).unwrap();
-    assert_eq!(parsed.ur_type, ur_type, "{name}");
+    let parsed = parse(ur, &DecoderLimits::default()).unwrap();
     if case["kind"].as_str() == Some("multi") {
-        assert_eq!(parsed.kind, Kind::MultiPart, "{name}");
+        let ParsedUr::Multi {
+            ur_type: parsed_type,
+            part,
+        } = parsed
+        else {
+            panic!("{name}: expected multi");
+        };
+        assert_eq!(parsed_type, ur_type, "{name}");
         let seq = case["seqNum"].as_u64().unwrap() as u32;
         let count = case["seqLen"].as_u64().unwrap() as u32;
-        assert_eq!(parsed.indices, Some((seq, count)), "{name}");
-        let (kind, payload) = decode(ur).unwrap();
-        assert_eq!(kind, Kind::MultiPart, "{name}");
-        assert!(!payload.is_empty(), "{name}");
+        assert_eq!(part.sequence(), seq, "{name}");
+        assert_eq!(part.sequence_count(), count, "{name}");
+        assert!(!part.data().is_empty(), "{name}");
     } else {
-        assert_eq!(parsed.kind, Kind::SinglePart, "{name}");
-        let payload = decode_message(ur).unwrap();
+        let ParsedUr::Single {
+            ur_type: parsed_type,
+            message,
+        } = parsed
+        else {
+            panic!("{name}: expected single");
+        };
+        assert_eq!(parsed_type, ur_type, "{name}");
         if let Some(expected) = case["cborHex"].as_str() {
-            assert_eq!(hex(&payload), expected, "{name}");
+            assert_eq!(hex(&message), expected, "{name}");
         }
-        assert_eq!(encode(&payload, &ur_type), ur, "{name}");
+        assert_eq!(encode(&ur_type, &message), ur, "{name}");
     }
 }
 
@@ -40,4 +52,45 @@ fn official_ur_single() {
         }
         run_case(case);
     }
+}
+
+#[test]
+fn ur_header_grammar() {
+    let doc = vector("ur/header.json");
+    for case in doc["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let uri = case["uri"].as_str().unwrap();
+        match parse(uri, &DecoderLimits::default()) {
+            Ok(ParsedUr::Multi { part, .. }) => {
+                assert_eq!(case["expect"].as_str().unwrap(), "ok", "{name}");
+                assert_eq!(
+                    part.sequence(),
+                    case["seq"].as_u64().unwrap() as u32,
+                    "{name}"
+                );
+                assert_eq!(
+                    part.sequence_count(),
+                    case["count"].as_u64().unwrap() as u32,
+                    "{name}"
+                );
+            }
+            Ok(ParsedUr::Single { .. }) => panic!("{name}: expected multi"),
+            Err(e) => {
+                assert_eq!(
+                    format!("{:?}", e.kind()),
+                    case["expect"].as_str().unwrap(),
+                    "{name}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn ur_type_contract() {
+    // `ur_type!` validates at compile time; `UrType::new` validates at run time.
+    const SEED: UrType = ur_type!("seed");
+    assert_eq!(SEED.as_str(), "seed");
+    assert!(UrType::new("SEED").is_ok_and(|t| t.as_str() == "seed"));
+    assert!(UrType::new("not_a_type").is_err());
 }

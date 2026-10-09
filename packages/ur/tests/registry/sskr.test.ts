@@ -68,11 +68,11 @@ test("toUr copies caller shareValue", () => {
   const shareValue = hexToBytes(sskrShare.shareValueHex);
   const ur = toUr(golden(shareValue), sskrCodec);
   shareValue[0] = 0;
-  expect(ur.string()).toBe(sskrShare.ur);
+  expect(ur.toString()).toBe(sskrShare.ur);
 });
 
 test("fromUr copies decoded shareValue", () => {
-  const ur = Ur.fromUrString(sskrShare.ur);
+  const ur = Ur.parse(sskrShare.ur);
   const decoded = fromUr(ur, sskrCodec);
   decoded.shareValue[0] = 0;
   expect(bytesToHex(fromUr(ur, sskrCodec).shareValue)).toBe(sskrShare.shareValueHex);
@@ -80,7 +80,7 @@ test("fromUr copies decoded shareValue", () => {
 
 test("length under 5 is CborType OutOfRange", () => {
   const err = errorOf(() =>
-    fromUr(Ur.create("sskr", new Uint8Array([0x4b, 0xbf, 0x11, 0x01])), sskrCodec),
+    fromUr(Ur.fromCbor("sskr", new Uint8Array([0x4b, 0xbf, 0x11, 0x01])), sskrCodec),
   );
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
@@ -89,7 +89,7 @@ test("length under 5 is CborType OutOfRange", () => {
 
 test("reserved nibble nonzero is CborType WrongType", () => {
   const err = errorOf(() =>
-    fromUr(Ur.create("sskr", rawShare([0x4b, 0xbf, 0x11, 0x01, 0x12])), sskrCodec),
+    fromUr(Ur.fromCbor("sskr", rawShare([0x4b, 0xbf, 0x11, 0x01, 0x12])), sskrCodec),
   );
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
@@ -98,7 +98,7 @@ test("reserved nibble nonzero is CborType WrongType", () => {
 
 test("groupThreshold greater than groupCount is CborType OutOfRange", () => {
   const decodeErr = errorOf(() =>
-    fromUr(Ur.create("sskr", rawShare([0x4b, 0xbf, 0x10, 0x01, 0x02])), sskrCodec),
+    fromUr(Ur.fromCbor("sskr", rawShare([0x4b, 0xbf, 0x10, 0x01, 0x02])), sskrCodec),
   );
   expect(decodeErr.code).toBe("CborType");
   expect(decodeErr.cause).toBeInstanceOf(CborError);
@@ -112,7 +112,7 @@ test("groupThreshold greater than groupCount is CborType OutOfRange", () => {
 
 test("groupIndex at or above groupCount is CborType OutOfRange", () => {
   const decodeErr = errorOf(() =>
-    fromUr(Ur.create("sskr", rawShare([0x4b, 0xbf, 0x11, 0x21, 0x02])), sskrCodec),
+    fromUr(Ur.fromCbor("sskr", rawShare([0x4b, 0xbf, 0x11, 0x21, 0x02])), sskrCodec),
   );
   expect(decodeErr.code).toBe("CborType");
   expect(decodeErr.cause).toBeInstanceOf(CborError);

@@ -1,7 +1,8 @@
 #![no_main]
 
+use bcur::fountain::EncoderOptions;
 use bcur::ur::{Decoder, Encoder};
-use bcur::{ErrorKind, State, UrType};
+use bcur::{State, UrType};
 use libfuzzer_sys::fuzz_target;
 
 /// True when the UR path contains `/<digits>-<digits>/` (fountain form).
@@ -48,13 +49,15 @@ fn encode_roundtrip(type_bytes: &[u8], payload: &[u8], max_frag: usize) {
         return;
     };
     let max_frag = max_frag.clamp(1, payload.len().max(1));
-    let Ok(mut encoder) = Encoder::new(payload, max_frag, &ur_type) else {
+    let Ok(mut encoder) =
+        Encoder::new(ur_type, payload.to_vec(), EncoderOptions::new(max_frag))
+    else {
         return;
     };
     let mut decoder = Decoder::default();
 
     if encoder.is_single_part() {
-        let part = encoder.next_part().expect("K==1 next_part");
+        let part = encoder.next().expect("K==1 next");
         assert!(
             !has_fountain_path(&part),
             "K==1 must emit ur:<type>/<body>, got {part}"
@@ -72,18 +75,17 @@ fn encode_roundtrip(type_bytes: &[u8], payload: &[u8], max_frag: usize) {
     let k = usize::try_from(encoder.fragment_count()).unwrap_or(usize::MAX);
     let cap = k.saturating_mul(6).max(40);
     for _ in 0..cap {
-        match encoder.next_part() {
-            Err(e) if e.kind() == ErrorKind::ResourceLimit => return,
-            Err(other) => panic!("encoder next_part: {other:?}"),
-            Ok(part) => match decoder.receive(&part) {
-                Err(e) if e.is_fatal() => return,
-                Err(other) => panic!("decoder receive: {other:?}"),
-                Ok(_) if matches!(decoder.state(), State::Complete(_)) => {
-                    assert_eq!(decoder.into_decoded().unwrap().message(), payload);
-                    return;
-                }
-                Ok(_) => {}
-            },
+        let Some(part) = encoder.next() else {
+            return;
+        };
+        match decoder.receive(&part) {
+            Err(e) if e.is_fatal() => return,
+            Err(other) => panic!("decoder receive: {other:?}"),
+            Ok(_) if matches!(decoder.state(), State::Complete(_)) => {
+                assert_eq!(decoder.into_decoded().unwrap().message(), payload);
+                return;
+            }
+            Ok(_) => {}
         }
     }
     panic!("did not complete after {cap} parts");

@@ -8,10 +8,18 @@
 
 import { expect, test } from "vite-plus/test";
 
-import * as bytewords from "../src/bytewords/index.ts";
+import { encodeBytewords } from "../src/bytewords/index.ts";
 import type { Part } from "../src/fountain/index.ts";
 import { FountainEncoder, encodePart } from "../src/fountain/index.ts";
-import { Encoder, UrDecoder, UrType, decode, encode, parse, toQrString } from "../src/ur/index.ts";
+import type { ParsedUr } from "../src/ur/index.ts";
+import {
+  UrDecoder,
+  UrEncoder,
+  encodeUr,
+  parseUr,
+  parseUrType,
+  toQrString,
+} from "../src/ur/index.ts";
 import { makeMessage } from "./message.ts";
 import { vectorJson, vectorLines } from "./vectors.ts";
 
@@ -29,6 +37,25 @@ function decodedMessage(decoder: UrDecoder): Uint8Array {
     throw new Error(`decoder ${state.phase}`);
   }
   return state.value.message;
+}
+
+function nextUr(encoder: UrEncoder): string {
+  const { done, value } = encoder.next();
+  if (done === true || value === undefined) {
+    throw new Error("ur encoder exhausted");
+  }
+  return value;
+}
+
+function bytesEncoder(data: Uint8Array, maxFragmentLength: number): UrEncoder {
+  return new UrEncoder(parseUrType("bytes"), data, { maxFragmentLength });
+}
+
+function parsedMessage(parsed: ParsedUr): Uint8Array {
+  if (parsed.kind !== "single") {
+    throw new Error(`expected single, got ${parsed.kind}`);
+  }
+  return parsed.message;
 }
 
 function nextPart(fountain: FountainEncoder): Part {
@@ -73,31 +100,30 @@ const L4 = vectorJson<{ type: string; cborHex: string; uri: string }>("typed/tes
 
 test("ur-rs test_ur_encoder: full 20 URI goldens", () => {
   const ur = makeMessageUr(256, "Wolf");
-  const encoder = Encoder.bytes(ur, 30);
+  const encoder = bytesEncoder(ur, 30);
   expect(encoder.fragmentCount).toBe(9);
-  for (let i = 0; i < UR_ENCODER_20.length; i++) {
-    expect(encoder.currentIndex).toBe(i);
-    expect(encoder.nextPart()).toBe(UR_ENCODER_20[i]);
+  for (const expected of UR_ENCODER_20) {
+    expect(nextUr(encoder)).toBe(expected);
   }
 });
 
 test("ur-rs test_single_part_ur", () => {
   const ur = makeMessageUr(50, "Wolf");
-  const encoded = encode(ur, UrType.bytes());
+  const encoded = encodeUr(parseUrType("bytes"), ur);
   expect(encoded).toBe(
     "ur:bytes/hdeymejtswhhylkepmykhhtsytsnoyoyaxaedsuttydmmhhpktpmsrjtgwdpfnsboxgwlbaawzuefywkdplrsrjynbvygabwjldapfcsdwkbrkch",
   );
-  const { kind, payload } = decode(encoded);
-  expect(kind).toBe("single");
-  expect(payload).toStrictEqual(ur);
+  const parsed = parseUr(encoded);
+  expect(parsed.kind).toBe("single");
+  expect(parsedMessage(parsed)).toStrictEqual(ur);
 });
 
 test("decode full-uppercase multipart URIs", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(8));
-  const encoder = Encoder.bytes(data, 10);
+  const encoder = bytesEncoder(data, 10);
   const decoder = new UrDecoder();
   while (decoder.state.phase !== "complete") {
-    feedUr(decoder, toQrString(encoder.nextPart()));
+    feedUr(decoder, toQrString(nextUr(encoder)));
   }
   expect(decodedMessage(decoder)).toStrictEqual(data);
 });
@@ -106,7 +132,7 @@ test("test_foreign_1_1_fountain_uri_decodes", () => {
   const message = new TextEncoder().encode("hello");
   const fountain = new FountainEncoder(message, { maxFragmentLength: 64 });
   expect(fountain.fragmentCount).toBe(1);
-  const body = bytewords.encode(encodePart(nextPart(fountain)), "minimal");
+  const body = encodeBytewords(encodePart(nextPart(fountain)), "minimal");
   const uri = `ur:bytes/1-1/${body}`;
   const decoder = new UrDecoder();
   expect(decoder.receive(uri).status).toBe("accepted");
@@ -115,7 +141,7 @@ test("test_foreign_1_1_fountain_uri_decodes", () => {
 
 test("bc-ur golden: ur:test array", () => {
   const cbor = new Uint8Array(Buffer.from(L4.cborHex, "hex"));
-  expect(encode(cbor, UrType.parse(L4.type))).toBe(L4.uri);
+  expect(encodeUr(parseUrType(L4.type), cbor)).toBe(L4.uri);
 });
 
 test("published-from-refs: pinned literals contain the in-tree goldens", () => {
@@ -129,6 +155,6 @@ test("published-from-refs: pinned literals contain the in-tree goldens", () => {
   // Sorted unique, matching the extraction script's ordering contract.
   expect(PUBLISHED_REFS).toStrictEqual([...new Set(PUBLISHED_REFS)].toSorted());
   for (const uri of PUBLISHED_REFS) {
-    parse(uri);
+    parseUr(uri);
   }
 });

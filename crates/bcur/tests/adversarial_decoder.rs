@@ -9,14 +9,16 @@
 
 //! Adversarial multi-part decoder session behavior (public API).
 
+use bcur::fountain::EncoderOptions;
 use bcur::ur::{Decoder, Encoder};
+use bcur::ur_type;
 use bcur::{DecoderLimits, ErrorKind, Limit, Received, State, UrType};
 
 #[test]
 fn uri_len_limit_fails_session() {
     let data = b"Ten chars!".repeat(8);
-    let mut enc = Encoder::bytes(&data, 10).unwrap();
-    let part = enc.next_part().unwrap();
+    let mut enc = Encoder::new(ur_type!("bytes"), data, EncoderOptions::new(10)).unwrap();
+    let part = enc.next().unwrap();
 
     let mut decoder = Decoder::new(DecoderLimits {
         max_uri_length: 16,
@@ -40,14 +42,14 @@ fn uri_len_limit_fails_session() {
 #[test]
 fn fragment_count_limit_fails() {
     let data = b"Ten chars!".repeat(16);
-    let mut enc = Encoder::bytes(&data, 10).unwrap();
+    let mut enc = Encoder::new(ur_type!("bytes"), data, EncoderOptions::new(10)).unwrap();
     assert!(enc.fragment_count() > 1);
 
     let mut decoder = Decoder::new(DecoderLimits {
         max_fragment_count: 1,
         ..DecoderLimits::default()
     });
-    let part = enc.next_part().unwrap();
+    let part = enc.next().unwrap();
     assert!(matches!(
         decoder.receive(&part),
         Err(ref e) if e.kind() == ErrorKind::ResourceLimit
@@ -60,13 +62,13 @@ fn fragment_count_limit_fails() {
 #[test]
 fn message_length_limit_fails() {
     let data = b"Ten chars!".repeat(16);
-    let mut enc = Encoder::bytes(&data, 10).unwrap();
+    let mut enc = Encoder::new(ur_type!("bytes"), data, EncoderOptions::new(10)).unwrap();
     let mut decoder = Decoder::new(DecoderLimits {
         max_message_length: 8,
         ..DecoderLimits::default()
     });
     assert!(matches!(
-        decoder.receive(&enc.next_part().unwrap()),
+        decoder.receive(&enc.next().unwrap()),
         Err(ref e) if e.kind() == ErrorKind::ResourceLimit
             && e.limit() == Some(Limit::MessageLength)
             && e.is_fatal()
@@ -77,17 +79,17 @@ fn message_length_limit_fails() {
 #[test]
 fn type_stickiness_is_rejected_not_fatal() {
     let data = b"Ten chars!".repeat(6);
-    let mut a = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
-    let mut b = Encoder::new(&data, 10, &UrType::new("beta").unwrap()).unwrap();
+    let mut a = Encoder::new(ur_type!("alpha"), data.clone(), EncoderOptions::new(10)).unwrap();
+    let mut b = Encoder::new(ur_type!("beta"), data, EncoderOptions::new(10)).unwrap();
     let mut decoder = Decoder::default();
-    decoder.receive(&a.next_part().unwrap()).unwrap();
+    decoder.receive(&a.next().unwrap()).unwrap();
     assert!(matches!(
-        decoder.receive(&b.next_part().unwrap()),
+        decoder.receive(&b.next().unwrap()),
         Err(ref e) if e.kind() == ErrorKind::UnexpectedType && !e.is_fatal()
     ));
     assert!(matches!(decoder.state(), State::Collecting(_)));
     // Same type is still received without error.
-    assert!(decoder.receive(&a.next_part().unwrap()).is_ok());
+    assert!(decoder.receive(&a.next().unwrap()).is_ok());
     assert!(decoder.progress().rank() >= 1);
 }
 
@@ -105,10 +107,10 @@ fn single_part_receive_completes() {
 #[test]
 fn accept_type_mismatch_is_rejected_not_fatal() {
     let data = b"Ten chars!".repeat(4);
-    let mut enc = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
+    let mut enc = Encoder::new(ur_type!("alpha"), data, EncoderOptions::new(10)).unwrap();
     let mut decoder = Decoder::default().accept([UrType::new("beta").unwrap()]);
     assert!(matches!(
-        decoder.receive(&enc.next_part().unwrap()),
+        decoder.receive(&enc.next().unwrap()),
         Err(ref e) if e.kind() == ErrorKind::UnexpectedType && !e.is_fatal()
     ));
     assert!(matches!(decoder.state(), State::Empty));
@@ -117,8 +119,8 @@ fn accept_type_mismatch_is_rejected_not_fatal() {
 #[test]
 fn index_path_mismatch_is_rejected_not_fatal() {
     let data = b"Ten chars!".repeat(4);
-    let mut enc = Encoder::bytes(&data, 10).unwrap();
-    let part = enc.next_part().unwrap();
+    let mut enc = Encoder::new(ur_type!("bytes"), data, EncoderOptions::new(10)).unwrap();
+    let part = enc.next().unwrap();
     let corrupted = part.replacen("/1-", "/2-", 1);
     let mut decoder = Decoder::default();
     assert!(matches!(

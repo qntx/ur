@@ -113,12 +113,12 @@ test("empty components without fingerprint is CborType", () => {
 
   const map = new CborMap();
   map.set(1, []);
-  const decodeErr = errorOf(() => fromUr(Ur.create("keypath", map), keypathCodec));
+  const decodeErr = errorOf(() => fromUr(Ur.fromCbor("keypath", map), keypathCodec));
   expect(decodeErr.code).toBe("CborType");
 });
 
 test("missing components is CborType MissingMapKey", () => {
-  const err = errorOf(() => fromUr(Ur.create("keypath", new CborMap()), keypathCodec));
+  const err = errorOf(() => fromUr(Ur.fromCbor("keypath", new CborMap()), keypathCodec));
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "MissingMapKey" });
@@ -128,7 +128,7 @@ test("extra map key is CborType", () => {
   const map = new CborMap();
   map.set(1, [0, false]);
   map.set(4, 0);
-  const err = errorOf(() => fromUr(Ur.create("keypath", map), keypathCodec));
+  const err = errorOf(() => fromUr(Ur.fromCbor("keypath", map), keypathCodec));
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "WrongType" });
@@ -165,21 +165,21 @@ test("source fingerprint 0 is CborType OutOfRange", () => {
 test("index missing trailing bool is CborType", () => {
   const map = new CborMap();
   map.set(1, [44]);
-  const err = errorOf(() => fromUr(Ur.create("keypath", map), keypathCodec));
+  const err = errorOf(() => fromUr(Ur.fromCbor("keypath", map), keypathCodec));
   expect(err.code).toBe("CborType");
 });
 
 test("pair does not consume a trailing bool", () => {
   const map = new CborMap();
   map.set(1, [[0, false, 1, false], true]);
-  const err = errorOf(() => fromUr(Ur.create("keypath", map), keypathCodec));
+  const err = errorOf(() => fromUr(Ur.fromCbor("keypath", map), keypathCodec));
   expect(err.code).toBe("CborType");
 });
 
 test("v1 crypto-keypath decodes and re-encodes as v2", () => {
   // No official standalone v1 keypath UR exists; v1/v2 bodies share the CDDL (BCR-2020-006).
   const keypath: Keypath = { components: [{ kind: "index", index: 44, hardened: true }] };
-  const v1Uri = Ur.create("crypto-keypath", keypathCodec.untaggedCbor(keypath)).string();
+  const v1Uri = Ur.fromCbor("crypto-keypath", keypathCodec.untaggedCbor(keypath)).toString();
   const v2 = fromUrString(toUrString(keypath, keypathCodec), keypathCodec);
   expect(fromUrString(v1Uri, keypathCodec)).toStrictEqual(v2);
   expect(fromUrString(v1Uri.toUpperCase(), keypathCodec)).toStrictEqual(v2);
@@ -190,7 +190,7 @@ test("toUr copies caller path object by encoding immediately", () => {
   const components: PathComponent[] = [{ kind: "index", index: 44, hardened: true }];
   const ur = toUr({ components }, keypathCodec);
   components[0] = { kind: "index", index: 0, hardened: false };
-  expect(ur.string()).toBe(
+  expect(ur.toString()).toBe(
     toUrString({ components: [{ kind: "index", index: 44, hardened: true }] }, keypathCodec),
   );
 });

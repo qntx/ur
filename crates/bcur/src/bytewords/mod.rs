@@ -47,8 +47,32 @@ pub fn encode(data: &[u8], style: Style) -> String {
 ///
 /// **Not for UR bodies.** Intended for short human identifiers only.
 #[must_use]
-pub fn encode_raw(data: &[u8], style: Style) -> String {
+fn encode_raw(data: &[u8], style: Style) -> String {
     encode_words(data.iter().copied(), style)
+}
+
+/// The four checksum words of `data` alone (`URKit` `checksumWords` semantics).
+#[must_use]
+pub fn checksum(data: &[u8], style: Style) -> String {
+    encode_raw(&crc32::checksum(data).to_be_bytes(), style)
+}
+
+/// Encoded length of `len` bytes (without a checksum) for `style`.
+#[must_use]
+pub const fn encoded_len(len: usize, style: Style) -> usize {
+    if len == 0 {
+        return 0;
+    }
+    match style {
+        Style::Standard | Style::Uri => len * 5 - 1,
+        Style::Minimal => len * 2,
+    }
+}
+
+/// Four-word standard-style identifier of a 4-byte digest (BCR-2020-012).
+#[must_use]
+pub fn identifier(data: [u8; 4]) -> String {
+    encode_raw(&data, Style::Standard)
 }
 
 fn encode_words(data: impl Iterator<Item = u8>, style: Style) -> String {
@@ -160,7 +184,7 @@ fn strip_checksum(mut data: Vec<u8>) -> Result<Vec<u8>> {
 /// Per BCR-2020-012, each word is uniquely identified by its first three or last
 /// three letters, so length-3 tokens are accepted when unambiguous.
 #[must_use]
-pub fn canonicalize_byteword(token: &str) -> Option<String> {
+pub fn canonicalize(token: &str) -> Option<&'static str> {
     if !token.is_ascii() {
         return None;
     }
@@ -169,18 +193,18 @@ pub fn canonicalize_byteword(token: &str) -> Option<String> {
     match bytes.len() {
         4 => {
             let byte = encoded_byte(&lower, false)?;
-            Some(String::from(word_at(byte)))
+            Some(word_at(byte))
         }
         3 => canonicalize_three_letter(bytes),
         2 => {
             let byte = encoded_byte(&lower, true)?;
-            Some(String::from(word_at(byte)))
+            Some(word_at(byte))
         }
         _ => None,
     }
 }
 
-fn canonicalize_three_letter(bytes: &[u8]) -> Option<String> {
+fn canonicalize_three_letter(bytes: &[u8]) -> Option<&'static str> {
     let mut found: Option<&'static str> = None;
     for word in &WORDS {
         let w = word.as_bytes();
@@ -194,7 +218,7 @@ fn canonicalize_three_letter(bytes: &[u8]) -> Option<String> {
         }
         found = Some(*word);
     }
-    found.map(String::from)
+    found
 }
 
 #[cfg(test)]
@@ -310,13 +334,18 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_raw_and_canonicalize() {
+    fn test_checksum_identifier_encoded_len_canonicalize() {
+        assert_eq!(checksum(&[0], Style::Standard), "tied also webs lung");
+        assert_eq!(identifier([0, 1, 2, 3]), "able acid also apex");
+        assert_eq!(encoded_len(0, Style::Standard), 0);
+        assert_eq!(encoded_len(5, Style::Standard), 24);
+        assert_eq!(encoded_len(5, Style::Minimal), 10);
         assert_eq!(encode_raw(&[0], Style::Minimal), "ae");
-        assert_eq!(canonicalize_byteword("ABLE"), Some(String::from("able")));
-        assert_eq!(canonicalize_byteword("ae"), Some(String::from("able")));
-        assert_eq!(canonicalize_byteword("abl"), Some(String::from("able")));
-        assert_eq!(canonicalize_byteword("ble"), Some(String::from("able")));
-        assert_eq!(canonicalize_byteword("nope"), None);
-        assert_eq!(canonicalize_byteword("a"), None);
+        assert_eq!(canonicalize("ABLE"), Some("able"));
+        assert_eq!(canonicalize("ae"), Some("able"));
+        assert_eq!(canonicalize("abl"), Some("able"));
+        assert_eq!(canonicalize("ble"), Some("able"));
+        assert_eq!(canonicalize("nope"), None);
+        assert_eq!(canonicalize("a"), None);
     }
 }

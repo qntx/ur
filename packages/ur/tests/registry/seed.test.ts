@@ -12,7 +12,7 @@ import { expect, test } from "vite-plus/test";
 import {
   TAGS,
   Ur,
-  UrType,
+  parseUrType,
   UrError,
   fromUr,
   fromUrString,
@@ -133,11 +133,11 @@ test("toUr copies caller payload", () => {
   const buf = payload(seedC709.payloadHex);
   const ur = toUr({ payload: buf }, seedCodec);
   buf[0] = 0;
-  expect(ur.string()).toBe(seedC709.ur);
+  expect(ur.toString()).toBe(seedC709.ur);
 });
 
 test("fromUr copies decoded payload", () => {
-  const ur = Ur.fromUrString(seedC709.ur);
+  const ur = Ur.parse(seedC709.ur);
   const decoded = fromUr(ur, seedCodec);
   decoded.payload[0] = 0;
   expect(bytesToHex(fromUr(ur, seedCodec).payload)).toBe(seedC709.payloadHex);
@@ -161,7 +161,7 @@ test("untagged number creation-date is CborType", () => {
   const map = new CborMap();
   map.set(1, payload(seedC709.payloadHex));
   map.set(2, seedYinmnFull.epochSeconds);
-  const err = errorOf(() => fromUr(Ur.create("seed", map), seedCodec));
+  const err = errorOf(() => fromUr(Ur.fromCbor("seed", map), seedCodec));
   expect(err.code).toBe("CborType");
 });
 
@@ -175,19 +175,19 @@ test("v1 crypto-seed decodes and re-encodes as v2", () => {
 test("fromUr mismatch lists every accepted type", () => {
   const err = errorOf(() =>
     fromUr(
-      Ur.create("bytes", seedCodec.untaggedCbor({ payload: payload(seedC709.payloadHex) })),
+      Ur.fromCbor("bytes", seedCodec.untaggedCbor({ payload: payload(seedC709.payloadHex) })),
       seedCodec,
     ),
   );
   expect(err.info).toStrictEqual({
     code: "UnexpectedType",
-    expected: [UrType.parse("seed"), UrType.parse("crypto-seed")],
-    found: UrType.parse("bytes"),
+    expected: [parseUrType("seed"), parseUrType("crypto-seed")],
+    found: parseUrType("bytes"),
   });
 });
 
 test("missing payload is CborType MissingMapKey", () => {
-  const err = errorOf(() => fromUr(Ur.create("seed", new CborMap()), seedCodec));
+  const err = errorOf(() => fromUr(Ur.fromCbor("seed", new CborMap()), seedCodec));
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "MissingMapKey" });
@@ -209,7 +209,7 @@ test("extra map key 5 is CborType", () => {
   const map = new CborMap();
   map.set(1, payload(seedC709.payloadHex));
   map.set(5, 0);
-  const err = errorOf(() => fromUr(Ur.create("seed", map), seedCodec));
+  const err = errorOf(() => fromUr(Ur.fromCbor("seed", map), seedCodec));
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "WrongType" });

@@ -5,7 +5,7 @@ import type { UrLimit } from "../src/error.ts";
 import { FountainDecoder, FountainEncoder } from "../src/fountain/index.ts";
 import type { Part, ReceiveResult } from "../src/fountain/index.ts";
 import { decodePart, encodePart } from "../src/fountain/part-cbor.ts";
-import { Encoder, UrDecoder, UrType, encode } from "../src/ur/index.ts";
+import { UrDecoder, UrEncoder, encodeUr, parseUrType } from "../src/ur/index.ts";
 import { makeMessage } from "./message.ts";
 
 function codeOf(fn: () => void): string {
@@ -54,6 +54,18 @@ function limitOf(result: ReceiveResult): UrLimit | undefined {
   return error?.info.code === "ResourceLimit" ? error.info.limit : undefined;
 }
 
+function nextUr(encoder: UrEncoder): string {
+  const { done, value } = encoder.next();
+  if (done === true || value === undefined) {
+    throw new Error("ur encoder exhausted");
+  }
+  return value;
+}
+
+function bytesEncoder(data: Uint8Array, maxFragmentLength: number): UrEncoder {
+  return new UrEncoder(parseUrType("bytes"), data, { maxFragmentLength });
+}
+
 function nextPart(encoder: FountainEncoder): Part {
   const { done, value } = encoder.next();
   if (done !== false || value === undefined) {
@@ -64,9 +76,9 @@ function nextPart(encoder: FountainEncoder): Part {
 
 test("accept list rejects mismatch", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(5));
-  const enc = Encoder.create(data, 10, UrType.parse("alpha"));
-  const part = enc.nextPart();
-  const decoder = new UrDecoder({ accept: [UrType.parse("beta")] });
+  const enc = new UrEncoder(parseUrType("alpha"), data, { maxFragmentLength: 10 });
+  const part = nextUr(enc);
+  const decoder = new UrDecoder({ accept: [parseUrType("beta")] });
   const result = decoder.receive(part);
   expect(result.status).toBe("rejected");
   expect(frameError(result)?.code).toBe("UnexpectedType");
@@ -75,8 +87,8 @@ test("accept list rejects mismatch", () => {
 
 test("maxUriLength fails the uri path", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(5));
-  const enc = Encoder.bytes(data, 10);
-  const part = enc.nextPart();
+  const enc = bytesEncoder(data, 10);
+  const part = nextUr(enc);
   const decoder = new UrDecoder({ limits: { maxUriLength: 8 } });
   const result = decoder.receive(part);
   expect(result.status).toBe("fatal");
@@ -88,8 +100,8 @@ test("maxUriLength fails the uri path", () => {
 
 test("multipart path index mismatch", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(5));
-  const enc = Encoder.bytes(data, 10);
-  const part = enc.nextPart();
+  const enc = bytesEncoder(data, 10);
+  const part = nextUr(enc);
   const corrupted = part.replace("/1-", "/2-");
   const decoder = new UrDecoder();
   const result = decoder.receive(corrupted);
@@ -156,11 +168,11 @@ test("single-part receive completes", () => {
   expect(decoder.state.phase).toBe("complete");
   const decoded = completedDecoded(decoder);
   expect(decoded.message).toStrictEqual(new TextEncoder().encode("data"));
-  expect(decoded.type.equals(UrType.bytes())).toBe(true);
+  expect(decoded.type).toBe(parseUrType("bytes"));
 });
 
 test("single-part maxMessageLength fails", () => {
-  const uri = encode(new Uint8Array(8).fill(1), UrType.bytes());
+  const uri = encodeUr(parseUrType("bytes"), new Uint8Array(8).fill(1));
   const decoder = new UrDecoder({ limits: { maxMessageLength: 4 } });
   const result = decoder.receive(uri);
   expect(result.status).toBe("fatal");
@@ -196,8 +208,8 @@ test("messageLength limit fails fail-closed", () => {
 
 test("uriLength resource limit fails", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(5));
-  const enc = Encoder.bytes(data, 10);
-  const part = enc.nextPart();
+  const enc = bytesEncoder(data, 10);
+  const part = nextUr(enc);
   const short = "ur:bytes/iehsjyhspmwfwfia";
   const decoder = new UrDecoder({ limits: { maxUriLength: short.length } });
   expect(part.length).toBeGreaterThan(short.length);
@@ -209,8 +221,8 @@ test("uriLength resource limit fails", () => {
 });
 
 test("UR-layer fragmentLength fails", () => {
-  const encoder = Encoder.bytes(makeMessage("Wolf", 64), 32);
-  const uri = encoder.nextPart();
+  const encoder = bytesEncoder(makeMessage("Wolf", 64), 32);
+  const uri = nextUr(encoder);
   const decoder = new UrDecoder({ limits: { maxFragmentLength: 16 } });
   const result = decoder.receive(uri);
   expect(result.status).toBe("fatal");

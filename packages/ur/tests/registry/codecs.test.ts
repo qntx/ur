@@ -4,7 +4,7 @@ import { expect, test } from "vite-plus/test";
 import {
   TAGS,
   Ur,
-  UrType,
+  parseUrType,
   UrError,
   codecMap,
   coinInfoCodec,
@@ -45,12 +45,12 @@ test("duplicate v1 name is TypeError", () => {
 });
 
 test("fromUrStringWith unknown type is UnexpectedType", () => {
-  const uri = Ur.create("bytes", new Uint8Array([1, 2, 3])).string();
+  const uri = Ur.fromCbor("bytes", new Uint8Array([1, 2, 3])).toString();
   const err = errorOf(() => fromUrStringWith(uri, codecMap([seedCodec])));
   expect(err.info).toStrictEqual({
     code: "UnexpectedType",
-    expected: [UrType.parse("seed"), UrType.parse("crypto-seed")],
-    found: UrType.parse("bytes"),
+    expected: [parseUrType("seed"), parseUrType("crypto-seed")],
+    found: parseUrType("bytes"),
   });
 });
 

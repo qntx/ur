@@ -14,13 +14,18 @@
 export { UrError, type UrErrorCode, type UrErrorInfo, type UrLimit } from "./error.ts";
 export { checksum as crc32 } from "./consensus/crc32.ts";
 
-export * as bytewords from "./bytewords/index.ts";
 export {
+  BYTEMOJIS,
+  MINIMALS,
+  WORDS,
+  bytemojiIdentifier,
+  bytewordsChecksum,
+  bytewordsEncodedLength,
+  bytewordsIdentifier,
   canonicalizeByteword,
-  decode as decodeBytewords,
-  encode as encodeBytewords,
-  encodeRaw,
-  type Style,
+  decodeBytewords,
+  encodeBytewords,
+  type BytewordsStyle,
 } from "./bytewords/index.ts";
 
 export {
@@ -39,18 +44,15 @@ export {
 
 export {
   type DecodedUr,
-  Encoder,
-  type Kind,
   type ParsedUr,
   UrDecoder,
   type UrDecoderOptions,
-  UrType,
-  decode,
-  decodeMessage,
-  decodeWithType,
-  encode,
-  normalizeUr,
-  parse,
-  parseNormalized,
+  UrEncoder,
+  type UrEncoderOptions,
+  type UrType,
+  encodeUr,
+  isUrType,
+  parseUr,
+  parseUrType,
   toQrString,
 } from "./ur/index.ts";

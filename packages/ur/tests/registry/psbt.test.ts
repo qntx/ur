@@ -54,11 +54,11 @@ test("toUr copies caller bytes", () => {
   const bytes = psbtBytes();
   const ur = toUr({ bytes }, psbtCodec);
   bytes[0] = 0;
-  expect(ur.string()).toBe(psbt167.ur);
+  expect(ur.toString()).toBe(psbt167.ur);
 });
 
 test("fromUr copies decoded bytes", () => {
-  const ur = Ur.fromUrString(psbt167.ur);
+  const ur = Ur.parse(psbt167.ur);
   const decoded = fromUr(ur, psbtCodec);
   decoded.bytes[0] = 0;
   expect(bytesToHex(fromUr(ur, psbtCodec).bytes)).toBe(bytesToHex(psbtBytes()));
@@ -72,7 +72,7 @@ test("PSBT without magic prefix is CborType", () => {
   expect(encodeErr.cause).toBeInstanceOf(CborError);
   expect(encodeErr.cause).toMatchObject({ code: "WrongType" });
 
-  const uri = Ur.create("psbt", bytes).string();
+  const uri = Ur.fromCbor("psbt", bytes).toString();
   const decodeErr = errorOf(() => fromUrString(uri, psbtCodec));
   expect(decodeErr.code).toBe("CborType");
 });

@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { canonicalizeByteword, decode, encode, encodeRaw } from "../src/bytewords/index.ts";
+import { canonicalizeByteword, decodeBytewords, encodeBytewords } from "../src/bytewords/index.ts";
 import { UrError } from "../src/error.ts";
 import { vectorJson } from "./vectors.ts";
 
@@ -10,42 +10,45 @@ const BYTEWORDS = vectorJson<{ inputHex: string; standard: string; uri: string; 
 
 test("bytewords styles and roundtrip", () => {
   const input = new Uint8Array(Buffer.from(BYTEWORDS.inputHex, "hex"));
-  expect(encode(input, "standard")).toBe(BYTEWORDS.standard);
-  expect(encode(input, "uri")).toBe(BYTEWORDS.uri);
-  expect(encode(input, "minimal")).toBe(BYTEWORDS.minimal);
+  expect(encodeBytewords(input, "standard")).toBe(BYTEWORDS.standard);
+  expect(encodeBytewords(input, "uri")).toBe(BYTEWORDS.uri);
+  expect(encodeBytewords(input, "minimal")).toBe(BYTEWORDS.minimal);
 
-  expect(decode(BYTEWORDS.standard, "standard")).toStrictEqual(input);
-  expect(decode(BYTEWORDS.uri, "uri")).toStrictEqual(input);
-  expect(decode(BYTEWORDS.minimal, "minimal")).toStrictEqual(input);
+  expect(decodeBytewords(BYTEWORDS.standard, "standard")).toStrictEqual(input);
+  expect(decodeBytewords(BYTEWORDS.uri, "uri")).toStrictEqual(input);
+  expect(decodeBytewords(BYTEWORDS.minimal, "minimal")).toStrictEqual(input);
 
-  expect(decode(encode(new Uint8Array(), "minimal"), "minimal")).toStrictEqual(new Uint8Array());
+  expect(decodeBytewords(encodeBytewords(new Uint8Array(), "minimal"), "minimal")).toStrictEqual(
+    new Uint8Array(),
+  );
 });
 
 test("bytewords errors", () => {
-  expect(() => decode("able acid also lava zero jade need echo wolf", "standard")).toThrow(UrError);
-  expect(() => decode("able acid also lava zero jade need echo wolf", "standard")).toThrow(
+  expect(() => decodeBytewords("able acid also lava zero jade need echo wolf", "standard")).toThrow(
+    UrError,
+  );
+  expect(() => decodeBytewords("able acid also lava zero jade need echo wolf", "standard")).toThrow(
     "invalid bytewords checksum",
   );
-  expect(() => decode("axxe tied also webs lung", "standard")).toThrow(UrError);
-  expect(() => decode("aea", "minimal")).toThrow(UrError);
-  expect(() => decode("₿", "standard")).toThrow(UrError);
+  expect(() => decodeBytewords("axxe tied also webs lung", "standard")).toThrow(UrError);
+  expect(() => decodeBytewords("aea", "minimal")).toThrow(UrError);
+  expect(() => decodeBytewords("₿", "standard")).toThrow(UrError);
 });
 
 test("single zero minimal", () => {
-  expect(encode(new Uint8Array([0]), "minimal")).toBe("aetdaowslg");
-  expect(decode("aetdaowslg", "minimal")).toStrictEqual(new Uint8Array([0]));
+  expect(encodeBytewords(new Uint8Array([0]), "minimal")).toBe("aetdaowslg");
+  expect(decodeBytewords("aetdaowslg", "minimal")).toStrictEqual(new Uint8Array([0]));
 });
 
 test("case insensitive decode", () => {
   const input = new Uint8Array([0, 1, 2]);
-  const standard = encode(input, "standard");
-  const minimal = encode(input, "minimal");
-  expect(decode(standard.toUpperCase(), "standard")).toStrictEqual(input);
-  expect(decode(minimal.toUpperCase(), "minimal")).toStrictEqual(input);
+  const standard = encodeBytewords(input, "standard");
+  const minimal = encodeBytewords(input, "minimal");
+  expect(decodeBytewords(standard.toUpperCase(), "standard")).toStrictEqual(input);
+  expect(decodeBytewords(minimal.toUpperCase(), "minimal")).toStrictEqual(input);
 });
 
-test("encodeRaw and canonicalize", () => {
-  expect(encodeRaw(new Uint8Array([0]), "minimal")).toBe("ae");
+test("canonicalize", () => {
   expect(canonicalizeByteword("ABLE")).toBe("able");
   expect(canonicalizeByteword("ae")).toBe("able");
   expect(canonicalizeByteword("abl")).toBe("able");
@@ -66,8 +69,8 @@ test("long vector", () => {
     "yank toys bulb skew when warm free fair tent swan open brag mint noon jury list view tiny brew note body data webs what zinc bald join runs data whiz days keys user diet news ruby whiz zone menu surf flew omit trip pose runs fund part even crux fern math visa tied loud redo silk curl jugs hard beta next cost puma drum acid junk swan free very mint flap warm fact math flap what limp free jugs yell fish epic whiz open numb math city belt glow wave limp fuel grim free zone open love diet gyro cats fizz holy city puff";
   const encodedMinimal =
     "yktsbbswwnwmfefrttsnonbgmtnnjyltvwtybwnebydawswtzcbdjnrsdawzdsksurdtnsrywzzemusffwottppersfdptencxfnmhvatdldroskcljshdbantctpadmadjksnfevymtfpwmftmhfpwtlpfejsylfhecwzonnbmhcybtgwwelpflgmfezeonledtgocsfzhycypf";
-  expect(decode(encoded, "standard")).toStrictEqual(input);
-  expect(decode(encodedMinimal, "minimal")).toStrictEqual(input);
-  expect(encode(input, "standard")).toBe(encoded);
-  expect(encode(input, "minimal")).toBe(encodedMinimal);
+  expect(decodeBytewords(encoded, "standard")).toStrictEqual(input);
+  expect(decodeBytewords(encodedMinimal, "minimal")).toStrictEqual(input);
+  expect(encodeBytewords(input, "standard")).toBe(encoded);
+  expect(encodeBytewords(input, "minimal")).toBe(encodedMinimal);
 });

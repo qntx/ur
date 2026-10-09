@@ -1,7 +1,8 @@
 import type { Cbor, Tag } from "@blockchaincommons/dcbor";
 
 import { fail } from "../error.ts";
-import { UrType } from "../ur/type.ts";
+import { parseUrType } from "../ur/index.ts";
+import type { UrType } from "../ur/index.ts";
 import { Ur, mapCborType } from "./ur.ts";
 
 /** `tags[0]` is written; every tag is accepted on read. Body is untagged. */
@@ -21,7 +22,7 @@ export function tagUrTypes(tags: ReadonlyArray<Tag>): UrType[] {
     if (tag.name === undefined || tag.name === "") {
       fail("InvalidType");
     }
-    return UrType.parse(tag.name);
+    return parseUrType(tag.name);
   });
 }
 
@@ -36,12 +37,12 @@ export function firstTagUrType(tags: ReadonlyArray<Tag>): UrType {
 export function toUr<T>(value: T, codec: UrCodec<T>): Ur {
   const type = firstTagUrType(codec.tags);
   const body = mapCborType(() => codec.untaggedCbor(value));
-  return Ur.create(type, body);
+  return Ur.fromCbor(type, body);
 }
 
 export function fromUr<T>(ur: Ur, codec: UrCodec<T>): T {
   const accepted = tagUrTypes(codec.tags);
-  if (!accepted.some((t) => ur.type.equals(t))) {
+  if (!accepted.some((t) => ur.type === t)) {
     fail({
       code: "UnexpectedType",
       expected: accepted,
@@ -52,9 +53,9 @@ export function fromUr<T>(ur: Ur, codec: UrCodec<T>): T {
 }
 
 export function toUrString<T>(value: T, codec: UrCodec<T>): string {
-  return toUr(value, codec).string();
+  return toUr(value, codec).toString();
 }
 
 export function fromUrString<T>(uri: string, codec: UrCodec<T>): T {
-  return fromUr(Ur.fromUrString(uri), codec);
+  return fromUr(Ur.parse(uri), codec);
 }

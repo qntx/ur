@@ -11,8 +11,9 @@
 
 //! Multi-part UR encode/decode throughput.
 
-use bcur::State;
+use bcur::fountain::EncoderOptions;
 use bcur::ur::{Decoder, Encoder};
+use bcur::{State, ur_type};
 use criterion::{Criterion, criterion_group, criterion_main};
 
 fn bench_ur(c: &mut Criterion) {
@@ -20,10 +21,11 @@ fn bench_ur(c: &mut Criterion) {
 
     c.bench_function("ur_multipart_roundtrip", |b| {
         b.iter(|| {
-            let mut enc = Encoder::bytes(&data, 12).unwrap();
+            let mut enc =
+                Encoder::new(ur_type!("bytes"), data.clone(), EncoderOptions::new(12)).unwrap();
             let mut dec = Decoder::default();
             while !matches!(dec.state(), State::Complete(_)) {
-                dec.receive(&enc.next_part().unwrap()).unwrap();
+                dec.receive(&enc.next().unwrap()).unwrap();
             }
             let _ = dec.into_decoded().unwrap();
         });
@@ -31,11 +33,14 @@ fn bench_ur(c: &mut Criterion) {
 
     c.bench_function("ur_multipart_lossy_skip", |b| {
         b.iter(|| {
-            let mut enc = Encoder::bytes(&data, 12).unwrap();
+            let mut enc =
+                Encoder::new(ur_type!("bytes"), data.clone(), EncoderOptions::new(12)).unwrap();
             let mut dec = Decoder::default();
+            let mut emitted = 0_u32;
             while !matches!(dec.state(), State::Complete(_)) {
-                let part = enc.next_part().unwrap();
-                if enc.current_index() & 1 != 0 {
+                let part = enc.next().unwrap();
+                emitted = emitted.saturating_add(1);
+                if emitted & 1 != 0 {
                     dec.receive(&part).unwrap();
                 }
             }
