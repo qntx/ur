@@ -7,9 +7,6 @@ use alloc::vec::Vec;
 use crate::ur::UrType;
 
 /// Which decoder/encoder budget was exceeded.
-///
-/// `ReceivedParts` and `BufferParts` are transitional and leave with the
-/// decoder redesign (R1c).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Limit {
@@ -17,14 +14,10 @@ pub enum Limit {
     MessageLength,
     /// Fragment count `K` (`max_fragment_count` or `u32` wire field).
     FragmentCount,
-    /// Part payload length (`max_fragment_data_length`).
+    /// Part payload length (`max_fragment_length`).
     FragmentLength,
-    /// UR string length (`max_uri_len`).
+    /// UR string length (`max_uri_length`).
     UriLength,
-    /// Unique received index-set count (`max_received_parts`).
-    ReceivedParts,
-    /// Mixed-part XOR buffer size (`max_buffer_parts`).
-    BufferParts,
 }
 
 impl Limit {
@@ -36,8 +29,6 @@ impl Limit {
             Self::FragmentCount => "fragmentCount",
             Self::FragmentLength => "fragmentLength",
             Self::UriLength => "uriLength",
-            Self::ReceivedParts => "receivedParts",
-            Self::BufferParts => "bufferParts",
         }
     }
 }
@@ -84,6 +75,9 @@ pub enum ErrorKind {
     MessageTooLong,
     /// A single-part API was used on a multi-part UR.
     NotSinglePart,
+    /// `into_*` on a decoder that has not completed (Rust only; TS uses
+    /// `state`).
+    NotComplete,
     /// The payload is not well-formed deterministic CBOR.
     CborDecode,
     /// Well-formed CBOR that cannot become the requested type.
@@ -115,6 +109,7 @@ impl ErrorKind {
             Self::InvalidFragmentLength => "invalid fragment length",
             Self::MessageTooLong => "message too long",
             Self::NotSinglePart => "expected single-part UR",
+            Self::NotComplete => "decoder is not complete",
             Self::CborDecode => "dCBOR decode failed",
             Self::CborType => "dCBOR type mismatch",
             Self::Internal => "internal error",
@@ -291,22 +286,6 @@ impl core::error::Error for Error {
             #[cfg(feature = "dcbor")]
             Detail::Cbor { source } => Some(&**source),
             _ => None,
-        }
-    }
-}
-
-/// Fail-closed decoder poison. Not re-exported.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Poison {
-    Limit(Limit),
-    Internal,
-}
-
-impl Poison {
-    pub(crate) const fn to_error(self) -> Error {
-        match self {
-            Self::Limit(limit) => Error::resource_limit(limit),
-            Self::Internal => Error::internal(),
         }
     }
 }

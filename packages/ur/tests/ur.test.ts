@@ -1,9 +1,10 @@
 import { expect, test } from "vite-plus/test";
 
 import { UrError } from "../src/error.ts";
+import type { ReceiveResult } from "../src/fountain/index.ts";
 import {
-  Decoder,
   Encoder,
+  UrDecoder,
   UrType,
   decode,
   decodeMessage,
@@ -12,6 +13,26 @@ import {
   toQrString,
 } from "../src/ur/index.ts";
 import { makeMessage } from "./message.ts";
+
+function frameError(result: ReceiveResult): UrError | undefined {
+  return "error" in result ? result.error : undefined;
+}
+
+function feedUr(decoder: UrDecoder, text: string): "accepted" | "duplicate" {
+  const result = decoder.receive(text);
+  if (result.status === "rejected" || result.status === "fatal") {
+    throw result.error;
+  }
+  return result.status;
+}
+
+function decodedMessage(decoder: UrDecoder): Uint8Array {
+  const { state } = decoder;
+  if (state.phase !== "complete") {
+    throw new Error(`decoder ${state.phase}`);
+  }
+  return state.value.message;
+}
 
 function errorOf(fn: () => void): UrError {
   try {
@@ -77,12 +98,12 @@ test("ur encoder first three parts (smoke; full 20 in interop-ur-rs)", () => {
 test("multipart ur", () => {
   const ur = makeMessageUr(32767, "Wolf");
   const encoder = Encoder.bytes(ur, 1000);
-  const decoder = new Decoder();
-  while (!decoder.complete) {
-    expect(decoder.message()).toBeUndefined();
-    decoder.receive(encoder.nextPart());
+  const decoder = new UrDecoder();
+  while (decoder.state.phase !== "complete") {
+    expect(["empty", "collecting"]).toContain(decoder.state.phase);
+    feedUr(decoder, encoder.nextPart());
   }
-  expect(decoder.message()).toStrictEqual(ur);
+  expect(decodedMessage(decoder)).toStrictEqual(ur);
 });
 
 test("data encode", () => {
@@ -101,9 +122,11 @@ test("type stickiness", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(5));
   const encA = Encoder.create(data, 10, UrType.parse("alpha"));
   const encB = Encoder.create(data, 10, UrType.parse("beta"));
-  const decoder = new Decoder();
-  decoder.receive(encA.nextPart());
-  expect(() => decoder.receive(encB.nextPart())).toThrow(UrError);
+  const decoder = new UrDecoder();
+  feedUr(decoder, encA.nextPart());
+  const result = decoder.receive(encB.nextPart());
+  expect(result.status).toBe("rejected");
+  expect(frameError(result)?.code).toBe("UnexpectedType");
 });
 
 test("invalid scheme", () => {
@@ -127,12 +150,17 @@ test("custom encoder", () => {
 });
 
 test("test_single_part_receive_completes", () => {
-  const decoder = new Decoder();
-  decoder.receive("ur:bytes/iehsjyhspmwfwfia");
-  expect(decoder.complete).toBe(true);
-  expect(decoder.fragmentCount).toBe(1);
-  expect(decoder.resolvedFragmentCount()).toBe(1);
-  expect(decoder.message()).toStrictEqual(new TextEncoder().encode("data"));
+  const decoder = new UrDecoder();
+  expect(feedUr(decoder, "ur:bytes/iehsjyhspmwfwfia")).toBe("accepted");
+  expect(decoder.state.phase).toBe("complete");
+  expect(decoder.progress).toStrictEqual({
+    fragmentCount: 1,
+    rank: 1,
+    recovered: 1,
+    processed: 1,
+    ratio: 1,
+  });
+  expect(decodedMessage(decoder)).toStrictEqual(new TextEncoder().encode("data"));
 });
 
 test("Encoder K==1 emits single-part", () => {
@@ -161,27 +189,29 @@ test("Encoder K==1 idempotent", () => {
   expect(encoder.complete).toBe(true);
 });
 
-test("mix single then multi", () => {
-  const decoder = new Decoder();
-  decoder.receive(encode(new TextEncoder().encode("data"), UrType.bytes()));
+test("multi after completed single is a terminal duplicate", () => {
+  const decoder = new UrDecoder();
+  feedUr(decoder, encode(new TextEncoder().encode("data"), UrType.bytes()));
   const enc = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(5)), 10);
-  expect(errorOf(() => decoder.receive(enc.nextPart())).code).toBe("InconsistentPart");
+  expect(decoder.receive(enc.nextPart()).status).toBe("duplicate");
 });
 
 test("mix fountain then single", () => {
-  const decoder = new Decoder();
+  const decoder = new UrDecoder();
   const enc = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(5)), 10);
-  decoder.receive(enc.nextPart());
-  expect(errorOf(() => decoder.receive("ur:bytes/iehsjyhspmwfwfia")).code).toBe("InconsistentPart");
+  feedUr(decoder, enc.nextPart());
+  const result = decoder.receive("ur:bytes/iehsjyhspmwfwfia");
+  expect(result.status).toBe("rejected");
+  expect(frameError(result)?.code).toBe("InconsistentPart");
 });
 
 test("duplicate single-part ignored", () => {
   const first = new TextEncoder().encode("data");
   const second = new TextEncoder().encode("other");
-  const decoder = new Decoder();
-  decoder.receive(encode(first, UrType.bytes()));
-  decoder.receive(encode(second, UrType.bytes()));
-  expect(decoder.message()).toStrictEqual(first);
+  const decoder = new UrDecoder();
+  feedUr(decoder, encode(first, UrType.bytes()));
+  expect(feedUr(decoder, encode(second, UrType.bytes()))).toBe("duplicate");
+  expect(decodedMessage(decoder)).toStrictEqual(first);
 });
 
 test("decodeMessage success", () => {
@@ -200,11 +230,16 @@ test("test_decode_message_rejects_multipart", () => {
 test("test_garbage_does_not_pin_type", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(6));
   const encoder = Encoder.create(data, 10, UrType.parse("alpha"));
-  const decoder = new Decoder();
-  expect(() => decoder.receive("ur:beta/1-2/zzzz")).toThrow(UrError);
-  expect(decoder.type).toBeUndefined();
-  decoder.receive(encoder.nextPart());
-  expect(decoder.type?.value).toBe("alpha");
+  const other = Encoder.create(data, 10, UrType.parse("beta"));
+  const decoder = new UrDecoder();
+  const garbage = decoder.receive("ur:beta/1-2/zzzz");
+  expect(garbage.status).toBe("rejected");
+  expect(decoder.state.phase).toBe("empty");
+  feedUr(decoder, encoder.nextPart());
+  expect(decoder.state.phase).toBe("collecting");
+  const wrong = decoder.receive(other.nextPart());
+  expect(wrong.status).toBe("rejected");
+  expect(frameError(wrong)?.code).toBe("UnexpectedType");
 });
 
 test("bc-ur example array", () => {

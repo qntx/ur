@@ -2,7 +2,9 @@ import { cbor, decodeCbor, encodeCbor, CborError } from "@blockchaincommons/dcbo
 import type { Cbor, CborInput } from "@blockchaincommons/dcbor";
 
 import { fail } from "../error.ts";
-import { UrType, decodeWithType, encode, toQrString } from "../ur/index.ts";
+import type { FountainEncoderOptions } from "../fountain/index.ts";
+import { Encoder, UrType, decodeWithType, encode, toQrString } from "../ur/index.ts";
+import type { DecodedUr } from "../ur/index.ts";
 
 export function mapCborDecode<T>(run: () => T): T {
   try {
@@ -65,6 +67,11 @@ export class Ur {
     return Ur.fromCborData(type, payload);
   }
 
+  /** Wrap a completed {@link UrDecoder} result; the message must be dCBOR. */
+  static fromDecoded(decoded: DecodedUr): Ur {
+    return Ur.fromCborData(decoded.type, decoded.message);
+  }
+
   string(): string {
     const bytes = mapCborType(() => encodeCbor(this.cbor));
     return encode(bytes, this.type);
@@ -72,6 +79,13 @@ export class Ur {
 
   qrString(): string {
     return toQrString(this.string());
+  }
+
+  /** L3 encoder over this UR's dCBOR bytes. */
+  encoder(options: FountainEncoderOptions): Encoder {
+    const bytes = mapCborType(() => encodeCbor(this.cbor));
+    const { maxFragmentLength, ...rest } = options;
+    return Encoder.create(bytes, maxFragmentLength, this.type, rest);
   }
 
   checkType(expected: UrType | string): void {

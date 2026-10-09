@@ -26,19 +26,24 @@ export {
 export {
   DEFAULT_LIMITS,
   type DecoderLimits,
+  type DecoderState,
   FountainDecoder,
   FountainEncoder,
   type FountainEncoderOptions,
   type Part,
+  type Progress,
+  type ReceiveResult,
   decodePart,
   encodePart,
 } from "./fountain/index.ts";
 
 export {
-  Decoder,
+  type DecodedUr,
   Encoder,
   type Kind,
   type ParsedUr,
+  UrDecoder,
+  type UrDecoderOptions,
   UrType,
   decode,
   decodeMessage,

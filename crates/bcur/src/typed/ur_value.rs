@@ -58,6 +58,17 @@ impl Ur {
         crate::encode(&self.cbor.to_cbor_data(), &self.ur_type)
     }
 
+    /// UR-string encoder for this value's dCBOR payload (single-part when
+    /// `K == 1`, fountain otherwise).
+    ///
+    /// # Errors
+    ///
+    /// Propagates fountain construction errors ([`ErrorKind::EmptyMessage`],
+    /// [`ErrorKind::InvalidFragmentLength`], [`ErrorKind::MessageTooLong`]).
+    pub fn encoder(&self, options: crate::fountain::EncoderOptions) -> Result<crate::ur::Encoder> {
+        crate::ur::Encoder::with_options(self.cbor.to_cbor_data(), options, &self.ur_type)
+    }
+
     /// Uppercase form of [`Self::string`] for QR payloads.
     #[must_use]
     pub fn qr_string(&self) -> String {
@@ -131,6 +142,21 @@ impl From<Ur> for CBOR {
     }
 }
 
+impl TryFrom<crate::ur::Decoded> for Ur {
+    type Error = Error;
+
+    /// dCBOR-checks the decoded message (UR-ADR-031).
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::CborDecode`] when the payload is not deterministic CBOR.
+    fn try_from(decoded: crate::ur::Decoded) -> Result<Self> {
+        let (ur_type, message) = decoded.into_parts();
+        let cbor = map_cbor(CBOR::try_from_data(message), ErrorKind::CborDecode)?;
+        Self::new(ur_type, cbor)
+    }
+}
+
 impl TryFrom<String> for Ur {
     type Error = Error;
 
@@ -178,7 +204,8 @@ mod tests {
     #[test]
     fn from_ur_string_rejects_multipart_and_bad_cbor() {
         let ur = Ur::new("test", (0_u8..64).collect::<Vec<_>>()).unwrap();
-        let mut encoder = crate::Encoder::new(&ur.cbor().to_cbor_data(), 12, ur.ur_type()).unwrap();
+        let mut encoder =
+            crate::ur::Encoder::new(&ur.cbor().to_cbor_data(), 12, ur.ur_type()).unwrap();
         let part = encoder.next_part().unwrap();
         assert_eq!(
             Ur::from_ur_string(&part).unwrap_err().kind(),

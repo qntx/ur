@@ -11,7 +11,7 @@
 
 //! Fountain encode/decode throughput.
 
-use bcur::fountain::{Decoder, Encoder, EncoderOptions};
+use bcur::fountain::{Decoder, Encoder, EncoderOptions, State};
 use criterion::{Criterion, criterion_group, criterion_main};
 
 fn bench_fountain(c: &mut Criterion) {
@@ -30,10 +30,10 @@ fn bench_fountain(c: &mut Criterion) {
         b.iter(|| {
             let mut enc = Encoder::new(message.clone(), EncoderOptions::new(30)).unwrap();
             let mut dec = Decoder::default();
-            while !dec.complete() {
-                dec.receive(enc.next().unwrap()).unwrap();
+            while !matches!(dec.state(), State::Complete(_)) {
+                dec.receive(&enc.next().unwrap()).unwrap();
             }
-            let _ = dec.message().unwrap();
+            let _ = dec.into_message().unwrap();
         });
     });
 }

@@ -7,9 +7,9 @@ import { expect, test } from "vite-plus/test";
 
 import {
   DEFAULT_LIMITS,
-  Decoder,
   Encoder,
   FountainEncoder,
+  UrDecoder,
   UrError,
   UrType,
   bytewords,
@@ -18,8 +18,8 @@ import {
   encode,
   encodePart,
 } from "../src/index.ts";
-import type { DecoderLimits } from "../src/index.ts";
-import { MultipartDecoder, Ur } from "../src/typed/index.ts";
+import type { DecoderLimits, DecodedUr, ReceiveResult } from "../src/index.ts";
+import { Ur } from "../src/typed/index.ts";
 import { vectorJson, vectorLines, vectorText } from "./vectors.ts";
 
 function assertLineFile(raw: string): void {
@@ -51,17 +51,37 @@ function limitOf(error: UrError): string | undefined {
   return error.info.code === "ResourceLimit" ? error.info.limit : undefined;
 }
 
-function assertSessionPoison(decoder: Decoder, part: string, limit: string): void {
-  const first = errorOf(() => decoder.receive(part));
-  expect(first.code).toBe("ResourceLimit");
-  expect(limitOf(first)).toBe(limit);
-  expect(decoder.isPoisoned).toBe(true);
-  const later = errorOf(() => decoder.receive(part));
-  expect(later.code).toBe("ResourceLimit");
-  expect(limitOf(later)).toBe(limit);
-  const msg = errorOf(() => decoder.message());
-  expect(msg.code).toBe("ResourceLimit");
-  expect(limitOf(msg)).toBe(limit);
+function frameError(result: ReceiveResult): UrError | undefined {
+  return "error" in result ? result.error : undefined;
+}
+
+function completedValue(decoder: UrDecoder): DecodedUr {
+  const { state } = decoder;
+  if (state.phase !== "complete") {
+    throw new Error(`decoder ${state.phase}`);
+  }
+  return state.value;
+}
+
+function failedError(decoder: UrDecoder): UrError {
+  const { state } = decoder;
+  if (state.phase !== "failed") {
+    throw new Error(`decoder ${state.phase}`);
+  }
+  return state.error;
+}
+
+function assertSessionFails(decoder: UrDecoder, part: string, limit: string): void {
+  const first = decoder.receive(part);
+  expect(first.status).toBe("fatal");
+  expect(frameError(first)?.code).toBe("ResourceLimit");
+  expect(frameError(first) === undefined ? undefined : limitOf(frameError(first)!)).toBe(limit);
+  expect(decoder.state.phase).toBe("failed");
+  const later = decoder.receive(part);
+  expect(later.status).toBe("duplicate");
+  const failure = failedError(decoder);
+  expect(failure.code).toBe("ResourceLimit");
+  expect(limitOf(failure)).toBe(limit);
 }
 
 type BytewordsSpec = {
@@ -99,16 +119,8 @@ type L4Spec = {
 type LimitsSpec = {
   maxMessageLength: number;
   maxFragmentCount: number;
-  maxFragmentDataLength: number;
-  maxBufferParts: number;
-  maxReceivedParts: number;
-  maxUriLen: number;
-};
-
-type PoisonLimit = {
-  limit: string;
-  rust: string;
-  sessionPoison: boolean;
+  maxFragmentLength: number;
+  maxUriLength: number;
 };
 
 type PartCborDecodeCase = {
@@ -124,12 +136,6 @@ type PartCborDecodeCase = {
   };
   reencodedHex?: string;
   error?: { code: string; limit?: string };
-};
-
-type PoisonSpec = {
-  limits: PoisonLimit[];
-  receiveAndMessageSameCode: string[];
-  notPoison: string[];
 };
 
 test("bytewords contract", () => {
@@ -198,10 +204,9 @@ test("k1 contract", () => {
   const part = must(fountain.next().value);
   const body = bytewords.encode(encodePart(part), "minimal");
   const uri = `ur:${urType.value}/1-1/${body}`;
-  const decoder = new Decoder();
-  decoder.receive(uri);
-  expect(decoder.complete).toBe(true);
-  expect(decoder.message()).toStrictEqual(payload);
+  const decoder = new UrDecoder();
+  expect(decoder.receive(uri).status).toBe("accepted");
+  expect(completedValue(decoder).message).toStrictEqual(payload);
 });
 
 test("l4 test array contract", () => {
@@ -219,59 +224,39 @@ test("decoder limits contract", () => {
   const spec = vectorJson<LimitsSpec>("limits/defaults.json");
   expect(DEFAULT_LIMITS.maxMessageLength).toBe(spec.maxMessageLength);
   expect(DEFAULT_LIMITS.maxFragmentCount).toBe(spec.maxFragmentCount);
-  expect(DEFAULT_LIMITS.maxFragmentDataLength).toBe(spec.maxFragmentDataLength);
-  expect(DEFAULT_LIMITS.maxBufferParts).toBe(spec.maxBufferParts);
-  expect(DEFAULT_LIMITS.maxReceivedParts).toBe(spec.maxReceivedParts);
-  expect(DEFAULT_LIMITS.maxUriLen).toBe(spec.maxUriLen);
+  expect(DEFAULT_LIMITS.maxFragmentLength).toBe(spec.maxFragmentLength);
+  expect(DEFAULT_LIMITS.maxUriLength).toBe(spec.maxUriLength);
 });
 
-test("poison maps via limit string", () => {
-  const raw = vectorText("limits/poison.json");
-  expect(raw).not.toContain("DecoderState");
-  const spec = vectorJson<PoisonSpec>("limits/poison.json");
-  expect(spec.limits).toStrictEqual([
-    { limit: "uriLength", rust: "UriLength", sessionPoison: true },
-    { limit: "fragmentCount", rust: "FragmentCount", sessionPoison: true },
-    { limit: "fragmentLength", rust: "FragmentLength", sessionPoison: true },
-    { limit: "messageLength", rust: "MessageLength", sessionPoison: true },
-    { limit: "receivedParts", rust: "ReceivedParts", sessionPoison: true },
-    { limit: "bufferParts", rust: "BufferParts", sessionPoison: true },
-  ]);
-});
-
-test("poison receive and message same code", () => {
-  const spec = vectorJson<PoisonSpec>("limits/poison.json");
-  expect(spec.receiveAndMessageSameCode).toStrictEqual(["uriLength", "fragmentCount"]);
-
+test("resource limits fail the session", () => {
   const uriEncoder = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(8)), 10);
-  const uriDecoder = new Decoder({ limits: { maxUriLen: 16 } });
-  assertSessionPoison(uriDecoder, uriEncoder.nextPart(), "uriLength");
+  const uriDecoder = new UrDecoder({ limits: { maxUriLength: 16 } });
+  assertSessionFails(uriDecoder, uriEncoder.nextPart(), "uriLength");
 
   const fragmentEncoder = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(16)), 10);
   expect(fragmentEncoder.fragmentCount).toBeGreaterThan(1);
-  const fragmentDecoder = new Decoder({ limits: { maxFragmentCount: 1 } });
-  assertSessionPoison(fragmentDecoder, fragmentEncoder.nextPart(), "fragmentCount");
+  const fragmentDecoder = new UrDecoder({ limits: { maxFragmentCount: 1 } });
+  assertSessionFails(fragmentDecoder, fragmentEncoder.nextPart(), "fragmentCount");
 });
 
-test("poison not-poison errors", () => {
-  const spec = vectorJson<PoisonSpec>("limits/poison.json");
-  expect(spec.notPoison).toStrictEqual(["UnexpectedType", "CborDecode"]);
-
+test("nonfatal errors leave state", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(6));
   const a = Encoder.create(data, 10, UrType.parse("alpha"));
   const b = Encoder.create(data, 10, UrType.parse("beta"));
-  const decoder = new Decoder();
+  const decoder = new UrDecoder();
   decoder.receive(a.nextPart());
-  const mismatch = errorOf(() => decoder.receive(b.nextPart()));
-  expect(mismatch.code).toBe("UnexpectedType");
-  expect(decoder.isPoisoned).toBe(false);
-  decoder.receive(a.nextPart());
+  const mismatch = decoder.receive(b.nextPart());
+  expect(mismatch.status).toBe("rejected");
+  expect(frameError(mismatch)?.code).toBe("UnexpectedType");
+  expect(decoder.state.phase).toBe("collecting");
+  expect(decoder.receive(a.nextPart()).status).not.toBe("rejected");
 
-  const typed = new MultipartDecoder();
-  typed.receive("ur:bytes/iehsjyhspmwfwfia");
-  expect(typed.complete).toBe(true);
-  expect(errorOf(() => typed.message()).code).toBe("CborDecode");
-  expect(typed.isPoisoned).toBe(false);
+  // A completed session whose bytes are not well-formed dCBOR fails the
+  // typed conversion, not the decode itself.
+  const single = new UrDecoder();
+  expect(single.receive("ur:bytes/iehsjyhspmwfwfia").status).toBe("accepted");
+  const decoded = completedValue(single);
+  expect(errorOf(() => Ur.fromDecoded(decoded)).code).toBe("CborDecode");
 });
 
 test("multipart 20 contract", () => {
@@ -279,12 +264,11 @@ test("multipart 20 contract", () => {
   assertLineFile(mixed);
   const uris = vectorLines("ur-rs/multipart-20.txt");
   expect(uris).toHaveLength(20);
-  const decoder = new Decoder();
+  const decoder = new UrDecoder();
   for (const uri of uris) {
     decoder.receive(uri);
   }
-  expect(decoder.complete).toBe(true);
-  const payload = must(decoder.message());
+  const payload = completedValue(decoder).message;
   const encoder = Encoder.bytes(payload, 30);
   expect(encoder.fragmentCount).toBe(9);
   expect(encoder.nextPart()).toBe(uris[0]);

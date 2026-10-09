@@ -68,9 +68,9 @@ const config: UserConfig = defineConfig({
         rules: { "eslint/no-bitwise": "off" },
       },
       {
-        files: ["packages/ur/scripts/**", "scripts/**"],
+        files: ["packages/ur/scripts/**", "scripts/**", "packages/ur/bench/**"],
         rules: {
-          // Maintenance scripts print their results.
+          // Maintenance scripts and benchmarks print their results.
           "eslint/no-console": "off",
         },
       },

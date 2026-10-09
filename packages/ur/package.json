@@ -56,7 +56,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.src.json",
     "check:pkg": "vp pack && publint && attw --pack . --profile esm-only",
     "smoke:hermes": "bun scripts/hermes-smoke.ts",
-    "prepublishOnly": "vp run build"
+    "prepublishOnly": "vp run build",
+    "bench": "BENCH=1 vp test bench/decoder.bench.ts"
   },
   "dependencies": {
     "@noble/hashes": "^2.4.0"

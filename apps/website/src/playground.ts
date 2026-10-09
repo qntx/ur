@@ -1,13 +1,5 @@
-import {
-  MultipartDecoder,
-  MultipartEncoder,
-  fromUr,
-  psbtCodec,
-  seedCodec,
-  toUr,
-  toUrString,
-} from "@qntx/ur/registry";
-import type { Ur } from "@qntx/ur/registry";
+import { UrDecoder } from "@qntx/ur";
+import { Ur, fromUr, psbtCodec, seedCodec, toUr, toUrString } from "@qntx/ur/registry";
 
 export const SEED_ENTROPY_BYTES = 16;
 export const PSBT_MAX_FRAGMENT_LENGTH = 50;
@@ -45,7 +37,9 @@ export function encodeSeed(payload: Uint8Array): string {
 }
 
 export function encodePsbtParts(bytes: Uint8Array): string[] {
-  const encoder = MultipartEncoder.create(toUr({ bytes }, psbtCodec), PSBT_MAX_FRAGMENT_LENGTH);
+  const encoder = toUr({ bytes }, psbtCodec).encoder({
+    maxFragmentLength: PSBT_MAX_FRAGMENT_LENGTH,
+  });
   const n = encoder.isSinglePart ? 1 : encoder.fragmentCount;
   const parts: string[] = [];
   for (let i = 0; i < n; i++) {
@@ -67,13 +61,16 @@ function urFromParts(text: string): Ur {
   if (parts.length === 0) {
     throw new TypeError("empty UR");
   }
-  const decoder = new MultipartDecoder();
+  const decoder = new UrDecoder();
   for (const part of parts) {
-    decoder.receive(part);
+    const result = decoder.receive(part);
+    if (result.status === "rejected" || result.status === "fatal") {
+      throw result.error;
+    }
   }
-  const ur = decoder.message();
-  if (ur === undefined) {
+  const { state } = decoder;
+  if (state.phase !== "complete") {
     throw new TypeError("incomplete UR");
   }
-  return ur;
+  return Ur.fromDecoded(state.value);
 }

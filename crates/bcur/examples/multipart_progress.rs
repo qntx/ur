@@ -9,30 +9,32 @@
 
 //! Print fountain progress while emitting multi-part UR strings.
 
-use bcur::{Decoder, Encoder};
+use bcur::State;
+use bcur::ur::{Decoder, Encoder};
 
 fn main() {
     let data = b"Progress demo payload - multi-part UR scan simulation.".repeat(4);
     let mut encoder = Encoder::bytes(&data, 16).expect("encoder");
     let mut decoder = Decoder::default();
 
-    while !decoder.complete() {
+    loop {
         let part = encoder.next_part().expect("part");
         decoder.receive(&part).expect("receive");
-        match decoder.resolved_fragment_count() {
-            Some(resolved) => {
-                println!(
-                    "seq={} resolved={resolved}/{} poisoned={}",
-                    encoder.current_index(),
-                    decoder.fragment_count(),
-                    decoder.is_poisoned()
-                );
-            }
-            None => println!("waiting for first part"),
+        let p = decoder.progress();
+        println!(
+            "seq={} rank={}/{} recovered={} processed={}",
+            encoder.current_index(),
+            p.rank(),
+            p.fragment_count(),
+            p.recovered(),
+            p.processed(),
+        );
+        if matches!(decoder.state(), State::Complete(_)) {
+            break;
         }
     }
 
-    let msg = decoder.message().expect("message").expect("complete");
+    let msg = decoder.into_decoded().expect("decoded").into_parts().1;
     println!("done: {} bytes recovered", msg.len());
     assert_eq!(msg, data);
 }

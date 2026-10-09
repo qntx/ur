@@ -1,22 +1,23 @@
 //! Uniform Resource encode/decode and multi-part fountain transport.
 //!
 //! ```
-//! use bcur::{Decoder, Encoder, UrType};
+//! use bcur::ur::{Decoder, Encoder};
+//! use bcur::UrType;
 //!
 //! let data = b"Ten chars!".repeat(10);
 //! let mut encoder = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
 //! let mut decoder = Decoder::default();
-//! while !decoder.complete() {
+//! while !matches!(decoder.state(), bcur::fountain::State::Complete(_)) {
 //!     decoder.receive(&encoder.next_part().unwrap()).unwrap();
 //! }
-//! assert_eq!(decoder.message().unwrap().as_deref(), Some(data.as_slice()));
+//! assert_eq!(decoder.into_decoded().unwrap().message(), data);
 //! ```
 
 use alloc::{string::String, vec::Vec};
 
 use crate::bytewords::{self, Style};
-use crate::error::{Error, ErrorKind, Limit, Poison, Result};
-use crate::fountain::{self, DecoderLimits};
+use crate::error::{Error, ErrorKind, Limit, Result};
+use crate::fountain::{self, DecoderLimits, Progress, Received, State};
 
 /// Validated UR type token (non-empty, stored lowercase).
 ///
@@ -240,9 +241,17 @@ fn decode_with_indices(value: &str) -> Result<DecodedPayload> {
 }
 
 fn decode_indices(indices: &str) -> Result<(u32, u32)> {
+    // UR-ADR-029: `1*DIGIT "-" 1*DIGIT`, no sign or whitespace.
     let (idx, idx_total) = indices
         .split_once('-')
         .ok_or_else(|| Error::new(ErrorKind::InvalidIndices))?;
+    if idx.is_empty()
+        || idx_total.is_empty()
+        || !idx.bytes().all(|b| b.is_ascii_digit())
+        || !idx_total.bytes().all(|b| b.is_ascii_digit())
+    {
+        return Err(Error::new(ErrorKind::InvalidIndices));
+    }
     let idx = idx
         .parse::<u32>()
         .map_err(|_| Error::new(ErrorKind::InvalidIndices))?;
@@ -374,212 +383,250 @@ impl Encoder {
     }
 }
 
+/// Reconstructed UR payload and type: the terminal value of [`Decoder`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Decoded {
+    ur_type: UrType,
+    message: Vec<u8>,
+}
+
+impl Decoded {
+    /// UR type token of the decoded message.
+    #[must_use]
+    pub const fn ur_type(&self) -> &UrType {
+        &self.ur_type
+    }
+
+    /// Decoded message bytes.
+    #[must_use]
+    pub fn message(&self) -> &[u8] {
+        &self.message
+    }
+
+    /// Consumes the value into `(type, message)`.
+    #[must_use]
+    pub fn into_parts(self) -> (UrType, Vec<u8>) {
+        (self.ur_type, self.message)
+    }
+}
+
+/// Terminal session payload of [`Decoder`].
+#[derive(Debug)]
+enum Terminal {
+    Complete(Decoded),
+    Failed(Error),
+}
+
 /// UR decoder (single-part or fountain).
+///
+/// Frame results follow the fountain [`crate::fountain::Decoder`]: `Ok` is
+/// `Accepted`/`Duplicate`; `Err(e)` rejects (`!e.is_fatal()`, session
+/// unchanged) or fails (`e.is_fatal()` → [`State::Failed`]). Terminal
+/// sessions return [`Received::Duplicate`] for every further frame without
+/// parsing it (UR-ADR-014).
 #[derive(Debug)]
 pub struct Decoder {
     fountain: fountain::Decoder,
     limits: DecoderLimits,
-    max_uri_len: usize,
-    max_message_length: usize,
-    expected_type: Option<UrType>,
-    seen_type: Option<UrType>,
-    single: Option<Vec<u8>>,
-    /// Fail-closed session flag (resource limit or decoder-state).
-    poisoned: Option<Poison>,
+    /// Allowed types; empty means "any". The first successfully ingested
+    /// frame still locks the type.
+    accept: Vec<UrType>,
+    locked: Option<UrType>,
+    terminal: Option<Terminal>,
+    /// Frames that were `accepted` or `duplicate`, including single-part and
+    /// post-terminal frames the fountain decoder never sees.
+    processed: u64,
 }
 
 impl Default for Decoder {
     fn default() -> Self {
-        Self::new()
+        Self::new(DecoderLimits::default())
     }
 }
 
 impl Decoder {
-    /// Creates a decoder with default limits.
+    /// Creates a decoder with the given limits.
     #[must_use]
-    pub fn new() -> Self {
-        Self::with_limits(DecoderLimits::default())
-    }
-
-    /// Creates a decoder with custom fountain/URI limits.
-    #[must_use]
-    pub const fn with_limits(limits: DecoderLimits) -> Self {
+    pub const fn new(limits: DecoderLimits) -> Self {
         Self {
-            fountain: fountain::Decoder::with_limits(limits),
+            fountain: fountain::Decoder::new(limits),
             limits,
-            max_uri_len: limits.max_uri_len,
-            max_message_length: limits.max_message_length,
-            expected_type: None,
-            seen_type: None,
-            single: None,
-            poisoned: None,
+            accept: Vec::new(),
+            locked: None,
+            terminal: None,
+            processed: 0,
         }
     }
 
-    /// Requires every received part to match `ur_type`.
+    /// Restricts the session to these UR types (empty accepts any).
     #[must_use]
-    pub fn with_expected_type(mut self, ur_type: UrType) -> Self {
-        self.expected_type = Some(ur_type);
+    pub fn accept(mut self, types: impl IntoIterator<Item = UrType>) -> Self {
+        self.accept = types.into_iter().collect();
         self
-    }
-
-    const fn poison(&mut self, limit: Limit) -> Error {
-        let poison = Poison::Limit(limit);
-        self.poisoned = Some(poison);
-        poison.to_error()
-    }
-
-    const fn escalate(&mut self, err: Error) -> Error {
-        match err.kind() {
-            ErrorKind::ResourceLimit => {
-                if let Some(limit) = err.limit() {
-                    self.poisoned = Some(Poison::Limit(limit));
-                }
-            }
-            ErrorKind::Internal => {
-                self.poisoned = Some(Poison::Internal);
-            }
-            _ => {}
-        }
-        err
-    }
-
-    fn check_type(&self, ur_type: &UrType) -> Result<()> {
-        if let Some(ref expected) = self.expected_type
-            && ur_type != expected
-        {
-            return Err(Error::unexpected_type(
-                alloc::vec![expected.clone()],
-                ur_type.clone(),
-            ));
-        }
-        if let Some(ref seen) = self.seen_type
-            && ur_type != seen
-        {
-            return Err(Error::unexpected_type(
-                alloc::vec![seen.clone()],
-                ur_type.clone(),
-            ));
-        }
-        Ok(())
     }
 
     /// Receives one UR string (single-part or fountain part).
     ///
-    /// A single-part URI completes the session immediately. Fountain parts are
-    /// combined until the message is recovered. The first **successfully**
-    /// ingested part pins the type.
+    /// A single-part URI completes the session immediately; a `1-1`
+    /// multi-part URI completes it through the fountain path. The first
+    /// successfully ingested frame locks the type.
     ///
     /// # Errors
     ///
-    /// Returns parse, type, index, bytewords, CBOR, or fountain errors.
-    /// [`ErrorKind::ResourceLimit`] and unrecoverable [`ErrorKind::Internal`]
-    /// poison the session (fail-closed).
-    pub fn receive(&mut self, value: &str) -> Result<()> {
-        if let Some(poison) = self.poisoned {
-            return Err(poison.to_error());
+    /// Rejected (state unchanged): parse, type, index, bytewords, part CBOR,
+    /// and consistency errors. Fatal ([`State::Failed`]):
+    /// [`ErrorKind::ResourceLimit`], [`ErrorKind::InvalidPadding`],
+    /// [`ErrorKind::InvalidMessageChecksum`], [`ErrorKind::Internal`].
+    pub fn receive(&mut self, text: &str) -> Result<Received> {
+        if self.terminal.is_some() {
+            self.processed = self.processed.saturating_add(1);
+            return Ok(Received::Duplicate);
         }
-
-        if value.len() > self.max_uri_len {
-            return Err(self.poison(Limit::UriLength));
+        if text.len() > self.limits.max_uri_length {
+            return Err(self.fail(Error::resource_limit(Limit::UriLength)));
         }
-
-        let parsed = parse(value)?;
+        let parsed = parse(text)?;
         self.check_type(&parsed.ur_type)?;
         match parsed.kind {
-            Kind::SinglePart => self.receive_single(parsed),
-            Kind::MultiPart => self.receive_fountain(parsed),
+            Kind::SinglePart => self.receive_single(&parsed),
+            Kind::MultiPart => self.receive_fountain(&parsed),
         }
     }
 
-    fn receive_single(&mut self, parsed: ParsedUr) -> Result<()> {
-        if self.fountain.resolved_fragment_count().is_some() {
-            return Err(Error::new(ErrorKind::InconsistentPart));
+    /// Type admission: `accept` list (when non-empty), then the locked type.
+    fn check_type(&self, ur_type: &UrType) -> Result<()> {
+        if !self.accept.is_empty() && !self.accept.iter().any(|t| t == ur_type) {
+            return Err(Error::unexpected_type(self.accept.clone(), ur_type.clone()));
         }
-        if self.single.is_some() {
-            return Ok(());
+        if let Some(locked) = &self.locked
+            && locked != ur_type
+        {
+            return Err(Error::unexpected_type(
+                alloc::vec![locked.clone()],
+                ur_type.clone(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn receive_single(&mut self, parsed: &ParsedUr) -> Result<Received> {
+        // A single-part URI inside a collecting fountain session is
+        // inconsistent (the reverse order is unreachable: a completed
+        // single-part session is already terminal).
+        if !matches!(self.fountain.state(), State::Empty) {
+            return Err(Error::new(ErrorKind::InconsistentPart));
         }
         let data = bytewords::decode(&parsed.body, Style::Minimal)?;
-        if data.len() > self.max_message_length {
-            return Err(self.poison(Limit::MessageLength));
+        if data.len() > self.limits.max_message_length {
+            return Err(self.fail(Error::resource_limit(Limit::MessageLength)));
         }
-        self.seen_type = Some(parsed.ur_type);
-        self.single = Some(data);
-        Ok(())
+        self.locked.get_or_insert_with(|| parsed.ur_type.clone());
+        self.terminal = Some(Terminal::Complete(Decoded {
+            ur_type: parsed.ur_type.clone(),
+            message: data,
+        }));
+        self.processed = self.processed.saturating_add(1);
+        Ok(Received::Accepted)
     }
 
-    fn receive_fountain(&mut self, parsed: ParsedUr) -> Result<()> {
-        if self.single.is_some() {
-            return Err(Error::new(ErrorKind::InconsistentPart));
-        }
+    fn receive_fountain(&mut self, parsed: &ParsedUr) -> Result<Received> {
         let decoded = bytewords::decode(&parsed.body, Style::Minimal)?;
-        let part = fountain::Part::from_cbor(decoded.as_slice(), &self.limits)
-            .map_err(|e| self.escalate(e))?;
-        let (idx, idx_total) = parsed
+        let part =
+            fountain::Part::from_cbor(&decoded, &self.limits).map_err(|e| self.fatalize(e))?;
+        let (seq, count) = parsed
             .indices
             .ok_or_else(|| Error::new(ErrorKind::InvalidIndices))?;
-        if part.sequence() != idx || part.sequence_count() != idx_total {
+        if part.sequence() != seq || part.sequence_count() != count {
             return Err(Error::new(ErrorKind::InvalidIndices));
         }
-        self.fountain.receive(part).map_err(|e| self.escalate(e))?;
-        if self.seen_type.is_none() {
-            self.seen_type = Some(parsed.ur_type);
+        let received = self.fountain.receive(&part).map_err(|e| self.fatalize(e))?;
+        self.locked.get_or_insert_with(|| parsed.ur_type.clone());
+        self.processed = self.processed.saturating_add(1);
+        if let State::Complete(message) = self.fountain.state() {
+            self.terminal = Some(Terminal::Complete(Decoded {
+                ur_type: parsed.ur_type.clone(),
+                message: message.to_vec(),
+            }));
         }
-        Ok(())
+        Ok(received)
     }
 
-    /// Whether the message is fully recovered.
+    /// Fails the session on fatal errors; non-fatal errors pass through.
+    fn fatalize(&mut self, error: Error) -> Error {
+        if error.is_fatal() {
+            self.terminal = Some(Terminal::Failed(error.clone()));
+        }
+        error
+    }
+
+    /// Moves the session to [`State::Failed`] and returns the fatal error.
+    fn fail(&mut self, error: Error) -> Error {
+        self.terminal = Some(Terminal::Failed(error.clone()));
+        error
+    }
+
+    /// Current session state.
     #[must_use]
-    pub fn complete(&self) -> bool {
-        self.single.is_some() || self.fountain.complete()
+    pub const fn state(&self) -> State<'_, Decoded> {
+        match &self.terminal {
+            Some(Terminal::Complete(decoded)) => State::Complete(decoded),
+            Some(Terminal::Failed(error)) => State::Failed(error),
+            None => {
+                let progress = self.progress();
+                // `fragment_count == 0` iff the fountain decoder has not
+                // ingested a part yet.
+                if progress.fragment_count() == 0 {
+                    State::Empty
+                } else {
+                    State::Collecting(progress)
+                }
+            }
+        }
     }
 
-    /// Type pinned by the first successfully received part.
+    /// Progress snapshot (`Empty` reports all zeros; a session completed via
+    /// a single-part URI reports `K = 1`).
     #[must_use]
-    pub const fn ur_type(&self) -> Option<&UrType> {
-        self.seen_type.as_ref()
+    pub const fn progress(&self) -> Progress {
+        let base = self.fountain.progress();
+        if base.fragment_count() == 0 && matches!(self.terminal, Some(Terminal::Complete(_))) {
+            return Progress::new(1, 1, 1, self.processed);
+        }
+        Progress::new(
+            base.fragment_count(),
+            base.rank(),
+            base.recovered(),
+            self.processed,
+        )
     }
 
-    /// Returns the decoded message if complete.
+    /// Fragment indexes of the most recent `accepted`/`duplicate` part.
+    #[must_use]
+    pub fn last_indexes(&self) -> &[u32] {
+        self.fountain.last_indexes()
+    }
+
+    /// Consumes the decoder and returns the decoded UR.
     ///
     /// # Errors
     ///
-    /// Propagates fountain message errors. Resource-limit sessions stay fail-closed.
-    pub fn message(&self) -> Result<Option<Vec<u8>>> {
-        if let Some(poison) = self.poisoned {
-            return Err(poison.to_error());
-        }
-        if let Some(ref data) = self.single {
-            return Ok(Some(data.clone()));
-        }
-        self.fountain.message()
-    }
-
-    /// Resolved source fragment count, or `None` before any part.
-    #[must_use]
-    pub fn resolved_fragment_count(&self) -> Option<u32> {
-        if self.single.is_some() {
-            Some(1)
-        } else {
-            self.fountain.resolved_fragment_count()
+    /// [`ErrorKind::NotComplete`] while still collecting; the stored fatal
+    /// error when the session is [`State::Failed`].
+    pub fn into_decoded(self) -> Result<Decoded> {
+        match self.terminal {
+            Some(Terminal::Complete(decoded)) => Ok(decoded),
+            Some(Terminal::Failed(error)) => Err(error),
+            None => Err(Error::new(ErrorKind::NotComplete)),
         }
     }
 
-    /// Total fragment count `K` (0 before any part).
-    #[must_use]
-    pub const fn fragment_count(&self) -> u32 {
-        if self.single.is_some() {
-            1
-        } else {
-            self.fountain.fragment_count()
-        }
-    }
-
-    /// Whether this session is fail-closed (a fatal error was received,
-    /// including inside the inner fountain decoder).
-    #[must_use]
-    pub const fn is_poisoned(&self) -> bool {
-        self.poisoned.is_some() || self.fountain.is_poisoned()
+    /// Returns the session to [`State::Empty`]; limits and the `accept` list
+    /// are kept.
+    pub fn reset(&mut self) {
+        self.fountain = fountain::Decoder::new(self.limits);
+        self.locked = None;
+        self.terminal = None;
+        self.processed = 0;
     }
 }
 
@@ -681,11 +728,19 @@ mod tests {
         let ur = make_message_ur(32767, "Wolf");
         let mut encoder = Encoder::bytes(&ur, 1000).unwrap();
         let mut decoder = Decoder::default();
-        while !decoder.complete() {
-            assert_eq!(decoder.message().unwrap(), None);
+        loop {
+            assert!(matches!(
+                decoder.state(),
+                State::Empty | State::Collecting(_)
+            ));
             decoder.receive(&encoder.next_part().unwrap()).unwrap();
+            if matches!(decoder.state(), State::Complete(_)) {
+                break;
+            }
         }
-        assert_eq!(decoder.message().unwrap(), Some(ur));
+        let decoded = decoder.into_decoded().unwrap();
+        assert_eq!(decoded.ur_type(), &UrType::bytes());
+        assert_eq!(decoded.message(), ur.as_slice());
     }
 
     #[test]
@@ -745,12 +800,24 @@ mod tests {
     #[test]
     fn test_single_part_receive_completes() {
         let mut decoder = Decoder::default();
-        decoder.receive("ur:bytes/iehsjyhspmwfwfia").unwrap();
-        assert!(decoder.complete());
         assert_eq!(
-            decoder.message().unwrap().as_deref(),
-            Some(b"data".as_slice())
+            decoder.receive("ur:bytes/iehsjyhspmwfwfia").unwrap(),
+            Received::Accepted
         );
+        assert!(matches!(decoder.state(), State::Complete(_)));
+        let decoded = decoder.into_decoded().unwrap();
+        assert_eq!(decoded.message(), b"data");
+        assert_eq!(decoded.ur_type(), &UrType::bytes());
+    }
+
+    #[test]
+    fn test_uppercase_qr_form_decodes() {
+        let mut decoder = Decoder::default();
+        assert_eq!(
+            decoder.receive("UR:BYTES/IEHSJYHSPMWFWFIA").unwrap(),
+            Received::Accepted
+        );
+        assert_eq!(decoder.into_decoded().unwrap().message(), b"data");
     }
 
     #[test]
@@ -763,7 +830,7 @@ mod tests {
         assert_eq!(part, encode(data, &UrType::bytes()));
         let mut decoder = Decoder::default();
         decoder.receive(&part).unwrap();
-        assert_eq!(decoder.message().unwrap().as_deref(), Some(data.as_slice()));
+        assert_eq!(decoder.into_decoded().unwrap().message(), data.as_slice());
     }
 
     #[test]
@@ -794,12 +861,9 @@ mod tests {
         let body = bytewords::encode(&part.to_cbor(), Style::Minimal);
         let uri = alloc::format!("ur:bytes/1-1/{body}");
         let mut decoder = Decoder::default();
-        decoder.receive(&uri).unwrap();
-        assert!(decoder.complete());
-        assert_eq!(
-            decoder.message().unwrap().as_deref(),
-            Some(b"hello".as_slice())
-        );
+        assert_eq!(decoder.receive(&uri).unwrap(), Received::Accepted);
+        assert!(matches!(decoder.state(), State::Complete(_)));
+        assert_eq!(decoder.into_decoded().unwrap().message(), b"hello");
     }
 
     #[test]
@@ -823,9 +887,30 @@ mod tests {
         let mut encoder = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
         let mut decoder = Decoder::default();
         assert!(decoder.receive("ur:beta/1-2/zzzz").is_err());
-        assert!(decoder.ur_type().is_none());
+        assert!(matches!(decoder.state(), State::Empty));
         decoder.receive(&encoder.next_part().unwrap()).unwrap();
-        assert_eq!(decoder.ur_type().map(UrType::as_str), Some("alpha"));
+        assert!(matches!(decoder.state(), State::Collecting(_)));
+        // A different type after the lock is rejected.
+        let mut other = Encoder::new(&data, 10, &UrType::new("beta").unwrap()).unwrap();
+        assert!(matches!(
+            decoder.receive(&other.next_part().unwrap()),
+            Err(ref e) if e.kind() == ErrorKind::UnexpectedType
+        ));
+    }
+
+    #[test]
+    fn test_single_after_multi_is_inconsistent() {
+        let data = b"Ten chars!".repeat(6);
+        let mut encoder = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
+        let mut decoder = Decoder::default();
+        decoder.receive(&encoder.next_part().unwrap()).unwrap();
+        let single = encode(b"x", &UrType::new("alpha").unwrap());
+        assert!(matches!(
+            decoder.receive(&single),
+            Err(ref e) if e.kind() == ErrorKind::InconsistentPart && !e.is_fatal()
+        ));
+        // State unchanged: still collecting with the same progress.
+        assert_eq!(decoder.progress().rank(), 1);
     }
 
     #[test]
@@ -886,25 +971,28 @@ mod tests {
     }
 
     #[test]
-    fn test_expected_type_and_uri_limit() {
+    fn test_accept_list_and_uri_limit() {
         let data = b"Ten chars!".repeat(5);
         let mut enc = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
         let part = enc.next_part().unwrap();
 
-        let mut decoder = Decoder::default().with_expected_type(UrType::new("beta").unwrap());
+        let mut decoder = Decoder::default().accept([UrType::new("beta").unwrap()]);
         assert!(matches!(
             decoder.receive(&part),
             Err(ref e) if e.kind() == ErrorKind::UnexpectedType
+                && e.expected_types() == [UrType::new("beta").unwrap()]
         ));
 
         let limits = DecoderLimits {
-            max_uri_len: 8,
+            max_uri_length: 8,
             ..DecoderLimits::default()
         };
-        let mut short = Decoder::with_limits(limits);
+        let mut short = Decoder::new(limits);
         assert!(matches!(
             short.receive(&part),
-            Err(ref e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(Limit::UriLength)
+            Err(ref e) if e.kind() == ErrorKind::ResourceLimit
+                && e.limit() == Some(Limit::UriLength)
+                && e.is_fatal()
         ));
     }
 
@@ -938,28 +1026,27 @@ mod tests {
     }
 
     #[test]
-    fn test_uri_len_resource_limit_poisons() {
+    fn test_uri_len_resource_limit_fails() {
         let data = b"Ten chars!".repeat(5);
         let mut enc = Encoder::bytes(&data, 10).unwrap();
         let part = enc.next_part().unwrap();
 
         let limits = DecoderLimits {
-            max_uri_len: 8,
+            max_uri_length: 8,
             ..DecoderLimits::default()
         };
-        let mut decoder = Decoder::with_limits(limits);
+        let mut decoder = Decoder::new(limits);
         assert!(matches!(
             decoder.receive(&part),
             Err(ref e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(Limit::UriLength)
         ));
-        assert!(decoder.is_poisoned());
+        assert!(matches!(decoder.state(), State::Failed(_)));
+        // Terminal: every further frame is a duplicate, no parse.
+        assert_eq!(decoder.receive(&part).unwrap(), Received::Duplicate);
+        assert_eq!(decoder.receive("garbage").unwrap(), Received::Duplicate);
         assert!(matches!(
-            decoder.receive(&part),
-            Err(ref e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(Limit::UriLength)
-        ));
-        assert!(matches!(
-            decoder.message(),
-            Err(ref e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(Limit::UriLength)
+            decoder.into_decoded().unwrap_err().kind(),
+            ErrorKind::ResourceLimit
         ));
     }
 
@@ -968,24 +1055,46 @@ mod tests {
         let ur = make_message_ur(256, "Wolf");
         let mut encoder = Encoder::bytes(&ur, 30).unwrap();
         let mut decoder = Decoder::default();
-        assert_eq!(decoder.resolved_fragment_count(), None);
-        assert_eq!(decoder.fragment_count(), 0);
+        assert!(matches!(decoder.state(), State::Empty));
+        assert_eq!(decoder.progress().fragment_count(), 0);
+        assert_eq!(decoder.progress().ratio(), 0.0);
 
         decoder.receive(&encoder.next_part().unwrap()).unwrap();
-        assert_eq!(decoder.resolved_fragment_count(), Some(1));
-        assert_eq!(decoder.fragment_count(), encoder.fragment_count());
-
-        let mut prev = 1;
-        while !decoder.complete() {
-            decoder.receive(&encoder.next_part().unwrap()).unwrap();
-            let now = decoder.resolved_fragment_count().unwrap();
-            assert!(now >= prev);
-            assert!(now <= decoder.fragment_count());
-            prev = now;
-        }
         assert_eq!(
-            decoder.resolved_fragment_count(),
-            Some(decoder.fragment_count())
+            decoder.progress().fragment_count(),
+            encoder.fragment_count()
         );
+        assert_eq!(decoder.progress().rank(), 1);
+        assert_eq!(decoder.progress().recovered(), 1);
+        assert_eq!(decoder.progress().processed(), 1);
+        assert_ne!(decoder.last_indexes().len(), 0);
+
+        let mut prev_rank = 1;
+        while !matches!(decoder.state(), State::Complete(_)) {
+            decoder.receive(&encoder.next_part().unwrap()).unwrap();
+            let now = decoder.progress().rank();
+            assert!(now >= prev_rank);
+            assert!(now <= decoder.progress().fragment_count());
+            prev_rank = now;
+        }
+        assert_eq!(decoder.progress().rank(), encoder.fragment_count());
+        assert_eq!(decoder.progress().ratio(), 1.0);
+    }
+
+    #[test]
+    fn test_terminal_duplicate_and_reset() {
+        let mut decoder = Decoder::default();
+        decoder.receive("ur:bytes/iehsjyhspmwfwfia").unwrap();
+        assert_eq!(
+            decoder.receive("ur:bytes/iehsjyhspmwfwfia").unwrap(),
+            Received::Duplicate
+        );
+        assert_eq!(decoder.progress().processed(), 2);
+        decoder.reset();
+        assert!(matches!(decoder.state(), State::Empty));
+        assert!(matches!(
+            decoder.into_decoded().unwrap_err().kind(),
+            ErrorKind::NotComplete
+        ));
     }
 }

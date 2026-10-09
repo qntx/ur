@@ -418,11 +418,15 @@ fn official_decoder() {
             ..crate::fountain::EncoderOptions::new(max)
         };
         let mut enc = crate::fountain::Encoder::new(message.clone(), options).unwrap();
-        let mut dec = crate::fountain::Decoder::new();
-        while !dec.complete() {
-            dec.receive(enc.next().unwrap()).unwrap();
+        let mut dec = crate::fountain::Decoder::default();
+        loop {
+            let part = enc.next().unwrap();
+            dec.receive(&part).unwrap();
+            if matches!(dec.state(), crate::fountain::State::Complete(_)) {
+                break;
+            }
         }
-        assert_eq!(dec.message().unwrap().as_deref(), Some(message.as_slice()));
+        assert_eq!(dec.into_message().unwrap(), message);
     }
 }
 
@@ -514,13 +518,205 @@ fn official_ur_multipart() {
                 .collect();
             assert_eq!(got, expected, "{name}");
         } else {
-            let mut dec = crate::ur::Decoder::new();
-            while !dec.complete() {
+            let mut dec = crate::ur::Decoder::default();
+            while !matches!(dec.state(), crate::fountain::State::Complete(_)) {
                 dec.receive(&enc.next_part().unwrap()).unwrap();
             }
             assert_eq!(
-                dec.message().unwrap().as_deref(),
-                Some(payload.as_slice()),
+                dec.into_decoded().unwrap().message(),
+                payload.as_slice(),
+                "{name}"
+            );
+        }
+    }
+}
+
+fn limits_of(case: &Value) -> crate::fountain::DecoderLimits {
+    let limits = &case["limits"];
+    let mut out = crate::fountain::DecoderLimits::default();
+    if let Some(v) = limits["maxMessageLength"].as_u64() {
+        out.max_message_length = v as usize;
+    }
+    if let Some(v) = limits["maxFragmentCount"].as_u64() {
+        out.max_fragment_count = v as usize;
+    }
+    if let Some(v) = limits["maxFragmentLength"].as_u64() {
+        out.max_fragment_length = v as usize;
+    }
+    if let Some(v) = limits["maxUriLength"].as_u64() {
+        out.max_uri_length = v as usize;
+    }
+    out
+}
+
+fn assert_error(frame: &Value, error: &crate::Error, name: &str, i: usize) {
+    let want = &frame["error"];
+    assert_eq!(
+        alloc::format!("{:?}", error.kind()),
+        want["code"].as_str().unwrap(),
+        "{name} frame {i}"
+    );
+    if let Some(limit) = want["limit"].as_str() {
+        assert_eq!(
+            error.limit().map(crate::Limit::as_str),
+            Some(limit),
+            "{name} frame {i}"
+        );
+    }
+}
+
+fn json_u32(value: &Value, key: &str) -> u32 {
+    u32::try_from(value[key].as_u64().unwrap()).unwrap()
+}
+
+fn json_u32_or(value: &Value, key: &str, default: u32) -> u32 {
+    value[key]
+        .as_u64()
+        .and_then(|v| u32::try_from(v).ok())
+        .unwrap_or(default)
+}
+
+/// Builds the frame's part: either the encoder's part for `sequence`, possibly
+/// patched, or nothing when no sequence is given.
+fn cached_or_patched(
+    frame: &Value,
+    enc: &mut crate::fountain::Encoder,
+    cache: &mut alloc::collections::BTreeMap<u32, crate::fountain::Part>,
+) -> Result<crate::fountain::Part, crate::Error> {
+    let seq = u32::try_from(frame["sequence"].as_u64().unwrap_or(0)).unwrap_or(0);
+    while !cache.contains_key(&seq) {
+        let part = enc.next().unwrap();
+        cache.insert(part.sequence(), part);
+    }
+    let base = cache.get(&seq).unwrap().clone();
+    let Some(patch) = frame.get("patch") else {
+        return Ok(base);
+    };
+    crate::fountain::Part::new(
+        json_u32_or(patch, "sequence", base.sequence()),
+        json_u32_or(patch, "sequenceCount", base.sequence_count()),
+        json_u32_or(patch, "messageLength", base.message_len()),
+        json_u32_or(patch, "checksum", base.checksum()),
+        patch["dataHex"]
+            .as_str()
+            .map_or_else(|| base.data().to_vec(), unhex),
+    )
+}
+
+/// `vectors/fountain/decoder-frames.json` (generated): per-frame GF(2) decoder
+/// outcomes. The generator cross-checked accepted/duplicate and the completion
+/// check against an independent naive `BigInt` rank tracker.
+#[test]
+fn fountain_decoder_frames() {
+    let doc = vdoc!("fountain/decoder-frames.json");
+    for case in doc["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let max = case["maxFragmentLength"].as_u64().unwrap() as usize;
+        let options = crate::fountain::EncoderOptions {
+            max_fragment_len: max,
+            min_fragment_len: case["minFragmentLength"].as_u64().unwrap_or(10) as usize,
+            first_sequence: case["firstSequence"].as_u64().unwrap_or(0) as u32,
+        };
+        let mut enc = crate::fountain::Encoder::new(message_of(case), options).unwrap();
+        let mut cache: alloc::collections::BTreeMap<u32, crate::fountain::Part> =
+            alloc::collections::BTreeMap::new();
+        let mut dec = crate::fountain::Decoder::new(limits_of(case));
+        let mut completed_at = None;
+        for (i, frame) in case["frames"].as_array().unwrap().iter().enumerate() {
+            let want = frame["status"].as_str().unwrap();
+            let built = frame.get("part").map_or_else(
+                || cached_or_patched(frame, &mut enc, &mut cache),
+                |raw| {
+                    crate::fountain::Part::new(
+                        json_u32(raw, "sequence"),
+                        json_u32(raw, "sequenceCount"),
+                        json_u32(raw, "messageLength"),
+                        json_u32(raw, "checksum"),
+                        unhex(raw["dataHex"].as_str().unwrap()),
+                    )
+                },
+            );
+            let part = match built {
+                Ok(part) => part,
+                Err(error) => {
+                    assert_eq!(want, "rejected", "{name} frame {i}");
+                    assert_error(frame, &error, name, i);
+                    continue;
+                }
+            };
+            let got = match dec.receive(&part) {
+                Ok(crate::fountain::Received::Accepted) => "accepted",
+                Ok(crate::fountain::Received::Duplicate) => "duplicate",
+                Err(error) => {
+                    assert_error(frame, &error, name, i);
+                    if error.is_fatal() {
+                        "fatal"
+                    } else {
+                        "rejected"
+                    }
+                }
+            };
+            assert_eq!(got, want, "{name} frame {i}");
+            if completed_at.is_none() && matches!(dec.state(), crate::fountain::State::Complete(_))
+            {
+                completed_at = Some(i + 1);
+            }
+        }
+        assert_eq!(
+            completed_at,
+            case["completeAt"].as_u64().map(|v| v as usize),
+            "{name}"
+        );
+        if let Some(want) = case["messageHex"].as_str() {
+            assert_eq!(hex::encode(dec.into_message().unwrap()), want, "{name}");
+        }
+    }
+}
+
+/// `vectors/ur/decoder-frames.json` (generated): per-frame UR decoder outcomes.
+#[test]
+fn ur_decoder_frames() {
+    let doc = vdoc!("ur/decoder-frames.json");
+    for case in doc["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let mut dec = crate::ur::Decoder::new(limits_of(case));
+        if let Some(accept) = case["accept"].as_array() {
+            dec = dec.accept(
+                accept
+                    .iter()
+                    .map(|t| crate::ur::UrType::new(t.as_str().unwrap()).unwrap()),
+            );
+        }
+        let mut completed_at = None;
+        for (i, frame) in case["frames"].as_array().unwrap().iter().enumerate() {
+            let want = frame["status"].as_str().unwrap();
+            let got = match dec.receive(frame["text"].as_str().unwrap()) {
+                Ok(crate::fountain::Received::Accepted) => "accepted",
+                Ok(crate::fountain::Received::Duplicate) => "duplicate",
+                Err(error) => {
+                    assert_error(frame, &error, name, i);
+                    if error.is_fatal() {
+                        "fatal"
+                    } else {
+                        "rejected"
+                    }
+                }
+            };
+            assert_eq!(got, want, "{name} frame {i}");
+            if completed_at.is_none() && matches!(dec.state(), crate::fountain::State::Complete(_))
+            {
+                completed_at = Some(i + 1);
+            }
+        }
+        assert_eq!(
+            completed_at,
+            case["completeAt"].as_u64().map(|v| v as usize),
+            "{name}"
+        );
+        if let Some(want) = case["messageHex"].as_str() {
+            assert_eq!(
+                hex::encode(dec.into_decoded().unwrap().message()),
+                want,
                 "{name}"
             );
         }

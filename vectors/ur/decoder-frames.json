@@ -1,0 +1,230 @@
+{
+  "schema": 1,
+  "capability": "ur.decoder",
+  "source": {
+    "kind": "generated",
+    "name": "scripts/vectors/generate-decoder-frames.ts",
+    "crossCheck": "independent naive GF(2) rank tracker (BigInt masks, row list)"
+  },
+  "cases": [
+    {
+      "name": "single-part",
+      "frames": [
+        {
+          "text": "ur:bytes/mejtswhhylkepmykhhtsytsnoyoyaxaedsuttydmnymsckdl",
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 1,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e"
+    },
+    {
+      "name": "one-of-one",
+      "frames": [
+        {
+          "text": "ur:bytes/1-1/lpadadbncyrygsjyvygsmejtswhhylkepmykhhtsytsnjnpsjydk",
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 1,
+      "messageHex": "916ec65cf77cadf55cd7f9cd"
+    },
+    {
+      "name": "multipart-in-order",
+      "frames": [
+        {
+          "text": "ur:bytes/1-3/lpadaxcsckcyuyrscyckgemejtswhhylkepmykhhtspllgbgfn",
+          "status": "accepted"
+        },
+        {
+          "text": "ur:bytes/2-3/lpaoaxcsckcyuyrscyckgeytsnoyoyaxaedsuttydmfdollbro",
+          "status": "accepted"
+        },
+        {
+          "text": "ur:bytes/3-3/lpaxaxcsckcyuyrscyckgemhhpktpmsrjtgwdpfnsbfnptensn",
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 3,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "multipart-uppercase",
+      "frames": [
+        {
+          "text": "UR:BYTES/1-3/LPADAXCSCKCYUYRSCYCKGEMEJTSWHHYLKEPMYKHHTSPLLGBGFN",
+          "status": "accepted"
+        },
+        {
+          "text": "UR:BYTES/2-3/LPAOAXCSCKCYUYRSCYCKGEYTSNOYOYAXAEDSUTTYDMFDOLLBRO",
+          "status": "accepted"
+        },
+        {
+          "text": "UR:BYTES/3-3/LPAXAXCSCKCYUYRSCYCKGEMHHPKTPMSRJTGWDPFNSBFNPTENSN",
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 3,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "wrong-type-after-lock",
+      "frames": [
+        {
+          "text": "ur:alpha/1-3/lpadaxcsckcyuyrscyckgemejtswhhylkepmykhhtspllgbgfn",
+          "status": "accepted"
+        },
+        {
+          "text": "ur:beta/1-3/lpadaxcsckcyuyrscyckgemejtswhhylkepmykhhtspllgbgfn",
+          "status": "rejected",
+          "error": {
+            "code": "UnexpectedType"
+          }
+        },
+        {
+          "text": "ur:alpha/2-3/lpaoaxcsckcyuyrscyckgeytsnoyoyaxaedsuttydmfdollbro",
+          "status": "accepted"
+        },
+        {
+          "text": "ur:alpha/3-3/lpaxaxcsckcyuyrscyckgemhhpktpmsrjtgwdpfnsbfnptensn",
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "accept-list-rejects",
+      "accept": [
+        "seed"
+      ],
+      "frames": [
+        {
+          "text": "ur:bytes/1-3/lpadaxcsckcyuyrscyckgemejtswhhylkepmykhhtspllgbgfn",
+          "status": "rejected",
+          "error": {
+            "code": "UnexpectedType"
+          }
+        },
+        {
+          "text": "ur:bytes/2-3/lpaoaxcsckcyuyrscyckgeytsnoyoyaxaedsuttydmfdollbro",
+          "status": "rejected",
+          "error": {
+            "code": "UnexpectedType"
+          }
+        }
+      ]
+    },
+    {
+      "name": "header-cbor-mismatch",
+      "frames": [
+        {
+          "text": "ur:bytes/2-9/lpaoaxcsckcyuyrscyckgeytsnoyoyaxaedsuttydmfdollbro",
+          "status": "rejected",
+          "error": {
+            "code": "InvalidIndices"
+          }
+        }
+      ]
+    },
+    {
+      "name": "bytewords-checksum",
+      "frames": [
+        {
+          "text": "ur:bytes/mejtswhhylkepmykhhtsytsnoyoyaxaedsuttydmnymsckae",
+          "status": "rejected",
+          "error": {
+            "code": "InvalidBytewordsChecksum"
+          }
+        }
+      ]
+    },
+    {
+      "name": "uri-too-long",
+      "limits": {
+        "maxUriLength": 40
+      },
+      "frames": [
+        {
+          "text": "ur:bytes/mejtswhhylkepmykhhtsytsnoyoyaxaedsuttydmnymsckdl",
+          "status": "fatal",
+          "error": {
+            "code": "ResourceLimit",
+            "limit": "uriLength"
+          }
+        },
+        {
+          "text": "ur:bytes/mejtswhhnllktdvt",
+          "status": "duplicate"
+        }
+      ]
+    },
+    {
+      "name": "garbage-input",
+      "frames": [
+        {
+          "text": "not-a-ur",
+          "status": "rejected",
+          "error": {
+            "code": "InvalidScheme"
+          }
+        },
+        {
+          "text": "ur:bytes/héllo",
+          "status": "rejected",
+          "error": {
+            "code": "NonAscii"
+          }
+        },
+        {
+          "text": "ur:/aetzaetd",
+          "status": "rejected",
+          "error": {
+            "code": "InvalidType"
+          }
+        }
+      ]
+    },
+    {
+      "name": "single-after-multipart",
+      "frames": [
+        {
+          "text": "ur:bytes/1-3/lpadaxcsckcyuyrscyckgemejtswhhylkepmykhhtspllgbgfn",
+          "status": "accepted"
+        },
+        {
+          "text": "ur:bytes/mejtswhhnllktdvt",
+          "status": "rejected",
+          "error": {
+            "code": "InconsistentPart"
+          }
+        },
+        {
+          "text": "ur:bytes/2-3/lpaoaxcsckcyuyrscyckgeytsnoyoyaxaedsuttydmfdollbro",
+          "status": "accepted"
+        },
+        {
+          "text": "ur:bytes/3-3/lpaxaxcsckcyuyrscyckgemhhpktpmsrjtgwdpfnsbfnptensn",
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "post-completion-duplicate",
+      "frames": [
+        {
+          "text": "ur:bytes/mejtswhhylkepmykylylyart",
+          "status": "accepted"
+        },
+        {
+          "text": "ur:bytes/aeadaeta",
+          "status": "duplicate"
+        }
+      ],
+      "completeAt": 1,
+      "messageHex": "916ec65cf77cadf5"
+    }
+  ]
+}

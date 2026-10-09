@@ -7,22 +7,22 @@ URs encode binary payloads as URI-friendly strings for QR codes and unreliable c
 ## Status (1.0)
 
 Transport: bytewords + fountain + multi-part UR + frozen `DecoderLimits` Default.  
-Typed dCBOR: `feature = "dcbor"` (`Ur`, traits, multipart wrappers; implies `std`).
+Typed dCBOR: `feature = "dcbor"` (`Ur`, traits; implies `std`).
 
 ## Layering
 
 **L0–L3 (always built).** A UR type token is a validated label (`[a-z0-9-]+` after ASCII lowercasing). The body is raw bytes plus bytewords CRC. `ur::encode` / `ur::Encoder` do **not** parse or require CBOR. `UrType::bytes()` and `Encoder::bytes` exist so tests and generic hosts can move untyped payloads. This is an intentional split, not an accident, and it matches ur-rs.
 
-**BCR-2020-005** says a UR _message_ MUST be dCBOR and that type `bytes` MUST NOT be used except for testing. That MUST is enforced on **L4** (`feature = "dcbor"`): `typed::Ur::from_ur_string` and `MultipartDecoder::message` reject non-dCBOR (`Error::Cbor`). L4 also uses the first registered `dcbor` tag **name** as the type token and strips the tag from the UR body (005 "top-level UR is untagged").
+**BCR-2020-005** says a UR _message_ MUST be dCBOR and that type `bytes` MUST NOT be used except for testing. That MUST is enforced on **L4** (`feature = "dcbor"`): `typed::Ur::from_ur_string` and `TryFrom<ur::Decoded>` reject non-dCBOR (`Error::Cbor`). L4 also uses the first registered `dcbor` tag **name** as the type token and strips the tag from the UR body (005 "top-level UR is untagged").
 
 **This crate will not** grow a Blockchain Commons type registry, Envelope, or PSBT module to "satisfy 005." Application types belong in a consumer crate that implements `UrEncodable` / `UrDecodable`.
 
 ## Features
 
-| Feature | Default | Description                                              |
-| ------- | ------- | -------------------------------------------------------- |
-| `std`   | yes     | Host / std builds                                        |
-| `dcbor` | no      | Typed `Ur` / traits / multipart wrappers (implies `std`) |
+| Feature | Default | Description                         |
+| ------- | ------- | ----------------------------------- |
+| `std`   | yes     | Host / std builds                   |
+| `dcbor` | no      | Typed `Ur` / traits (implies `std`) |
 
 `no_std` + `alloc`: `--no-default-features`.
 
@@ -32,15 +32,16 @@ L3 transport — opaque bytes plus a type token. `Encoder::bytes` / `UrType::byt
 remain for tests and generic hosts; they are not the product default.
 
 ```rust
-use bcur::{Decoder, Encoder, UrType};
+use bcur::{Decoder, Encoder, State, UrType};
 
 let data = b"Ten chars!".repeat(10);
 let mut encoder = Encoder::new(&data, 5, &UrType::new("alpha").unwrap()).unwrap();
 let mut decoder = Decoder::default();
-while !decoder.complete() {
+while !matches!(decoder.state(), State::Complete(_)) {
     decoder.receive(&encoder.next_part().unwrap()).unwrap();
 }
-assert_eq!(decoder.message().unwrap().as_deref(), Some(data.as_slice()));
+let decoded = decoder.into_decoded().unwrap();
+assert_eq!(decoded.message(), data.as_slice());
 ```
 
 L4 typed dCBOR (`feature = "dcbor"`). First registered tag **name** is the UR

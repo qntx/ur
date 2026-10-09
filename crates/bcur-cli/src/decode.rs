@@ -2,7 +2,8 @@
 
 use std::path::PathBuf;
 
-use bcur::{Decoder, DecoderLimits, UrType};
+use bcur::ur::Decoder;
+use bcur::{State, UrType};
 use clap::Args;
 
 use crate::error::{Error, Result};
@@ -35,24 +36,25 @@ pub(crate) fn run(args: &DecodeArgs) -> Result<()> {
         return Err(Error::msg("no UR lines in input"));
     }
 
-    let mut decoder = Decoder::with_limits(DecoderLimits::default());
+    let mut decoder = Decoder::default();
     if let Some(t) = args.ur_type.as_deref() {
-        decoder = decoder.with_expected_type(UrType::new(t)?);
+        decoder = decoder.accept([UrType::new(t)?]);
     }
 
     for (idx, line) in lines.iter().enumerate() {
         decoder.receive(line)?;
-        if let Some(resolved) = decoder.resolved_fragment_count() {
+        let progress = decoder.progress();
+        if progress.fragment_count() > 0 {
             eprintln!(
-                "part {} resolved={resolved}/{}",
+                "part {} rank={}/{} recovered={}",
                 idx + 1,
-                decoder.fragment_count()
+                progress.rank(),
+                progress.fragment_count(),
+                progress.recovered(),
             );
         }
-        if decoder.complete() {
-            let data = decoder
-                .message()?
-                .ok_or_else(|| Error::msg("decoder complete without message"))?;
+        if matches!(decoder.state(), State::Complete(_)) {
+            let data = decoder.into_decoded()?.into_parts().1;
             return write_bytes(args.out.as_deref(), &data, args.hex);
         }
     }

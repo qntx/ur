@@ -25,17 +25,8 @@ export type UrErrorCode =
   | "CborType"
   | "Internal";
 
-/**
- * Decoder budget names carried by `ResourceLimit` errors. Mirrors `bcur::Limit`. `receivedParts`
- * and `bufferParts` are transitional and leave with the decoder redesign.
- */
-export type UrLimit =
-  | "messageLength"
-  | "fragmentCount"
-  | "fragmentLength"
-  | "uriLength"
-  | "receivedParts"
-  | "bufferParts";
+/** Decoder budget names carried by `ResourceLimit` errors. Mirrors `bcur::Limit`. */
+export type UrLimit = "messageLength" | "fragmentCount" | "fragmentLength" | "uriLength";
 
 /** Per-code error detail; `switch (info.code)` narrows the payload. */
 export type UrErrorInfo =

@@ -9,6 +9,9 @@
 - Part CBOR decodes leniently (any definite-width integers and headers, values <= u32) and encodes in shortest form; malformed CBOR is `InvalidPartCbor`, invalid fields are `InvalidPart`, and fragment/count limits map to `ResourceLimit(fragmentLength)`/`ResourceLimit(fragmentCount)`.
 - `FountainEncoder` is an iterator: TS `new FountainEncoder(message, { maxFragmentLength, minFragmentLength?, firstSequence? })` implements `IterableIterator<Part>` (replaces `create`/`nextPart`/`nextSequence`/`complete` with `next()`/`isComplete`/`sequence`/`lastFragmentIndexes`); Rust `fountain::Encoder::new(message, EncoderOptions)` implements `Iterator<Item = Part>` + `FusedIterator` (replaces `next_part`). Iteration ends after sequence `0xFFFFFFFF`; `firstSequence` out of range is a `RangeError` (TS).
 - `K == 1` encoders repeat the same single-part output on every call instead of throwing `SinglePartExhausted` (removed in both languages).
+- Decoders are rebuilt around incremental GF(2) Gauss-Jordan elimination. TS `FountainDecoder` and the renamed `UrDecoder` (was `Decoder`) expose `receive()` returning `{ status: "accepted" | "duplicate" | "rejected" | "fatal" }` instead of throwing, plus `state` (`empty`/`collecting`/`complete`/`failed`), `progress` (`fragmentCount`, `rank`, `recovered`, `processed`, `ratio`), `lastIndexes`, and `reset()`; `complete`, `message()`, `resolvedFragmentCount`, `isPoisoned`, `poisonState`, and `expectedType` are gone — type admission is the `accept` option and terminal sessions report `duplicate`. Rust mirrors this: `fountain::Decoder::receive` returns `Result<Received>` with `state()`/`progress()`/`last_indexes()`/`into_message()`/`reset()`, and `ur::Decoder` adds `accept()`/`into_decoded()` returning the new `Decoded` value (`ur_type()`/`message()`/`into_parts()`).
+- `DecoderLimits` shrinks to four limits (`maxMessageLength`, `maxFragmentCount`, `maxFragmentLength`, `maxUriLength`); `receivedParts` and `bufferParts` are gone, and there is no poison state — limit violations fail the session (`fatal`, `State::Failed`).
+- The typed multipart wrappers are removed. TS `MultipartEncoder`/`MultipartDecoder` are replaced by `Ur.encoder(options)` (returns the L3 `Encoder`) and `Ur.fromDecoded(decoded)`; Rust drops `typed::MultipartEncoder`/`typed::MultipartDecoder` for `typed::Ur::encoder()` and `impl TryFrom<ur::Decoded> for typed::Ur`.
 
 ### Added
 
@@ -17,6 +20,7 @@
 
 ### Changed
 
+- Fountain decoding needs ~35–50% fewer frames at K ≥ 20 (measured frames-to-complete ÷ K, random start, no loss: K=50 → 1.129, K=100 → 1.044, K=200 → 1.055; reference: `docs/internal/research.mdx` Gauss column) and is much faster: K=2000, fragLen 200, 20% loss decodes in ~0.57 s in TypeScript (was ~18.3 s) and ~40 ms in Rust (was ~223 ms).
 - `fromTagged` accepts any tag in `codec.tags`, so v1 nested keypath/coin-info tags 304/305 decode; `codecMap` registers every accepted name, including the v1 tokens.
 - License is now `MIT OR Apache-2.0` (1.8.0 and earlier remain MIT). New `LICENSE-MIT` / `LICENSE-APACHE` files replace `LICENSE`.
 - Repository moved to `github.com/qntx/ur` (was `qntx/ur.js`).

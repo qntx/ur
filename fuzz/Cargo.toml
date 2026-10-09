@@ -44,3 +44,10 @@ path  = "fuzz_targets/encode_roundtrip.rs"
 test  = false
 doc   = false
 bench = false
+
+[[bin]]
+name  = "fountain_decoder"
+path  = "fuzz_targets/fountain_decoder.rs"
+test  = false
+doc   = false
+bench = false

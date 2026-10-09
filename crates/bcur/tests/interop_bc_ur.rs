@@ -11,7 +11,8 @@
 //!
 //! Does not copy bc-ur source; only well-known published UR strings / CBOR.
 
-use bcur::{Decoder, Encoder, Kind, UrType, decode, encode, qr_string};
+use bcur::ur::{Decoder, Encoder};
+use bcur::{Kind, State, UrType, decode, encode, qr_string};
 
 #[test]
 fn bc_ur_array_123_single_part() {
@@ -33,9 +34,9 @@ fn uppercase_qr_roundtrip_single_and_multi() {
     let data = b"bc-ur multipath".repeat(8);
     let mut encoder = Encoder::bytes(&data, 10).unwrap();
     let mut decoder = Decoder::default();
-    while !decoder.complete() {
+    while !matches!(decoder.state(), State::Complete(_)) {
         let part = encoder.next_part().unwrap();
         decoder.receive(&qr_string(&part)).unwrap();
     }
-    assert_eq!(decoder.message().unwrap().as_deref(), Some(data.as_slice()));
+    assert_eq!(decoder.into_decoded().unwrap().message(), data.as_slice());
 }
