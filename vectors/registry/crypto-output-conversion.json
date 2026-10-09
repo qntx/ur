@@ -1,0 +1,277 @@
+{
+  "schema": 1,
+  "capability": "registry.output-descriptor",
+  "source": {
+    "name": "project-owned v1 -> v2 conversion expectations",
+    "derivedFrom": [
+      {
+        "crossChecked": [],
+        "kind": "official",
+        "name": "BCR-2020-010",
+        "path": "papers/bcr-2020-010-output-desc.md",
+        "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+      },
+      {
+        "crossChecked": [],
+        "kind": "official",
+        "name": "BCR-2020-015",
+        "path": "papers/bcr-2020-015-account.md",
+        "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+      }
+    ],
+    "rule": "docs/internal/registry.mdx interface design (R3-0): script-expression tags 400-410 -> BIP-380 text with @n placeholders in order of appearance"
+  },
+  "cases": [
+    {
+      "name": "crypto-output vector 1: pkh eckey",
+      "source": "pkh(@0)",
+      "keys": [
+        {
+          "kind": "eckey",
+          "taggedCborHex": "d99d72a103582102c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        }
+      ],
+      "crossCheck": {
+        "method": "placeholder-substitution",
+        "textDescriptor": "pkh(02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5)",
+        "substituted": "pkh(02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5)",
+        "matches": true
+      },
+      "v1": {
+        "urType": "crypto-output",
+        "cborHex": "d90193d90132a103582102c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "ur": "ur:crypto-output/taadmutaadeyoyaxhdclaoswaalbmwfpwekijndyfefzjtmdrtketphhktmngrlkwsfnospypsasrhhhjonnvwtsqzwljy"
+      },
+      "v2": {
+        "cborHex": "a20167706b68284030290281d99d72a103582102c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "ur": "ur:output-descriptor/oeadiojojeisdefzdydtaolytantjpoyaxhdclaoswaalbmwfpwekijndyfefzjtmdrtketphhktmngrlkwsfnospypsasrhhhjonnvwhtcmhylt"
+      }
+    },
+    {
+      "name": "crypto-output vector 2: sh(wpkh) eckey",
+      "source": "sh(wpkh(@0))",
+      "keys": [
+        {
+          "kind": "eckey",
+          "taggedCborHex": "d99d72a103582103fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556"
+        }
+      ],
+      "crossCheck": {
+        "method": "placeholder-substitution",
+        "textDescriptor": "sh(wpkh(03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556))",
+        "substituted": "sh(wpkh(03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556))",
+        "matches": true
+      },
+      "v1": {
+        "urType": "crypto-output",
+        "cborHex": "d90190d90194d90132a103582103fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+        "ur": "ur:crypto-output/taadmhtaadmwtaadeyoyaxhdclaxzmytkgtlkphywyoxcxfeftbbecgmectelfynfldllpisoyludlahknbbhndtkphfhlehmust"
+      },
+      "v2": {
+        "cborHex": "a2016c73682877706b6828403029290281d99d72a103582103fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+        "ur": "ur:output-descriptor/oeadjzjkisdektjojeisdefzdydtdtaolytantjpoyaxhdclaxzmytkgtlkphywyoxcxfeftbbecgmectelfynfldllpisoyludlahknbbhndtkphfpskepdwy"
+      }
+    },
+    {
+      "name": "crypto-output vector 3: sh multi 2-of-2 eckey",
+      "source": "sh(multi(2,@0,@1))",
+      "keys": [
+        {
+          "kind": "eckey",
+          "taggedCborHex": "d99d72a1035821022f01e5e15cca351daff3843fb70f3c2f0a1bdd05e5af888a67784ef3e10a2a01"
+        },
+        {
+          "kind": "eckey",
+          "taggedCborHex": "d99d72a103582103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe"
+        }
+      ],
+      "crossCheck": {
+        "method": "placeholder-substitution",
+        "textDescriptor": "sh(multi(2,022f01e5e15cca351daff3843fb70f3c2f0a1bdd05e5af888a67784ef3e10a2a01,03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe))",
+        "substituted": "sh(multi(2,022f01e5e15cca351daff3843fb70f3c2f0a1bdd05e5af888a67784ef3e10a2a01,03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe))",
+        "matches": true
+      },
+      "v1": {
+        "urType": "crypto-output",
+        "cborHex": "d90190d90196a201020282d90132a1035821022f01e5e15cca351daff3843fb70f3c2f0a1bdd05e5af888a67784ef3e10a2a01d90132a103582103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "ur": "ur:crypto-output/taadmhtaadmtoeadaoaolftaadeyoyaxhdclaodladvwvyhhsgeccapewflrfhrlbsfndlbkcwutahvwpeloleioksglwfvybkdradtaadeyoyaxhdclaxpstylrvowtstynguaspmchlenegonyryvtmsmtmsgshgvdbbsrhebybtztdisfrnpfadremh"
+      },
+      "v2": {
+        "cborHex": "a201727368286d756c746928322c40302c403129290282d99d72a1035821022f01e5e15cca351daff3843fb70f3c2f0a1bdd05e5af888a67784ef3e10a2a01d99d72a103582103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "ur": "ur:output-descriptor/oeadjpjkisdejnkpjzjyindeeydwfzdydwfzehdtdtaolftantjpoyaxhdclaodladvwvyhhsgeccapewflrfhrlbsfndlbkcwutahvwpeloleioksglwfvybkdradtantjpoyaxhdclaxpstylrvowtstynguaspmchlenegonyryvtmsmtmsgshgvdbbsrhebybtztdisfrnytjofmsr"
+      }
+    },
+    {
+      "name": "crypto-output vector 4: pkh hdkey",
+      "source": "pkh(@0)",
+      "keys": [
+        {
+          "kind": "hdkey",
+          "taggedCborHex": "d99d6fa503582102d2b36900396c9282fa14628566582f206a5dd0bcc8d5e892611806cafb0301f0045820637807030d55d01f9a0cb3a7839515d796bd07706386a6eddf06cc29a65a0e2906d99d70a30186182cf500f500f5021ad34db33f030407d99d70a1018401f480f4081a78412e3a"
+        }
+      ],
+      "crossCheck": {
+        "method": "none",
+        "textDescriptor": "pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)",
+        "reason": "key rendering needs BIP32 xpub/base58 or bech32; only the tagged-CBOR keys are asserted"
+      },
+      "v1": {
+        "urType": "crypto-output",
+        "cborHex": "d90193d9012fa503582102d2b36900396c9282fa14628566582f206a5dd0bcc8d5e892611806cafb0301f0045820637807030d55d01f9a0cb3a7839515d796bd07706386a6eddf06cc29a65a0e2906d90130a30186182cf500f500f5021ad34db33f030407d90130a1018401f480f4081a78412e3a",
+        "ur": "ur:crypto-output/taadmutaaddlonaxhdclaotdqdinaeesjzmolfzsbbidlpiyhddlcximhltirfsptlvsmohscsamsgzoaxadwtaahdcxiaksataxbtgotictnybnqdoslsmdbztsmtryatjoialnolweuramsfdtolhtbadtamtaaddyotadlncsdwykaeykaeykaocytegtqdfhaxaaattaaddyoyadlradwklawkaycyksfpdmftkiiozsfd"
+      },
+      "v2": {
+        "cborHex": "a20167706b68284030290281d99d6fa503582102d2b36900396c9282fa14628566582f206a5dd0bcc8d5e892611806cafb0301f0045820637807030d55d01f9a0cb3a7839515d796bd07706386a6eddf06cc29a65a0e2906d99d70a30186182cf500f500f5021ad34db33f030407d99d70a1018401f480f4081a78412e3a",
+        "ur": "ur:output-descriptor/oeadiojojeisdefzdydtaolytantjlonaxhdclaotdqdinaeesjzmolfzsbbidlpiyhddlcximhltirfsptlvsmohscsamsgzoaxadwtaahdcxiaksataxbtgotictnybnqdoslsmdbztsmtryatjoialnolweuramsfdtolhtbadtamtantjootadlncsdwykaeykaeykaocytegtqdfhaxaaattantjooyadlradwklawkaycyksfpdmftjtsejomn"
+      }
+    },
+    {
+      "name": "crypto-output vector 5: wsh multi 1-of-2 hdkey",
+      "source": "wsh(multi(1,@0,@1))",
+      "keys": [
+        {
+          "kind": "hdkey",
+          "taggedCborHex": "d99d6fa403582103cbcaa9c98c877a26977d00825c956a238e8dddfbd322cce4f74b0b5bd6ace4a704582060499f801b896d83179a4374aeb7822aaeaceaa0db1f85ee3e904c4defbd968906d99d70a20180030007d99d70a1018601f400f480f4"
+        },
+        {
+          "kind": "hdkey",
+          "taggedCborHex": "d99d6fa403582102fc9e5af0ac8d9b3cecfe2a888e2117ba3d089d8585886c9c826b6b22a98d12ea045820f0909affaa7ee7abe5dd4e100598d4dc53cd709d5a5c2cac40e7412f232f7c9c06d99d70a2018200f4021abd16bee507d99d70a1018600f400f480f4"
+        }
+      ],
+      "crossCheck": {
+        "method": "none",
+        "textDescriptor": "wsh(multi(1,xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB/1/0/*,xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH/0/0/*))",
+        "reason": "key rendering needs BIP32 xpub/base58 or bech32; only the tagged-CBOR keys are asserted"
+      },
+      "v1": {
+        "urType": "crypto-output",
+        "cborHex": "d90191d90196a201010282d9012fa403582103cbcaa9c98c877a26977d00825c956a238e8dddfbd322cce4f74b0b5bd6ace4a704582060499f801b896d83179a4374aeb7822aaeaceaa0db1f85ee3e904c4defbd968906d90130a20180030007d90130a1018601f400f480f4d9012fa403582102fc9e5af0ac8d9b3cecfe2a888e2117ba3d089d8585886c9c826b6b22a98d12ea045820f0909affaa7ee7abe5dd4e100598d4dc53cd709d5a5c2cac40e7412f232f7c9c06d90130a2018200f4021abd16bee507d90130a1018600f400f480f4",
+        "ur": "ur:crypto-output/taadmetaadmtoeadadaolftaaddloxaxhdclaxsbsgptsolkltkndsmskiaelfhhmdimcnmnlgutzotecpsfveylgrbdhptbpsveosaahdcxhnganelacwldjnlschnyfxjyplrllfdrplpswdnbuyctlpwyfmmhgsgtwsrymtldamtaaddyoeadlaaxaeattaaddyoyadlnadwkaewklawktaaddloxaxhdclaoztnnhtwtpslgndfnwpzedrlomnclchrdfsayntlplplojznslfjejecpptlgbgwdaahdcxwtmhnyzmpkkbvdpyvwutglbeahmktyuogusnjonththhdwpsfzvdfpdlcndlkensamtaaddyoeadlfaewkaocyrycmrnvwattaaddyoyadlnaewkaewklawktdbsfttn"
+      },
+      "v2": {
+        "cborHex": "a20173777368286d756c746928312c40302c403129290282d99d6fa403582103cbcaa9c98c877a26977d00825c956a238e8dddfbd322cce4f74b0b5bd6ace4a704582060499f801b896d83179a4374aeb7822aaeaceaa0db1f85ee3e904c4defbd968906d99d70a20180030007d99d70a1018601f400f480f4d99d6fa403582102fc9e5af0ac8d9b3cecfe2a888e2117ba3d089d8585886c9c826b6b22a98d12ea045820f0909affaa7ee7abe5dd4e100598d4dc53cd709d5a5c2cac40e7412f232f7c9c06d99d70a2018200f4021abd16bee507d99d70a1018600f400f480f4",
+        "ur": "ur:output-descriptor/oeadjkktjkisdejnkpjzjyindeehdwfzdydwfzehdtdtaolftantjloxaxhdclaxsbsgptsolkltkndsmskiaelfhhmdimcnmnlgutzotecpsfveylgrbdhptbpsveosaahdcxhnganelacwldjnlschnyfxjyplrllfdrplpswdnbuyctlpwyfmmhgsgtwsrymtldamtantjooeadlaaxaeattantjooyadlnadwkaewklawktantjloxaxhdclaoztnnhtwtpslgndfnwpzedrlomnclchrdfsayntlplplojznslfjejecpptlgbgwdaahdcxwtmhnyzmpkkbvdpyvwutglbeahmktyuogusnjonththhdwpsfzvdfpdlcndlkensamtantjooeadlfaewkaocyrycmrnvwattantjooyadlnaewkaewklawkneoxvyps"
+      }
+    },
+    {
+      "name": "BIP39 'shield group…' account, 7 v1 descriptors",
+      "masterFingerprint": 934670036,
+      "entries": [
+        {
+          "name": "BIP39 'shield group…' account, 7 v1 descriptors[0]",
+          "source": "pkh(@0)",
+          "keys": [
+            {
+              "kind": "hdkey",
+              "taggedCborHex": "d99d6fa403582103eb3e2863911826374de86c231a4b76f0b89dfa174afb78d7f478199884d9dd320458206456a5df2db0f6d9af72b2a1af4b25f45200ed6fcc29c3440b311d4796b70b5b06d99d70a20186182cf500f500f5021a37b5eed4081a99f9cdf7"
+            }
+          ],
+          "crossCheck": {
+            "method": "none",
+            "textDescriptor": "pkh([37b5eed4/44'/0'/0']xpub6CnQkivUEH9bSbWVWfDLCtigKKgnSWGaVSRyCbN2QNBJzuvHT1vUQpgSpY1NiVvoeNEuVwk748Cn9G3NtbQB1aGGsEL7aYEnjVWgjj9tefu)",
+            "reason": "key rendering needs BIP32 xpub/base58 or bech32; only the tagged-CBOR keys are asserted"
+          }
+        },
+        {
+          "name": "BIP39 'shield group…' account, 7 v1 descriptors[1]",
+          "source": "sh(wpkh(@0))",
+          "keys": [
+            {
+              "kind": "hdkey",
+              "taggedCborHex": "d99d6fa403582102c7e4823730f6ee2cf864e2c352060a88e60b51a84e89e4c8c75ec22590ad6b690458209d2f86043276f9251a4a4f577166a5abeb16b6ec61e226b5b8fa11038bfda42d06d99d70a201861831f500f500f5021a37b5eed4081aa80f7cdb"
+            }
+          ],
+          "crossCheck": {
+            "method": "none",
+            "textDescriptor": "sh(wpkh([37b5eed4/49'/0'/0']xpub6CtR1iF4dZPkEyXDwVf3HE74tSwXNMcHtBzX4gwz2UnPhJ54Jz5unHx2syYCCDkvVUmsmoYTmcaHXe1wJppvct4GMMaN5XAbRk7yGScRSte))",
+            "reason": "key rendering needs BIP32 xpub/base58 or bech32; only the tagged-CBOR keys are asserted"
+          }
+        },
+        {
+          "name": "BIP39 'shield group…' account, 7 v1 descriptors[2]",
+          "source": "wpkh(@0)",
+          "keys": [
+            {
+              "kind": "hdkey",
+              "taggedCborHex": "d99d6fa403582103fd433450b6924b4f7efdd5d1ed017d364be95ab2b592dc8bddb3b00c1c24f63f04582072ede7334d5acf91c6fda622c205199c595a31f9218ed30792d301d5ee9e3a8806d99d70a201861854f500f500f5021a37b5eed4081a0d5de1d7"
+            }
+          ],
+          "crossCheck": {
+            "method": "none",
+            "textDescriptor": "wpkh([37b5eed4/84'/0'/0']xpub6BkU445MSEBXbPjD3g2c2ch6mn8yy1SXXQUM7EwjgYiq6Wt1NDwDZ45npqWcV8uQC5oi2gHuVukoCoZZyT4HKq8EpotPMqGqxdZRuapCQ23)",
+            "reason": "key rendering needs BIP32 xpub/base58 or bech32; only the tagged-CBOR keys are asserted"
+          }
+        },
+        {
+          "name": "BIP39 'shield group…' account, 7 v1 descriptors[3]",
+          "source": "sh(cosigner(@0))",
+          "keys": [
+            {
+              "kind": "hdkey",
+              "taggedCborHex": "d99d6fa4035821035ccd58b63a2cdc23d0812710603592e7457573211880cb59b1ef012e168e059a04582088d3299b448f87215d96b0c226235afc027f9e7dc700284f3e912a34daeb1a2306d99d70a20182182df5021a37b5eed4081a37b5eed4"
+            }
+          ],
+          "crossCheck": {
+            "method": "none",
+            "textDescriptor": "sh(cosigner([37b5eed4/45']xpub68JFLJTH96GUqC6SoVw5c2qyLSt776PGu5xde8ddVACuPYyarvSL827TbZGavuNbKQ8DG3VP9fCXPhQRBgPrS4MPG3zaZgwAGuPHYvVuY9X))",
+            "reason": "key rendering needs BIP32 xpub/base58 or bech32; only the tagged-CBOR keys are asserted"
+          }
+        },
+        {
+          "name": "BIP39 'shield group…' account, 7 v1 descriptors[4]",
+          "source": "sh(wsh(cosigner(@0)))",
+          "keys": [
+            {
+              "kind": "hdkey",
+              "taggedCborHex": "d99d6fa4035821032c78ebfcabdac6d735a0820ef8732f2821b4fb84cd5d6b26526938f90c0507110458207953efe16a73e5d3f9f2d4c6e49bd88e22093bbd85be5a7e862a4b98a16e0ab606d99d70a201881830f500f500f501f5021a37b5eed4081a59b69b2a"
+            }
+          ],
+          "crossCheck": {
+            "method": "none",
+            "textDescriptor": "sh(wsh(cosigner([37b5eed4/48'/0'/0'/1']xpub6EC9f7mLFJQoPaqDJ72Zbv67JWzmpXvCYQSecER9GzkYy5eWLsVLbHnxoAZ8NnnsrjhMLduJo9dG6fNQkmMFL3Qedj2kf5bEy5tptHPApNf)))",
+            "reason": "key rendering needs BIP32 xpub/base58 or bech32; only the tagged-CBOR keys are asserted"
+          }
+        },
+        {
+          "name": "BIP39 'shield group…' account, 7 v1 descriptors[5]",
+          "source": "wsh(cosigner(@0))",
+          "keys": [
+            {
+              "kind": "hdkey",
+              "taggedCborHex": "d99d6fa40358210260563ee80c26844621b06b74070baf0e23fb76ce439d0237e87502ebbd3ca3460458202fa0e41c9dc43dc4518659bfcef935ba8101b57dbc0812805dd983bc1d34b81306d99d70a201881830f500f500f502f5021a37b5eed4081a59b69b2a"
+            }
+          ],
+          "crossCheck": {
+            "method": "none",
+            "textDescriptor": "wsh(cosigner([37b5eed4/48'/0'/0'/2']xpub6EC9f7mLFJQoRQ6qiTvWQeeYsgtki6fBzSUgWgUtAujEMtAfJSAn3AVS4KrLHRV2hNX77YwNkg4azUzuSwhNGtcq4r2J8bLGMDkrQYHvoed))",
+            "reason": "key rendering needs BIP32 xpub/base58 or bech32; only the tagged-CBOR keys are asserted"
+          }
+        },
+        {
+          "name": "BIP39 'shield group…' account, 7 v1 descriptors[6]",
+          "source": "tr(@0)",
+          "keys": [
+            {
+              "kind": "hdkey",
+              "taggedCborHex": "d99d6fa403582102bbb97cf9efa176b738efd6ee1d4d0fa391a973394fbc16e4c5e78e536cd14d2d0458204b4693e1f794206ed1355b838da24949a92b63d02e58910bf3bd3d9c242281e606d99d70a201861856f500f500f5021a37b5eed4081acec7070c"
+            }
+          ],
+          "crossCheck": {
+            "method": "none",
+            "textDescriptor": "tr([37b5eed4/86'/0'/0']xpub6DAvL2L5bgGSpDygSQUDpjwE47saoMk2rSRtYhN7Dma7HvnFLTXNrcSC1AmEN8G2SCD958bUwgc6Bew4sAFa2kqYynF8Rmu6P5jMt2FDPtm)",
+            "reason": "key rendering needs BIP32 xpub/base58 or bech32; only the tagged-CBOR keys are asserted"
+          }
+        }
+      ],
+      "v1": {
+        "urType": "crypto-account",
+        "cborHex": "a2011a37b5eed40287d90134d90193d9012fa403582103eb3e2863911826374de86c231a4b76f0b89dfa174afb78d7f478199884d9dd320458206456a5df2db0f6d9af72b2a1af4b25f45200ed6fcc29c3440b311d4796b70b5b06d90130a20186182cf500f500f5021a37b5eed4081a99f9cdf7d90134d90190d90194d9012fa403582102c7e4823730f6ee2cf864e2c352060a88e60b51a84e89e4c8c75ec22590ad6b690458209d2f86043276f9251a4a4f577166a5abeb16b6ec61e226b5b8fa11038bfda42d06d90130a201861831f500f500f5021a37b5eed4081aa80f7cdbd90134d90194d9012fa403582103fd433450b6924b4f7efdd5d1ed017d364be95ab2b592dc8bddb3b00c1c24f63f04582072ede7334d5acf91c6fda622c205199c595a31f9218ed30792d301d5ee9e3a8806d90130a201861854f500f500f5021a37b5eed4081a0d5de1d7d90134d90190d9019ad9012fa4035821035ccd58b63a2cdc23d0812710603592e7457573211880cb59b1ef012e168e059a04582088d3299b448f87215d96b0c226235afc027f9e7dc700284f3e912a34daeb1a2306d90130a20182182df5021a37b5eed4081a37b5eed4d90134d90190d90191d9019ad9012fa4035821032c78ebfcabdac6d735a0820ef8732f2821b4fb84cd5d6b26526938f90c0507110458207953efe16a73e5d3f9f2d4c6e49bd88e22093bbd85be5a7e862a4b98a16e0ab606d90130a201881830f500f500f501f5021a37b5eed4081a59b69b2ad90134d90191d9019ad9012fa40358210260563ee80c26844621b06b74070baf0e23fb76ce439d0237e87502ebbd3ca3460458202fa0e41c9dc43dc4518659bfcef935ba8101b57dbc0812805dd983bc1d34b81306d90130a201881830f500f500f502f5021a37b5eed4081a59b69b2ad90134d90199d9012fa403582102bbb97cf9efa176b738efd6ee1d4d0fa391a973394fbc16e4c5e78e536cd14d2d0458204b4693e1f794206ed1355b838da24949a92b63d02e58910bf3bd3d9c242281e606d90130a201861856f500f500f5021a37b5eed4081acec7070c",
+        "ur": "ur:crypto-account/oeadcyemrewytyaolttaadeetaadmutaaddloxaxhdclaxwmfmdeiamecsdsemgtvsjzcncygrkowtrontzschgezokstswkkscfmklrtauteyaahdcxiehfonurdppfyntapejpproypegrdawkgmaewejlsfdtsrfybdehcaflmtrlbdhpamtaaddyoeadlncsdwykaeykaeykaocyemrewytyaycynlytsnyltaadeetaadmhtaadmwtaaddloxaxhdclaostvelfemdyynwydwyaievosrgmambklovabdgypdglldvespsthysadamhpmjeinaahdcxntdllnaaeykoytdacygegwhgjsiyonpywmcmrpwphsvodsrerozsbyaxluzcoxdpamtaaddyoeadlncsehykaeykaeykaocyemrewytyaycypdbskeuytaadeetaadmwtaaddloxaxhdclaxzcfxeegdrpmogrgwkbzctlttweadkiengrwlhtprremouoluutqdpfbncedkynfhaahdcxjpwevdeogthttkmeswzcolcpsaahcfnshkhtehytclmnteatmoteadtlwynnftloamtaaddyoeadlncsghykaeykaeykaocyemrewytyaycybthlvytstaadeetaadmhtaadnytaaddloxaxhdclaxhhsnhdrpftdwuocntilydibehnecmovdfekpjkclcslasbhkpawsaddmcmmnahnyaahdcxlotedtndfymyltclhlmtpfsadscnhtztaolbnnkistaedegwfmmedreetnwmcycnamtaaddyoeadlfcsdpykaocyemrewytyaycyemrewytytaadeetaadmhtaadmetaadnytaaddloxaxhdclaxdwkswmztpytnswtsecnblfbayajkdldeclqzzolrsnhljedsgminetytbnahatbyaahdcxkkguwsvyimjkvwteytwztyswvendtpmncpasfrrylprnhtkblndrgrmkoyjtbkrpamtaaddyoeadlocsdyykaeykaeykadykaocyemrewytyaycyhkrpnddrtaadeetaadmetaadnytaaddloxaxhdclaohnhffmvsbndslrfgclpfjejyatbdpebacnzokotofxntaoemvskpaowmryfnotfgaahdcxdlnbvecentssfsssgylnhkrstoytecrdlyadrekirfaybglahltalsrfcaeerobwamtaaddyoeadlocsdyykaeykaeykaoykaocyemrewytyaycyhkrpnddrtaadeetaadnltaaddloxaxhdclaorkrhkeytwsoykorletwstbwycagtbsotmeptjkesgwrfcmveskvdmngujzttgtdpaahdcxgrfgmuvyylmwcxjtttechplslgoegagaptdniatidmhdmebdwfryfsnsdkcplyvaamtaaddyoeadlncshfykaeykaeykaocyemrewytyaycytostatbngmdavolk"
+      },
+      "v2": {
+        "cborHex": "a2011a37b5eed40287d99d74a20167706b68284030290281d99d6fa403582103eb3e2863911826374de86c231a4b76f0b89dfa174afb78d7f478199884d9dd320458206456a5df2db0f6d9af72b2a1af4b25f45200ed6fcc29c3440b311d4796b70b5b06d99d70a20186182cf500f500f5021a37b5eed4081a99f9cdf7d99d74a2016c73682877706b6828403029290281d99d6fa403582102c7e4823730f6ee2cf864e2c352060a88e60b51a84e89e4c8c75ec22590ad6b690458209d2f86043276f9251a4a4f577166a5abeb16b6ec61e226b5b8fa11038bfda42d06d99d70a201861831f500f500f5021a37b5eed4081aa80f7cdbd99d74a2016877706b68284030290281d99d6fa403582103fd433450b6924b4f7efdd5d1ed017d364be95ab2b592dc8bddb3b00c1c24f63f04582072ede7334d5acf91c6fda622c205199c595a31f9218ed30792d301d5ee9e3a8806d99d70a201861854f500f500f5021a37b5eed4081a0d5de1d7d99d74a20170736828636f7369676e657228403029290281d99d6fa4035821035ccd58b63a2cdc23d0812710603592e7457573211880cb59b1ef012e168e059a04582088d3299b448f87215d96b0c226235afc027f9e7dc700284f3e912a34daeb1a2306d99d70a20182182df5021a37b5eed4081a37b5eed4d99d74a2017573682877736828636f7369676e65722840302929290281d99d6fa4035821032c78ebfcabdac6d735a0820ef8732f2821b4fb84cd5d6b26526938f90c0507110458207953efe16a73e5d3f9f2d4c6e49bd88e22093bbd85be5a7e862a4b98a16e0ab606d99d70a201881830f500f500f501f5021a37b5eed4081a59b69b2ad99d74a2017177736828636f7369676e657228403029290281d99d6fa40358210260563ee80c26844621b06b74070baf0e23fb76ce439d0237e87502ebbd3ca3460458202fa0e41c9dc43dc4518659bfcef935ba8101b57dbc0812805dd983bc1d34b81306d99d70a201881830f500f500f502f5021a37b5eed4081a59b69b2ad99d74a201667472284030290281d99d6fa403582102bbb97cf9efa176b738efd6ee1d4d0fa391a973394fbc16e4c5e78e536cd14d2d0458204b4693e1f794206ed1355b838da24949a92b63d02e58910bf3bd3d9c242281e606d99d70a201861856f500f500f5021a37b5eed4081acec7070c",
+        "ur": "ur:account-descriptor/oeadcyemrewytyaolttantjyoeadiojojeisdefzdydtaolytantjloxaxhdclaxwmfmdeiamecsdsemgtvsjzcncygrkowtrontzschgezokstswkkscfmklrtauteyaahdcxiehfonurdppfyntapejpproypegrdawkgmaewejlsfdtsrfybdehcaflmtrlbdhpamtantjooeadlncsdwykaeykaeykaocyemrewytyaycynlytsnyltantjyoeadjzjkisdektjojeisdefzdydtdtaolytantjloxaxhdclaostvelfemdyynwydwyaievosrgmambklovabdgypdglldvespsthysadamhpmjeinaahdcxntdllnaaeykoytdacygegwhgjsiyonpywmcmrpwphsvodsrerozsbyaxluzcoxdpamtantjooeadlncsehykaeykaeykaocyemrewytyaycypdbskeuytantjyoeadisktjojeisdefzdydtaolytantjloxaxhdclaxzcfxeegdrpmogrgwkbzctlttweadkiengrwlhtprremouoluutqdpfbncedkynfhaahdcxjpwevdeogthttkmeswzcolcpsaahcfnshkhtehytclmnteatmoteadtlwynnftloamtantjooeadlncsghykaeykaeykaocyemrewytyaycybthlvytstantjyoeadjojkisdeiajljkiniojtihjpdefzdydtdtaolytantjloxaxhdclaxhhsnhdrpftdwuocntilydibehnecmovdfekpjkclcslasbhkpawsaddmcmmnahnyaahdcxlotedtndfymyltclhlmtpfsadscnhtztaolbnnkistaedegwfmmedreetnwmcycnamtantjooeadlfcsdpykaocyemrewytyaycyemrewytytantjyoeadkpjkisdektjkisdeiajljkiniojtihjpdefzdydtdtdtaolytantjloxaxhdclaxdwkswmztpytnswtsecnblfbayajkdldeclqzzolrsnhljedsgminetytbnahatbyaahdcxkkguwsvyimjkvwteytwztyswvendtpmncpasfrrylprnhtkblndrgrmkoyjtbkrpamtantjooeadlocsdyykaeykaeykadykaocyemrewytyaycyhkrpnddrtantjyoeadjsktjkisdeiajljkiniojtihjpdefzdydtdtaolytantjloxaxhdclaohnhffmvsbndslrfgclpfjejyatbdpebacnzokotofxntaoemvskpaowmryfnotfgaahdcxdlnbvecentssfsssgylnhkrstoytecrdlyadrekirfaybglahltalsrfcaeerobwamtantjooeadlocsdyykaeykaeykaoykaocyemrewytyaycyhkrpnddrtantjyoeadiyjyjpdefzdydtaolytantjloxaxhdclaorkrhkeytwsoykorletwstbwycagtbsotmeptjkesgwrfcmveskvdmngujzttgtdpaahdcxgrfgmuvyylmwcxjtttechplslgoegagaptdniatidmhdmebdwfryfsnsdkcplyvaamtantjooeadlncshfykaeykaeykaocyemrewytyaycytostatbnyadleoeh"
+      }
+    }
+  ]
+}

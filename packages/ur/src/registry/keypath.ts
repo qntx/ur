@@ -143,7 +143,14 @@ function decodeComponents(value: Cbor): PathComponent[] {
 export const keypathCodec: UrCodec<Keypath> = {
   tags: [TAGS.keypath, TAGS["crypto-keypath"]],
   encode(keypath) {
-    if (keypath.components.length === 0 && keypath.sourceFingerprint === undefined) {
+    // A fully vacuous keypath is meaningless (no components, fingerprint or
+    // depth); empty components with a depth still identify the master key —
+    // see BCR-2020-010 vector 5 (`{1: [], 3: 0}`).
+    if (
+      keypath.components.length === 0 &&
+      keypath.sourceFingerprint === undefined &&
+      keypath.depth === undefined
+    ) {
       throw CborError.wrongType();
     }
     const items: CborInput[] = [];
@@ -165,7 +172,7 @@ export const keypathCodec: UrCodec<Keypath> = {
     const components = decodeComponents(map.getOrThrow(1));
     const fingerprint = map.get(2);
     const depth = map.get(3);
-    if (components.length === 0 && fingerprint === undefined) {
+    if (components.length === 0 && fingerprint === undefined && depth === undefined) {
       throw CborError.wrongType();
     }
     return Object.freeze({

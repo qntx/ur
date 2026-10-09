@@ -19,14 +19,19 @@
 - UR part headers follow a strict grammar `seq = 1*DIGIT "-" 1*DIGIT` with both fields in `1..=0xFFFFFFFF`: no signs, no whitespace, no extra separators; leading zeros are allowed.
 - `UrCodec<T>` is a flat `{ tags: readonly [Tag, ...Tag[]], encode(value): Cbor, decode(cbor): T }` contract: `tags[0]` is written, every named tag is accepted on read, and every tag name must be a valid UR type (`InvalidType`). The codec helpers are `codecUrTypes`, `toUr`, `fromUr`, `toTagged`, `fromTagged`, `codecMap`, and `fromUrWith`; `toUrString`, `fromUrString`, `firstTagUrType`, `tagUrTypes`, and the registry's `fromUrStringWith` are removed.
 - `Ur` is the single L4 value type. TS: `Ur.fromCbor`/`fromCborData`/`fromDecoded`/`parse`, `type`/`cbor`, `toCborData`/`toString`/`toQrString`/`encoder(options)`. Rust `typed::Ur` keeps `new`/`from_cbor_data`/`ur_type`/`cbor`/`into_cbor`/`to_cbor_data`/`to_qr_string`/`encoder` plus `Display`, `FromStr` (single-part only, `NotSinglePart`), and `TryFrom<ur::Decoded>`; `string`, `from_ur_string`, `ur`, `check_type`, and `UrCodable` are removed. Rust `UrEncodable`/`UrDecodable` blanket-impl over `dcbor`'s tagged traits: writes use the first tag name, reads accept any `cbor_tags()` name.
+- `@qntx/ur/registry` no longer exports the numeric `TAG_*` constants; tags are reached through `TAGS` (UR-type tags, e.g. `TAGS.seed.value`) and `SCRIPT_TAGS` (BCR-2020-010 script-expression tags).
 
 ### Added
 
 - Read-only decode of deprecated BCR-2020-006 v1 tokens/tags: `crypto-seed` (300), `crypto-hdkey` (303), `crypto-keypath` (304), `crypto-coin-info` (305), `crypto-sskr` (309), `crypto-psbt` (310). Writes always emit v2. `codecUrTypes` validates and returns every `UrCodec.tags` name as a `UrType`.
 - Hermes smoke test in CI: `packages/ur` sources are bundled to a classic script and run on the Hermes V1 CLI that React Native ships. Runtime requirements on Hermes: the root transport needs only `TextEncoder`; `@qntx/ur/typed` and `@qntx/ur/registry` additionally need a WHATWG `TextDecoder` supporting `{ fatal: true }` (Expo provides one; bare React Native needs a polyfill).
+- New registry types/codecs: `eckey` (40306), `address` (40307), `output-descriptor` (40308), and `account-descriptor` (40311), with `EcKey`, `Address`/`AddressType`, `OutputDescriptor`/`DescriptorKey`, and `AccountDescriptor` value types.
+- Read-only v1 decode of `crypto-output` (308) and `crypto-account` (311): tagged script-expression trees (tags 400–410) convert to v2 text descriptors with `@n` key placeholders; writes always emit v2. The `crypto-eckey` (306), `crypto-address` (307) and untagged KeystoneHQ spellings are also accepted on read.
 
 ### Changed
 
+- Encode-side validation now mirrors decode-side validation across the registry: caller-built values are checked against the same shape, length, placeholder and tag rules that wire input must satisfy (including hdkey private `0x00` key-data prefix and the `@n` placeholder set of `output-descriptor`).
+- `@qntx/ur` engine requirement is now Node `>=20.19.0` (was `>=22.12`), the real floor of the ES2022 + ESM root transport; `@qntx/ur/typed` and `@qntx/ur/registry` still need Node `>=22.12` through `@blockchaincommons/dcbor`.
 - Fountain decoding needs ~35–50% fewer frames at K ≥ 20 (measured frames-to-complete ÷ K, random start, no loss: K=50 → 1.129, K=100 → 1.044, K=200 → 1.055; reference: `docs/internal/research.mdx` Gauss column) and is much faster: K=2000, fragLen 200, 20% loss decodes in ~0.57 s in TypeScript (was ~18.3 s) and ~40 ms in Rust (was ~223 ms).
 - `fromTagged` accepts any tag in `codec.tags`, so v1 nested keypath/coin-info tags 304/305 decode; `codecMap` registers every accepted name, including the v1 tokens.
 
@@ -50,6 +55,7 @@
 ### Changed
 
 - Fountain index selection uses a per-stream `FragmentChooser` (BCR-2024-001 §4): harmonic degree sampler built once, remove-shuffle stops at `degree`, indexes computed once per received part and returned sorted. Decode of a K=2000 stream at 20% simple-part loss: ~8 s → ~1 s (same part count; wire output unchanged).
+- `@qntx/ur/registry` no longer exports the numeric `TAG_*` constants; tags are reached through `TAGS` (UR-type tags, e.g. `TAGS.seed.value`) and `SCRIPT_TAGS` (BCR-2020-010 script-expression tags).
 
 ### Added
 
@@ -70,11 +76,15 @@
 
 ## 1.6.0 - 2026-09-16
 
+- `@qntx/ur/registry` no longer exports the numeric `TAG_*` constants; tags are reached through `TAGS` (UR-type tags, e.g. `TAGS.seed.value`) and `SCRIPT_TAGS` (BCR-2020-010 script-expression tags).
+
 ### Added
 
 - L5 `codecMap` / `fromUrStringWith`. Host-provided dispatch. Duplicate `tags[0].name` is `TypeError`. Unknown type is `UnexpectedType`. No global registry.
 
 ## 1.5.0 - 2026-09-16
+
+- `@qntx/ur/registry` no longer exports the numeric `TAG_*` constants; tags are reached through `TAGS` (UR-type tags, e.g. `TAGS.seed.value`) and `SCRIPT_TAGS` (BCR-2020-010 script-expression tags).
 
 ### Added
 
@@ -82,17 +92,23 @@
 
 ## 1.4.0 - 2026-09-16
 
+- `@qntx/ur/registry` no longer exports the numeric `TAG_*` constants; tags are reached through `TAGS` (UR-type tags, e.g. `TAGS.seed.value`) and `SCRIPT_TAGS` (BCR-2020-010 script-expression tags).
+
 ### Added
 
 - L5 `sskrCodec`. Packed 5-byte header; domain stores N not N-1. Official BCR-2020-011 third share golden.
 
 ## 1.3.0 - 2026-09-16
 
+- `@qntx/ur/registry` no longer exports the numeric `TAG_*` constants; tags are reached through `TAGS` (UR-type tags, e.g. `TAGS.seed.value`) and `SCRIPT_TAGS` (BCR-2020-010 script-expression tags).
+
 ### Added
 
 - L5 `hdKeyCodec`, `keypathCodec`, `coinInfoCodec`, `hdKeyDigestSource`, `hdKeyDigest`. Nested tags 40304/40305. Official HDKey vectors 1–2.
 
 ## 1.2.0 - 2026-09-16
+
+- `@qntx/ur/registry` no longer exports the numeric `TAG_*` constants; tags are reached through `TAGS` (UR-type tags, e.g. `TAGS.seed.value`) and `SCRIPT_TAGS` (BCR-2020-010 script-expression tags).
 
 ### Added
 
@@ -110,6 +126,7 @@
 ### Breaking
 
 - `engines.node` is `>=22.12`, matching `@blockchaincommons/dcbor`. Node 20 is not a supported runtime.
+- `@qntx/ur/registry` no longer exports the numeric `TAG_*` constants; tags are reached through `TAGS` (UR-type tags, e.g. `TAGS.seed.value`) and `SCRIPT_TAGS` (BCR-2020-010 script-expression tags).
 
 ### Added
 
@@ -135,6 +152,7 @@
 - Exceeding `maxUriLen`, UR-layer `Part.fromCbor` `ResourceLimit`, and fountain `DecoderState` poison the session; later `receive` / `message` throw the same code.
 - `Part.fromCbor` caps `sequenceCount` at `maxFragmentCount`.
 - First-part padding wider than one fragment (`product - ml >= fragLen`) is `InconsistentPart`.
+- `@qntx/ur/registry` no longer exports the numeric `TAG_*` constants; tags are reached through `TAGS` (UR-type tags, e.g. `TAGS.seed.value`) and `SCRIPT_TAGS` (BCR-2020-010 script-expression tags).
 
 ### Added
 
@@ -157,6 +175,7 @@
 ### Changed
 
 - Package name is `@qntx/ur` (npm name `ur` is already taken by an unrelated package).
+- `@qntx/ur/registry` no longer exports the numeric `TAG_*` constants; tags are reached through `TAGS` (UR-type tags, e.g. `TAGS.seed.value`) and `SCRIPT_TAGS` (BCR-2020-010 script-expression tags).
 
 ### Added
 

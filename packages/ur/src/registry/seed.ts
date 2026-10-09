@@ -11,7 +11,7 @@ import type { Cbor } from "@blockchaincommons/dcbor";
 
 import type { UrCodec } from "../typed/codec.ts";
 import { copyBuf, copyBytes } from "./bytes.ts";
-import { expectClosedIntMap } from "./map.ts";
+import { assertText, expectClosedIntMap } from "./map.ts";
 import { TAGS } from "./tags.ts";
 
 const SEED_KEYS: ReadonlySet<number> = new Set([1, 2, 3, 4]);
@@ -51,10 +51,10 @@ export const seedCodec: UrCodec<Seed> = {
       map.set(2, seed.creationDate);
     }
     if (seed.name !== undefined && seed.name !== "") {
-      map.set(3, seed.name);
+      map.set(3, assertText(seed.name));
     }
     if (seed.note !== undefined && seed.note !== "") {
-      map.set(4, seed.note);
+      map.set(4, assertText(seed.note));
     }
     return cbor(map);
   },

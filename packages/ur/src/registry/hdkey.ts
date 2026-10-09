@@ -8,7 +8,7 @@ import { coinInfoCodec } from "./coin-info.ts";
 import type { CoinInfo } from "./coin-info.ts";
 import { keypathCodec } from "./keypath.ts";
 import type { Keypath } from "./keypath.ts";
-import { expectBool, expectClosedIntMap, expectUint32Ne0 } from "./map.ts";
+import { assertText, expectBool, expectClosedIntMap, expectUint32Ne0 } from "./map.ts";
 import { TAGS } from "./tags.ts";
 
 const MASTER_KEYS: ReadonlySet<number> = new Set([1, 3, 4]);
@@ -52,6 +52,14 @@ function bytesOfLen(value: Cbor, len: number): Uint8Array {
   return bytes;
 }
 
+// Private key-data is `0x00 || 32-byte secret` (BCR-2020-007); public is a 33-byte
+// compressed point. Checked in both directions (registry design table).
+function assertKeyData(isPrivate: boolean, data: Uint8Array): void {
+  if (data.length !== KEY_DATA_LEN || (isPrivate && data[0] !== 0)) {
+    throw CborError.outOfRange();
+  }
+}
+
 function assertUint32Ne0(n: number): number {
   if (!Number.isInteger(n) || n < 1 || n > 0xff_ff_ff_ff) {
     throw CborError.outOfRange();
@@ -72,7 +80,8 @@ export const hdKeyCodec: UrCodec<HdKey> = {
     if (key.isPrivate === true) {
       map.set(2, true);
     }
-    map.set(3, cbor(copyLen(key.keyData, KEY_DATA_LEN)));
+    assertKeyData(key.isPrivate === true, key.keyData);
+    map.set(3, cbor(copyBuf(key.keyData)));
     if (key.chainCode !== undefined) {
       map.set(4, cbor(copyLen(key.chainCode, CHAIN_CODE_LEN)));
     }
@@ -89,10 +98,10 @@ export const hdKeyCodec: UrCodec<HdKey> = {
       map.set(8, assertUint32Ne0(key.parentFingerprint));
     }
     if (key.name !== undefined && key.name !== "") {
-      map.set(9, key.name);
+      map.set(9, assertText(key.name));
     }
     if (key.note !== undefined && key.note !== "") {
-      map.set(10, key.note);
+      map.set(10, assertText(key.note));
     }
     return cbor(map);
   },
@@ -113,6 +122,9 @@ export const hdKeyCodec: UrCodec<HdKey> = {
     }
     const map = expectClosedIntMap(value, DERIVED_KEYS);
     const isPrivate = map.get(2);
+    const priv = isPrivate === undefined ? false : expectBool(isPrivate);
+    const keyData = bytesOfLen(map.getOrThrow(3), KEY_DATA_LEN);
+    assertKeyData(priv, keyData);
     const chainCode = map.get(4);
     const useInfo = map.get(5);
     const origin = map.get(6);
@@ -122,8 +134,8 @@ export const hdKeyCodec: UrCodec<HdKey> = {
     const note = map.get(10);
     return Object.freeze({
       kind: "derived",
-      ...(isPrivate === undefined ? {} : { isPrivate: expectBool(isPrivate) }),
-      keyData: bytesOfLen(map.getOrThrow(3), KEY_DATA_LEN),
+      ...(isPrivate === undefined ? {} : { isPrivate: priv }),
+      keyData,
       ...(chainCode === undefined ? {} : { chainCode: bytesOfLen(chainCode, CHAIN_CODE_LEN) }),
       ...(useInfo === undefined ? {} : { useInfo: fromTagged(useInfo, coinInfoCodec) }),
       ...(origin === undefined ? {} : { origin: fromTagged(origin, keypathCodec) }),
