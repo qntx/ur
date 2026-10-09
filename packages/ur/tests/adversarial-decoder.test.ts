@@ -2,8 +2,8 @@ import { expect, test } from "vite-plus/test";
 
 import { UrError } from "../src/error.ts";
 import { FountainDecoder, FountainEncoder, Part } from "../src/fountain/index.ts";
-import { makeMessage } from "../src/rng/index.ts";
 import { Decoder, Encoder, UrType, encode } from "../src/ur/index.ts";
+import { makeMessage } from "./message.ts";
 
 function codeOf(fn: () => void): string {
   try {

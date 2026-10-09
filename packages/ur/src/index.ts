@@ -12,7 +12,7 @@
  */
 
 export { UrError, failPoison, type DecoderPoison, type UrErrorCode } from "./error.ts";
-export { checksum as crc32 } from "./crc32.ts";
+export { checksum as crc32 } from "./consensus/crc32.ts";
 
 export * as bytewords from "./bytewords/index.ts";
 export {

@@ -1,5 +1,5 @@
+import { checksum } from "../consensus/crc32.ts";
 import { MINIMALS, WORDS } from "../constants.ts";
-import { checksum } from "../crc32.ts";
 import { fail } from "../error.ts";
 
 /** Bytewords encoding styles (BCR-2020-012). */

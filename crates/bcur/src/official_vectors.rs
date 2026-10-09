@@ -1,6 +1,6 @@
 //! Official compliance vectors (BCR-2024-001, `URKit`, bc-ur), read from the
 //! repository-root `vectors/` tree. These cover crate-private consensus internals
-//! (`crc32`, `Xoshiro256`, `Weighted`, `shuffled`, `choose_fragments`, `partition`,
+//! (`crc32`, `Xoshiro256`, `Sampler`, `shuffled`, `choose_fragments`, `partition`,
 //! `fragment_length`), plus public-API cases that need the crate-internal message
 //! generator. `crates/bcur/tests/official/` covers the rest of the public API.
 
@@ -16,13 +16,13 @@
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use core::num::NonZeroU32;
 
 use serde_json::Value;
 
-use crate::crc32;
-use crate::fountain::{choose_fragments, fragment_length, partition};
-use crate::rng::test_utils::make_message;
-use crate::rng::{Weighted, Xoshiro256};
+use crate::consensus::xoshiro::test_utils::make_message;
+use crate::consensus::{Sampler, Xoshiro256, choose_fragments, crc32};
+use crate::fountain::{fragment_length, partition};
 
 // vectors/ sits at the repository root — same include scheme as crates/bcur/tests.
 macro_rules! vector {
@@ -209,7 +209,7 @@ fn official_sampler() {
                     .iter()
                     .map(|x| x.as_f64().unwrap())
                     .collect();
-                let sampler = Weighted::new(probs);
+                let sampler = Sampler::new(probs);
                 let mut rng = Xoshiro256::from(case["rngSeed"].as_str().unwrap());
                 let samples: Vec<u64> = (0..count)
                     .map(|_| u64::from(sampler.next(&mut rng)))
@@ -230,14 +230,12 @@ fn official_shuffle() {
         let mut rng = Xoshiro256::from(case["rngSeed"].as_str().unwrap());
         if case["kind"].as_str().unwrap() == "continued" {
             let rounds: Vec<Vec<u64>> = (0..case["rounds"].as_u64().unwrap())
-                .map(|_| rng.shuffled(values.clone()))
+                .map(|_| rng.shuffled(values.clone(), values.len()))
                 .collect();
             assert_eq!(rounds, rows(&case["expected"]), "{}", case["name"]);
         } else {
             let count = case["count"].as_u64().unwrap() as usize;
-            // A prefix of the full remove-shuffle equals the reference partial shuffle.
-            let mut shuffled = rng.shuffled(values.clone());
-            shuffled.truncate(count);
+            let shuffled = rng.shuffled(values.clone(), count);
             assert_eq!(shuffled, u64s(&case["expected"]), "{}", case["name"]);
         }
     }
@@ -258,10 +256,14 @@ fn official_chooser() {
             .unwrap()
             .iter()
             .map(|seq| {
-                let mut idx =
-                    choose_fragments(seq.as_u64().unwrap() as usize, fragment_count, checksum);
-                idx.sort_unstable();
-                idx.iter().map(|x| *x as u64).collect()
+                choose_fragments(
+                    NonZeroU32::new(seq.as_u64().unwrap() as u32).unwrap(),
+                    NonZeroU32::new(fragment_count as u32).unwrap(),
+                    checksum,
+                )
+                .iter()
+                .map(|x| *x as u64)
+                .collect()
             })
             .collect();
         assert_eq!(indexes, rows(&case["indexes"]));

@@ -1,6 +1,6 @@
-import { checksum } from "../crc32.ts";
+import { FragmentChooser } from "../consensus/chooser.ts";
+import { checksum } from "../consensus/crc32.ts";
 import { fail } from "../error.ts";
-import { FragmentChooser, fragmentLength, partition } from "./choose.ts";
 import { Part } from "./part.ts";
 
 function xorInto(target: Uint8Array, src: Uint8Array): void {
@@ -14,6 +14,28 @@ function xorInto(target: Uint8Array, src: Uint8Array): void {
     }
     target[i] = a ^ b;
   }
+}
+
+function divCeil(a: number, b: number): number {
+  return Math.trunc((a + b - 1) / b);
+}
+
+/** Optimal equal fragment length under a max cap. */
+export function fragmentLength(dataLength: number, maxFragmentLength: number): number {
+  const fragmentCount = divCeil(dataLength, maxFragmentLength);
+  return divCeil(dataLength, fragmentCount);
+}
+
+/** Pad and split message into equal fragments. */
+export function partition(data: Uint8Array, fragLen: number): Uint8Array[] {
+  const pad = (fragLen - (data.length % fragLen)) % fragLen;
+  const padded = new Uint8Array(data.length + pad);
+  padded.set(data);
+  const out: Uint8Array[] = [];
+  for (let i = 0; i < padded.length; i += fragLen) {
+    out.push(padded.subarray(i, i + fragLen));
+  }
+  return out;
 }
 
 /** Next 1-based fountain seqNum. Does not wrap. */

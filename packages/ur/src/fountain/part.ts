@@ -1,4 +1,4 @@
-import { chooseFragments } from "./choose.ts";
+import { FragmentChooser } from "../consensus/chooser.ts";
 import { DEFAULT_LIMITS } from "./limits.ts";
 import { decodePart, encodePart } from "./part-cbor.ts";
 
@@ -9,6 +9,8 @@ export class Part {
   readonly messageLength: number;
   readonly checksum: number;
   readonly data: Uint8Array;
+
+  #chooser: FragmentChooser | undefined;
 
   private constructor(
     sequence: number,
@@ -35,7 +37,8 @@ export class Part {
   }
 
   indexes(): number[] {
-    return chooseFragments(this.sequence, this.sequenceCount, this.checksum);
+    this.#chooser ??= new FragmentChooser(this.sequenceCount, this.checksum);
+    return this.#chooser.choose(this.sequence);
   }
 
   isSimple(): boolean {

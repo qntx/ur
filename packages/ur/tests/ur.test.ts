@@ -1,7 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
 import { UrError } from "../src/error.ts";
-import { makeMessage } from "../src/rng/index.ts";
 import {
   Decoder,
   Encoder,
@@ -12,6 +11,7 @@ import {
   parse,
   toQrString,
 } from "../src/ur/index.ts";
+import { makeMessage } from "./message.ts";
 
 function errorOf(fn: () => void): UrError {
   try {

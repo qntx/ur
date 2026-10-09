@@ -1,27 +1,5 @@
-import { Weighted } from "../rng/sampler.ts";
-import { Xoshiro256 } from "../rng/xoshiro.ts";
-
-function divCeil(a: number, b: number): number {
-  return Math.trunc((a + b - 1) / b);
-}
-
-/** Optimal equal fragment length under a max cap. */
-export function fragmentLength(dataLength: number, maxFragmentLength: number): number {
-  const fragmentCount = divCeil(dataLength, maxFragmentLength);
-  return divCeil(dataLength, fragmentCount);
-}
-
-/** Pad and split message into equal fragments. */
-export function partition(data: Uint8Array, fragLen: number): Uint8Array[] {
-  const pad = (fragLen - (data.length % fragLen)) % fragLen;
-  const padded = new Uint8Array(data.length + pad);
-  padded.set(data);
-  const out: Uint8Array[] = [];
-  for (let i = 0; i < padded.length; i += fragLen) {
-    out.push(padded.subarray(i, i + fragLen));
-  }
-  return out;
-}
+import { Sampler } from "./sampler.ts";
+import { Xoshiro256 } from "./xoshiro.ts";
 
 /**
  * Per-stream index generator (BCR-2024-001 §4 FragmentChooser): harmonic degree sampler built once,
@@ -30,7 +8,7 @@ export function partition(data: Uint8Array, fragLen: number): Uint8Array[] {
 export class FragmentChooser {
   readonly fragmentCount: number;
   readonly checksum: number;
-  readonly #degrees: Weighted;
+  readonly #degrees: Sampler;
 
   constructor(fragmentCount: number, checksum: number) {
     this.fragmentCount = fragmentCount;
@@ -39,7 +17,7 @@ export class FragmentChooser {
     for (let x = 1; x <= fragmentCount; x++) {
       weights.push(1 / x);
     }
-    this.#degrees = Weighted.new(weights);
+    this.#degrees = Sampler.new(weights);
   }
 
   /**
@@ -64,16 +42,4 @@ export class FragmentChooser {
     const indexes = Array.from({ length: this.fragmentCount }, (_, i) => i);
     return xoshiro.shuffled(indexes, degree).sort((a, b) => a - b);
   }
-}
-
-/** Fragment indexes mixed into sequence `sequence` (1-based), sorted ascending. */
-export function chooseFragments(
-  sequence: number,
-  fragmentCount: number,
-  checksum: number,
-): number[] {
-  if (sequence <= fragmentCount) {
-    return [sequence - 1];
-  }
-  return new FragmentChooser(fragmentCount, checksum).choose(sequence);
 }

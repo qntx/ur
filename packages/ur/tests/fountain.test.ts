@@ -1,17 +1,17 @@
 import { expect, test } from "vite-plus/test";
 
-import { checksum } from "../src/crc32.ts";
+import { FragmentChooser } from "../src/consensus/chooser.ts";
+import { checksum } from "../src/consensus/crc32.ts";
 import { UrError } from "../src/error.ts";
 import {
   FountainDecoder,
   FountainEncoder,
   Part,
-  chooseFragments,
   fragmentLength,
   nextSequence,
   partition,
 } from "../src/fountain/index.ts";
-import { makeMessage } from "../src/rng/index.ts";
+import { makeMessage } from "./message.ts";
 import { vectorJson, vectorLines } from "./vectors.ts";
 
 const PART_CBOR = vectorJson<{
@@ -130,7 +130,7 @@ test("choose_fragments", () => {
   );
   expect(expected).toHaveLength(30);
   for (let i = 0; i < expected.length; i++) {
-    const indexes = chooseFragments(i + 1, fragments.length, cs).toSorted((a, b) => a - b);
+    const indexes = new FragmentChooser(fragments.length, cs).choose(i + 1);
     expect(indexes).toStrictEqual(expected[i]);
   }
 });

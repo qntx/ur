@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "capability": "consensus.xoshiro",
+  "source": {
+    "kind": "generated",
+    "name": "scripts/vectors/generate-next-double.ts",
+    "crossCheck": "python float()"
+  },
+  "cases": [
+    {
+      "name": "0",
+      "rawHex": "0000000000000000",
+      "nextDoubleBitsHex": "0000000000000000",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 1
+    },
+    {
+      "name": "1",
+      "rawHex": "0000000000000001",
+      "nextDoubleBitsHex": "3bf0000000000000",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 1
+    },
+    {
+      "name": "2^11 - 1",
+      "rawHex": "00000000000007ff",
+      "nextDoubleBitsHex": "3c9ffc0000000000",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 1
+    },
+    {
+      "name": "2^11",
+      "rawHex": "0000000000000800",
+      "nextDoubleBitsHex": "3ca0000000000000",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 1
+    },
+    {
+      "name": "2^63 + 2^10 - 1 (low 11 bits round down)",
+      "rawHex": "80000000000003ff",
+      "nextDoubleBitsHex": "3fe0000000000000",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 6
+    },
+    {
+      "name": "2^63 + 2^10 + 1 (low 11 bits round up)",
+      "rawHex": "8000000000000401",
+      "nextDoubleBitsHex": "3fe0000000000001",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 6
+    },
+    {
+      "name": "2^63 + 2^10 (tie, kept bit even -> down)",
+      "rawHex": "8000000000000400",
+      "nextDoubleBitsHex": "3fe0000000000000",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 6
+    },
+    {
+      "name": "2^63 + 3 * 2^10 (tie, kept bit odd -> up)",
+      "rawHex": "8000000000000c00",
+      "nextDoubleBitsHex": "3fe0000000000002",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 6
+    },
+    {
+      "name": "2^53",
+      "rawHex": "0020000000000000",
+      "nextDoubleBitsHex": "3f40000000000000",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 1
+    },
+    {
+      "name": "2^53 + 1 (unrepresentable, ties to even)",
+      "rawHex": "0020000000000001",
+      "nextDoubleBitsHex": "3f40000000000000",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 1
+    },
+    {
+      "name": "2^63",
+      "rawHex": "8000000000000000",
+      "nextDoubleBitsHex": "3fe0000000000000",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 6
+    },
+    {
+      "name": "2^64 - 2^11",
+      "rawHex": "fffffffffffff800",
+      "nextDoubleBitsHex": "3fefffffffffffff",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 10
+    },
+    {
+      "name": "2^64 - 2^10 (rounds to 1.0, nextInt clamps)",
+      "rawHex": "fffffffffffffc00",
+      "nextDoubleBitsHex": "3ff0000000000000",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 10
+    },
+    {
+      "name": "2^64 - 1",
+      "rawHex": "ffffffffffffffff",
+      "nextDoubleBitsHex": "3ff0000000000000",
+      "nextIntRange": [
+        1,
+        10
+      ],
+      "nextInt": 10
+    }
+  ]
+}

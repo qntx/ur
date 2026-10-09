@@ -14,7 +14,7 @@ use super::Xoshiro256;
 
 /// Weighted discrete sampler over `0..weights.len()`.
 #[derive(Debug)]
-pub(crate) struct Weighted {
+pub(crate) struct Sampler {
     aliases: Vec<u32>,
     probs: Vec<f64>,
 }
@@ -25,7 +25,7 @@ pub(crate) struct Weighted {
     clippy::cast_sign_loss,
     reason = "alias method uses f64 probabilities; table sizes match ur-rs exactly"
 )]
-impl Weighted {
+impl Sampler {
     /// Builds a sampler from non-negative weights that sum to a positive value.
     ///
     /// # Panics
@@ -78,10 +78,11 @@ impl Weighted {
     }
 
     pub(crate) fn next(&self, xoshiro: &mut Xoshiro256) -> u32 {
-        let r1 = xoshiro.next_double();
-        let r2 = xoshiro.next_double();
         let n = self.probs.len();
-        let i = (n as f64 * r1) as usize;
+        // `next_int` covers the `r1 == 1.0` edge by clamping to `n - 1` (same
+        // documented deviation), so `i` is always a valid table index.
+        let i = xoshiro.next_index(n);
+        let r2 = xoshiro.next_double();
         if r2 < self.probs[i] {
             i as u32
         } else {
@@ -93,13 +94,12 @@ impl Weighted {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rng::Xoshiro256;
 
     #[test]
     fn test_sampler() {
         let weights = vec![1.0, 2.0, 4.0, 8.0];
         let mut xoshiro = Xoshiro256::from("Wolf");
-        let sampler = Weighted::new(weights);
+        let sampler = Sampler::new(weights);
         let expected = [
             3, 3, 3, 3, 3, 3, 3, 0, 2, 3, 3, 3, 3, 1, 2, 2, 1, 3, 3, 2, 3, 3, 1, 1, 2, 1, 1, 3, 1,
             3,

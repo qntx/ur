@@ -10,8 +10,8 @@ import { expect, test } from "vite-plus/test";
 
 import * as bytewords from "../src/bytewords/index.ts";
 import { FountainEncoder } from "../src/fountain/index.ts";
-import { makeMessage } from "../src/rng/index.ts";
 import { Decoder, Encoder, UrType, decode, encode, parse, toQrString } from "../src/ur/index.ts";
+import { makeMessage } from "./message.ts";
 import { vectorJson, vectorLines } from "./vectors.ts";
 
 /** CBOR bstr header + payload (ur-rs ByteVec). */
