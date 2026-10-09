@@ -107,8 +107,7 @@ function parseUint(name: string, raw: string): number {
   return Number(raw);
 }
 
-// --- case specification ---------------------------------------------------
-
+// case specification
 export type CaseOptions = {
   maxFragmentLength: number;
   minFragmentLength?: number;
@@ -168,8 +167,7 @@ export function messageBytes(rng: Rng, length: number): Uint8Array {
   return bytes;
 }
 
-// --- encoder stream -------------------------------------------------------
-
+// encoder stream
 function encoderOptions(options: CaseOptions): {
   minFragmentLength?: number;
   firstSequence: number;
@@ -205,8 +203,7 @@ export function encodeAll(spec: CaseSpec, message: Uint8Array): string[] {
   return encoded;
 }
 
-// --- receiver frame mutation ----------------------------------------------
-
+// receiver frame mutation
 export type MutatedFrame = {
   text: string;
   /** Index into the encoded stream; -1 for injected foreign frames. */
@@ -306,8 +303,7 @@ export function shuffleWindows(frames: MutatedFrame[], rng: Rng): MutatedFrame[]
   return out;
 }
 
-// --- decoder replay --------------------------------------------------------
-
+// decoder replay
 export type FrameError = {
   code: string;
   limit?: string;
@@ -369,8 +365,7 @@ export function decodeFrames(frames: ReadonlyArray<string>): DecodedRun {
   };
 }
 
-// --- top level --------------------------------------------------------------
-
+// top level
 export type DifferentialCase = {
   options: CaseOptions;
   urType: string;

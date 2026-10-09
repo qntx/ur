@@ -17,8 +17,7 @@ use bcur::fountain::{self, DecoderLimits, EncoderOptions};
 use bcur::ur::{self, Decoded, ParsedUr};
 use bcur::{Error, ErrorKind, Limit, Part, Progress, Received, State, UrType, ur_type};
 
-// ---- L1 -----------------------------------------------------------------
-
+// L1
 const _: fn(&[u8], Style) -> String = bytewords::encode;
 const _: fn(&str, Style) -> bcur::Result<Vec<u8>> = bytewords::decode;
 const _: fn(&[u8], Style) -> String = bytewords::checksum;
@@ -32,8 +31,7 @@ const _: Style = Style::Standard;
 const _: Style = Style::Uri;
 const _: Style = Style::Minimal;
 
-// ---- UrType --------------------------------------------------------------
-
+// UrType
 const _: fn(&str) -> bcur::Result<UrType> = UrType::new;
 const _: fn(&'static str) -> Option<UrType> = UrType::new_static;
 const _: fn(&UrType) -> &str = UrType::as_str;
@@ -54,8 +52,7 @@ const UR_TYPE: UrType = ur_type!("seed");
 
 const fn assert_traits<T: Eq + Ord + core::hash::Hash + core::fmt::Display>() {}
 
-// ---- ur::parse / encode / to_qr_string ------------------------------------
-
+// ur::parse / encode / to_qr_string
 const _: fn(&str, &DecoderLimits) -> bcur::Result<ParsedUr> = ur::parse;
 const _: fn(&UrType, &[u8]) -> String = ur::encode;
 const _: fn(&str) -> String = ur::to_qr_string;
@@ -66,8 +63,7 @@ const fn parsed_ur_type(parsed: &ParsedUr) -> &UrType {
     }
 }
 
-// ---- ur::Encoder -----------------------------------------------------------
-
+// ur::Encoder
 const _: fn(UrType, Vec<u8>, EncoderOptions) -> bcur::Result<ur::Encoder> =
     ur_encoder_new::<Vec<u8>>;
 
@@ -88,8 +84,7 @@ const _: fn() = assert_fused::<ur::Encoder>;
 
 const fn assert_fused<T: Iterator + core::iter::FusedIterator>() {}
 
-// ---- ur::Decoder / Decoded --------------------------------------------------
-
+// ur::Decoder / Decoded
 const _: fn(DecoderLimits) -> ur::Decoder = ur::Decoder::new;
 const _: fn() -> ur::Decoder = <ur::Decoder as Default>::default;
 const _: fn(ur::Decoder, [UrType; 1]) -> ur::Decoder = ur_decoder_accept::<[UrType; 1]>;
@@ -110,8 +105,7 @@ const _: fn(&Decoded) -> &UrType = Decoded::ur_type;
 const _: fn(&Decoded) -> &[u8] = Decoded::message;
 const _: fn(Decoded) -> (UrType, Vec<u8>) = Decoded::into_parts;
 
-// ---- fountain (L2, touched by R2 signatures) ---------------------------------
-
+// fountain (L2, touched by R2 signatures)
 const _: fn(Vec<u8>, EncoderOptions) -> bcur::Result<fountain::Encoder> =
     fountain_encoder_new::<Vec<u8>>;
 
@@ -135,16 +129,14 @@ const _: fn(&fountain::Decoder) -> &[u32] = fountain::Decoder::last_indexes;
 const _: fn(fountain::Decoder) -> bcur::Result<Vec<u8>> = fountain::Decoder::into_message;
 const _: fn(&mut fountain::Decoder) = fountain::Decoder::reset;
 
-// ---- crate root re-exports ---------------------------------------------------
-
+// crate root re-exports
 const _: fn(&Error) -> ErrorKind = Error::kind;
 const _: fn(&Error) -> Option<Limit> = Error::limit;
 const _: fn(&Error) -> bool = Error::is_fatal;
 const _: fn(&Progress) -> u32 = Progress::fragment_count;
 const _: fn(&Progress) -> f64 = Progress::ratio;
 
-// ---- typed (L4, feature `dcbor`) --------------------------------------------
-
+// typed (L4, feature `dcbor`)
 #[cfg(feature = "dcbor")]
 mod l4 {
     use std::fmt::Display;

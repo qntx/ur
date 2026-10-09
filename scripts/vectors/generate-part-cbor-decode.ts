@@ -69,8 +69,7 @@ function hex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// --- CBOR writers (any width, including non-shortest) -------------------------------
-
+// CBOR writers (any width, including non-shortest)
 /** Argument bytes for `ai` width 0..4 (0 = value inlined in the head byte). */
 function argBytes(width: number, v: bigint): number[] {
   const hex = v.toString(16).padStart(width * 2, "0");
@@ -140,8 +139,7 @@ function partBytes(
   });
 }
 
-// --- cases -------------------------------------------------------------------------
-
+// cases
 type Case = {
   name: string;
   cborHex: string;
