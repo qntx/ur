@@ -7,7 +7,9 @@ pub(crate) mod crc32;
 pub(crate) mod sampler;
 pub(crate) mod xoshiro;
 
-pub(crate) use chooser::{FragmentChooser, choose_fragments};
+pub(crate) use chooser::FragmentChooser;
+#[cfg(test)]
+pub(crate) use chooser::choose_fragments;
 pub(crate) use sampler::Sampler;
 pub(crate) use xoshiro::Xoshiro256;
 

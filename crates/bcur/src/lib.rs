@@ -26,7 +26,8 @@
 //! **BCR-2020-005** says a UR *message* MUST be dCBOR and that type
 //! `bytes` MUST NOT be used except for testing. That MUST is enforced on
 //! **L4** (`feature = "dcbor"`): [`typed::Ur::from_ur_string`] and
-//! [`typed::MultipartDecoder::message`] reject non-dCBOR ([`Error::Cbor`]).
+//! [`typed::MultipartDecoder::message`] reject non-dCBOR
+//! ([`ErrorKind::CborDecode`]).
 //! L4 also uses the first registered `dcbor` tag **name** as the type
 //! token and strips the tag from the UR body (005 "top-level UR is
 //! untagged").
@@ -44,7 +45,7 @@
 //! use bcur::{Decoder, Encoder, UrType};
 //!
 //! let data = b"Ten chars!".repeat(10);
-//! let mut encoder = Encoder::new(&data, 5, &UrType::new("alpha").unwrap()).unwrap();
+//! let mut encoder = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
 //! let mut decoder = Decoder::default();
 //! while !decoder.complete() {
 //!     decoder.receive(&encoder.next_part().unwrap()).unwrap();
@@ -77,7 +78,7 @@ mod consensus;
 mod constants;
 mod error;
 
-pub use error::{CborError, CborErrorKind, Error, ResourceKind, Result};
+pub use error::{Error, ErrorKind, Limit, Result};
 pub use fountain::DecoderLimits;
 pub use ur::{
     Decoder, Encoder, Kind, ParsedUr, UrType, decode, decode_message, decode_with_type, encode,

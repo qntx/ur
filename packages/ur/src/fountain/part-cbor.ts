@@ -1,54 +1,50 @@
 import { fail } from "../error.ts";
+import { mergeLimits } from "./limits.ts";
+import type { DecoderLimits } from "./limits.ts";
+import type { Part } from "./part.ts";
+import { validatePart } from "./part.ts";
 
-/** Wire-level fountain part fields (decouples CBOR coding from {@link Part}). */
-export type PartFields = {
-  sequence: number;
-  sequenceCount: number;
-  messageLength: number;
-  checksum: number;
-  data: Uint8Array;
-};
+const MAX_U32 = 0xff_ff_ff_ff;
 
-/** Encode a part to deterministic fixed-schema CBOR. */
-export function encodePart(part: PartFields): Uint8Array {
-  const { data } = part;
+/**
+ * Encode a part as fixed-schema deterministic CBOR: `array(5) [sequence, sequenceCount,
+ * messageLength, checksum, data]` with shortest-form integers.
+ */
+export function encodePart(part: Part): Uint8Array {
   const out: number[] = [0x85];
   encodeU32(out, part.sequence);
   encodeU32(out, part.sequenceCount);
   encodeU32(out, part.messageLength);
   encodeU32(out, part.checksum);
-  encodeBstr(out, data);
+  encodeBstr(out, part.data);
   return new Uint8Array(out);
 }
 
-/** Decode a part from CBOR with data-length and fragment-count caps. */
-export function decodePart(
-  bytes: Uint8Array,
-  maxDataLen: number,
-  maxFragmentCount: number,
-): PartFields {
+/**
+ * Decode a part from CBOR. Lenient on integer width (UR-ADR-017): any well-formed definite-length
+ * encoding is accepted; re-encode with {@link encodePart} for the shortest form. `limits` apply
+ * `maxFragmentDataLength` to the bstr and `maxFragmentCount` to `sequenceCount`.
+ */
+export function decodePart(bytes: Uint8Array, limits?: Partial<DecoderLimits>): Part {
+  const merged = mergeLimits(limits);
   const cur = { i: 0 };
-  if (read(bytes, cur) !== 0x85) {
+  if (decodeLen(bytes, cur, 4) !== 5) {
     fail("InvalidPartCbor");
   }
   const sequence = decodeU32(bytes, cur);
   const sequenceCount = decodeU32(bytes, cur);
   const messageLength = decodeU32(bytes, cur);
   const checksum = decodeU32(bytes, cur);
-  const data = decodeBstr(bytes, cur, maxDataLen);
+  const data = decodeBstr(bytes, cur, merged.maxFragmentDataLength);
   if (cur.i !== bytes.length) {
     fail("InvalidPartCbor");
   }
-  if (sequence === 0) {
-    fail("InvalidSequence");
+  const part: Part = { sequence, sequenceCount, messageLength, checksum, data };
+  validatePart(part);
+  if (sequenceCount > merged.maxFragmentCount) {
+    fail({ code: "ResourceLimit", limit: "fragmentCount" });
   }
-  if (sequenceCount === 0 || messageLength === 0 || data.length === 0) {
-    fail("EmptyPart");
-  }
-  if (sequenceCount > maxFragmentCount) {
-    fail("ResourceLimit", { limit: "fragment_count" });
-  }
-  return { sequence, sequenceCount, messageLength, checksum, data };
+  return part;
 }
 
 function encodeU32(out: number[], v: number): void {
@@ -79,80 +75,66 @@ function encodeBstr(out: number[], data: Uint8Array): void {
   }
 }
 
-function decodeU32(bytes: Uint8Array, cur: { i: number }): number {
+/**
+ * Reads a definite-length argument for the given major type in any width (including 8-byte u64).
+ * Values above 2^53 lose low bits — callers only order or bound-check such values; equality is only
+ * demanded of values <= u32::MAX.
+ */
+function decodeLen(bytes: Uint8Array, cur: { i: number }, major: number): number {
   const head = read(bytes, cur);
-  const major = head >> 5;
-  const ai = head & 0x1f;
-  if (major !== 0) {
+  if (head >> 5 !== major) {
     fail("InvalidPartCbor");
   }
+  const ai = head & 0x1f;
   if (ai <= 23) {
     return ai;
   }
   if (ai === 24) {
-    const v = read(bytes, cur);
-    if (v <= 23) {
-      fail("InvalidPartCbor");
-    }
-    return v;
+    return read(bytes, cur);
   }
   if (ai === 25) {
-    const v = (read(bytes, cur) << 8) | read(bytes, cur);
-    if (v <= 0xff) {
-      fail("InvalidPartCbor");
-    }
-    return v;
+    return (read(bytes, cur) << 8) | read(bytes, cur);
   }
   if (ai === 26) {
-    const v =
+    return (
+      ((read(bytes, cur) << 24) |
+        (read(bytes, cur) << 16) |
+        (read(bytes, cur) << 8) |
+        read(bytes, cur)) >>>
+      0
+    );
+  }
+  if (ai === 27) {
+    const hi =
       ((read(bytes, cur) << 24) |
         (read(bytes, cur) << 16) |
         (read(bytes, cur) << 8) |
         read(bytes, cur)) >>>
       0;
-    if (v <= 0xffff) {
-      fail("InvalidPartCbor");
-    }
-    return v;
+    const lo =
+      ((read(bytes, cur) << 24) |
+        (read(bytes, cur) << 16) |
+        (read(bytes, cur) << 8) |
+        read(bytes, cur)) >>>
+      0;
+    return hi * 0x1_00_00_00_00 + lo;
   }
+  // ai 28-30 reserved, ai 31 indefinite length.
   return fail("InvalidPartCbor");
 }
 
+function decodeU32(bytes: Uint8Array, cur: { i: number }): number {
+  const v = decodeLen(bytes, cur, 0);
+  if (v > MAX_U32) {
+    fail("InvalidPartCbor");
+  }
+  return v;
+}
+
 function decodeBstr(bytes: Uint8Array, cur: { i: number }, maxDataLen: number): Uint8Array {
-  const head = read(bytes, cur);
-  const major = head >> 5;
-  const ai = head & 0x1f;
-  if (major !== 2) {
-    fail("InvalidPartCbor");
-  }
-  let len: number;
-  if (ai <= 23) {
-    len = ai;
-  } else if (ai === 24) {
-    len = read(bytes, cur);
-    if (len <= 23) {
-      fail("InvalidPartCbor");
-    }
-  } else if (ai === 25) {
-    len = (read(bytes, cur) << 8) | read(bytes, cur);
-    if (len <= 0xff) {
-      fail("InvalidPartCbor");
-    }
-  } else if (ai === 26) {
-    len =
-      ((read(bytes, cur) << 24) |
-        (read(bytes, cur) << 16) |
-        (read(bytes, cur) << 8) |
-        read(bytes, cur)) >>>
-      0;
-    if (len <= 0xffff) {
-      fail("InvalidPartCbor");
-    }
-  } else {
-    fail("InvalidPartCbor");
-  }
+  const len = decodeLen(bytes, cur, 2);
   if (len > maxDataLen) {
-    fail("ResourceLimit", { limit: "fragment_data" });
+    fail({ code: "ResourceLimit", limit: "fragmentLength" });
   }
   if (cur.i + len > bytes.length) {
     fail("InvalidPartCbor");

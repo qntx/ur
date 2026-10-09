@@ -57,7 +57,7 @@ fn fountain_encode_decode_roundtrip() {
             "--type",
             "bytes",
             "--max-chars",
-            "80",
+            "100",
             "--count",
             "80",
         ])
@@ -155,7 +155,7 @@ fn qr_animate_without_tty_fails() {
             "--type",
             "bytes",
             "--max-chars",
-            "80",
+            "100",
         ])
         .write_stdin(payload)
         .assert()

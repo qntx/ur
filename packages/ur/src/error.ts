@@ -1,105 +1,114 @@
-/** Discriminated error codes for the UR transport stack. */
+import type { UrType } from "./ur/type.ts";
+
+/** Discriminated error codes for the UR transport stack. Mirrors `bcur::ErrorKind`. */
 export type UrErrorCode =
-  | "InvalidWord"
-  | "InvalidBytewordsChecksum"
-  | "InvalidBytewordsLength"
   | "NonAscii"
-  | "EmptyMessage"
-  | "EmptyPart"
-  | "InvalidFragmentLen"
-  | "InvalidSequence"
-  | "InconsistentPart"
-  | "InvalidPadding"
-  | "InvalidMessageChecksum"
-  | "InvalidPartCbor"
-  | "DecoderState"
-  | "SinglePartExhausted"
-  | "ResourceLimit"
+  | "InvalidWord"
+  | "InvalidBytewordsLength"
+  | "InvalidBytewordsChecksum"
   | "InvalidScheme"
   | "TypeUnspecified"
   | "InvalidType"
   | "InvalidIndices"
-  | "NotSinglePart"
   | "UnexpectedType"
+  | "InvalidPartCbor"
+  | "InvalidPart"
+  | "InconsistentPart"
+  | "ResourceLimit"
+  | "InvalidPadding"
+  | "InvalidMessageChecksum"
+  | "EmptyMessage"
+  | "InvalidFragmentLength"
+  | "MessageTooLong"
+  | "NotSinglePart"
   | "CborDecode"
-  | "CborType";
+  | "CborType"
+  | "Internal";
+
+/**
+ * Decoder budget names carried by `ResourceLimit` errors. Mirrors `bcur::Limit`. `receivedParts`
+ * and `bufferParts` are transitional and leave with the decoder redesign.
+ */
+export type UrLimit =
+  | "messageLength"
+  | "fragmentCount"
+  | "fragmentLength"
+  | "uriLength"
+  | "receivedParts"
+  | "bufferParts";
+
+/** Per-code error detail; `switch (info.code)` narrows the payload. */
+export type UrErrorInfo =
+  | Readonly<{ code: "ResourceLimit"; limit: UrLimit }>
+  | Readonly<{ code: "UnexpectedType"; expected: ReadonlyArray<UrType>; found: UrType }>
+  | Readonly<{ code: Exclude<UrErrorCode, "ResourceLimit" | "UnexpectedType"> }>;
 
 const MESSAGES: Record<UrErrorCode, string> = {
-  InvalidWord: "invalid bytewords word",
-  InvalidBytewordsChecksum: "invalid bytewords checksum",
-  InvalidBytewordsLength: "invalid bytewords length",
   NonAscii: "bytewords string is not ASCII",
-  EmptyMessage: "empty message",
-  EmptyPart: "empty fountain part",
-  InvalidFragmentLen: "invalid maximum fragment length",
-  InvalidSequence: "invalid sequence number",
-  InconsistentPart: "fountain part inconsistent with previous parts",
-  InvalidPadding: "invalid fountain part padding",
-  InvalidMessageChecksum: "invalid fountain message checksum",
-  InvalidPartCbor: "invalid fountain part CBOR",
-  DecoderState: "fountain decoder internal state error",
-  SinglePartExhausted: "single-part fountain encoder exhausted",
-  ResourceLimit: "resource limit exceeded",
+  InvalidWord: "invalid bytewords word",
+  InvalidBytewordsLength: "invalid bytewords length",
+  InvalidBytewordsChecksum: "invalid bytewords checksum",
   InvalidScheme: "invalid UR scheme",
   TypeUnspecified: "UR type unspecified",
   InvalidType: "invalid UR type",
   InvalidIndices: "invalid multi-part indices",
-  NotSinglePart: "expected single-part UR",
   UnexpectedType: "unexpected UR type",
+  InvalidPartCbor: "invalid fountain part CBOR",
+  InvalidPart: "invalid fountain part",
+  InconsistentPart: "fountain part inconsistent with previous parts",
+  ResourceLimit: "resource limit exceeded",
+  InvalidPadding: "invalid fountain part padding",
+  InvalidMessageChecksum: "invalid fountain message checksum",
+  EmptyMessage: "empty message",
+  InvalidFragmentLength: "invalid fragment length",
+  MessageTooLong: "message too long",
+  NotSinglePart: "expected single-part UR",
   CborDecode: "dCBOR decode failed",
   CborType: "dCBOR type mismatch",
+  Internal: "internal error",
 };
+
+const FATAL_CODES: ReadonlySet<UrErrorCode> = new Set([
+  "ResourceLimit",
+  "InvalidPadding",
+  "InvalidMessageChecksum",
+  "Internal",
+]);
+
+function describe(info: UrErrorInfo): string {
+  if (info.code === "ResourceLimit") {
+    return `${MESSAGES.ResourceLimit}: ${info.limit}`;
+  }
+  if (info.code === "UnexpectedType") {
+    const names = info.expected.map((t) => t.value).join(", ");
+    return `${MESSAGES.UnexpectedType}: expected ${names}, found ${info.found.value}`;
+  }
+  return MESSAGES[info.code];
+}
 
 /** Structured error thrown by the UR stack. */
 export class UrError extends Error {
-  readonly code: UrErrorCode;
-  readonly expected?: string | undefined;
-  readonly found?: string | undefined;
-  readonly limit?: string | undefined;
+  readonly info: UrErrorInfo;
 
-  constructor(
-    code: UrErrorCode,
-    options?: { expected?: string; found?: string; limit?: string; cause?: unknown },
-  ) {
-    const expected = options?.expected;
-    const found = options?.found;
-    const limit = options?.limit;
-    let message = MESSAGES[code];
-    if (code === "ResourceLimit" && limit !== undefined && limit !== "") {
-      message = `${message}: ${limit}`;
-    } else if (
-      code === "UnexpectedType" &&
-      expected !== undefined &&
-      expected !== "" &&
-      found !== undefined &&
-      found !== ""
-    ) {
-      message = `${message}: expected ${expected}, found ${found}`;
-    }
-    super(message, options?.cause === undefined ? undefined : { cause: options.cause });
+  constructor(info: UrErrorInfo, options?: { cause?: unknown }) {
+    super(describe(info), options?.cause === undefined ? undefined : { cause: options.cause });
     this.name = "UrError";
-    this.code = code;
-    this.expected = expected;
-    this.found = found;
-    this.limit = limit;
+    this.info = info;
+  }
+
+  get code(): UrErrorCode {
+    return this.info.code;
+  }
+
+  get fatal(): boolean {
+    return FATAL_CODES.has(this.info.code);
   }
 }
 
-/** Throws a {@link UrError} with the given code. */
-export function fail(
-  code: UrErrorCode,
-  options?: { expected?: string; found?: string; limit?: string; cause?: unknown },
-): never {
-  throw new UrError(code, options);
-}
+/** Codes whose info carries no detail beyond `code`. */
+type PlainCode = Exclude<UrErrorCode, "ResourceLimit" | "UnexpectedType">;
 
-/** Fail-closed decoder poison reason. */
-export type DecoderPoison = { code: "ResourceLimit"; limit: string } | { code: "DecoderState" };
-
-/** Rethrows the stored poison as a {@link UrError}. */
-export function failPoison(p: DecoderPoison): never {
-  if (p.code === "ResourceLimit") {
-    fail("ResourceLimit", { limit: p.limit });
-  }
-  fail("DecoderState");
+/** Throws a {@link UrError}; a bare code builds `{ code }` info. */
+export function fail(arg: PlainCode | UrErrorInfo, options?: { cause?: unknown }): never {
+  throw new UrError(typeof arg === "string" ? { code: arg } : arg, options);
 }

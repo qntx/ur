@@ -5,8 +5,9 @@ use std::fmt;
 use dcbor::CBOR;
 
 use super::map_cbor;
+use crate::error::ErrorKind;
 use crate::ur::{IntoUrType, Kind};
-use crate::{CborErrorKind, Error, Result, UrType};
+use crate::{Error, Result, UrType};
 
 /// A Uniform Resource whose payload is deterministic CBOR.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,7 +21,7 @@ impl Ur {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidType`] if `ur_type` is empty or not
+    /// Returns [`ErrorKind::InvalidType`] if `ur_type` is empty or not
     /// `[a-z0-9-]+` after ASCII lowercasing.
     pub fn new(ur_type: impl IntoUrType, cbor: impl Into<CBOR>) -> Result<Self> {
         Ok(Self {
@@ -35,16 +36,17 @@ impl Ur {
     ///
     /// # Errors
     ///
-    /// Transport parse/decode errors, [`Error::NotSinglePart`] for multi-part
-    /// URIs, or [`Error::Cbor`] if the payload is not dCBOR.
+    /// Transport parse/decode errors, [`ErrorKind::NotSinglePart`] for
+    /// multi-part URIs, or [`ErrorKind::CborDecode`] if the payload is not
+    /// dCBOR.
     pub fn from_ur_string(s: impl AsRef<str>) -> Result<Self> {
         let (ur_type, kind, data) = crate::decode_with_type(s.as_ref())?;
         if kind != Kind::SinglePart {
-            return Err(Error::NotSinglePart);
+            return Err(Error::new(ErrorKind::NotSinglePart));
         }
         Ok(Self {
             ur_type,
-            cbor: map_cbor(CBOR::try_from_data(data), CborErrorKind::Decode)?,
+            cbor: map_cbor(CBOR::try_from_data(data), ErrorKind::CborDecode)?,
         })
     }
 
@@ -72,17 +74,17 @@ impl Ur {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidType`] if `expected` is not a valid type token;
-    /// [`Error::UnexpectedType`] on mismatch.
+    /// [`ErrorKind::InvalidType`] if `expected` is not a valid type token;
+    /// [`ErrorKind::UnexpectedType`] on mismatch.
     pub fn check_type(&self, expected: impl IntoUrType) -> Result<()> {
         let expected = expected.into_ur_type()?;
         if self.ur_type == expected {
             Ok(())
         } else {
-            Err(Error::UnexpectedType {
-                expected: String::from(expected.as_str()),
-                found: String::from(self.ur_type.as_str()),
-            })
+            Err(Error::unexpected_type(
+                alloc::vec![expected],
+                self.ur_type.clone(),
+            ))
         }
     }
 
@@ -163,10 +165,13 @@ mod tests {
 
     #[test]
     fn rejects_empty_and_illegal_types() {
-        assert_eq!(Ur::new("", vec![1]).unwrap_err(), Error::InvalidType);
         assert_eq!(
-            Ur::new("Bad_Type", vec![1]).unwrap_err(),
-            Error::InvalidType
+            Ur::new("", vec![1]).unwrap_err().kind(),
+            ErrorKind::InvalidType
+        );
+        assert_eq!(
+            Ur::new("Bad_Type", vec![1]).unwrap_err().kind(),
+            ErrorKind::InvalidType
         );
     }
 
@@ -175,13 +180,16 @@ mod tests {
         let ur = Ur::new("test", (0_u8..64).collect::<Vec<_>>()).unwrap();
         let mut encoder = crate::Encoder::new(&ur.cbor().to_cbor_data(), 12, ur.ur_type()).unwrap();
         let part = encoder.next_part().unwrap();
-        assert_eq!(Ur::from_ur_string(&part).unwrap_err(), Error::NotSinglePart);
+        assert_eq!(
+            Ur::from_ur_string(&part).unwrap_err().kind(),
+            ErrorKind::NotSinglePart
+        );
 
         let body = bytewords::encode(&[0xff, 0xff], Style::Minimal);
         let uri = format!("ur:test/{body}");
         assert!(matches!(
             Ur::from_ur_string(uri).unwrap_err(),
-            Error::Cbor(ref e) if e.kind() == CborErrorKind::Decode
+            ref e if e.kind() == ErrorKind::CborDecode
         ));
     }
 
@@ -194,7 +202,7 @@ mod tests {
         ur.check_type(ur.ur_type().clone()).unwrap();
         assert!(matches!(
             ur.check_type("bytes").unwrap_err(),
-            Error::UnexpectedType { .. }
+            ref e if e.kind() == ErrorKind::UnexpectedType
         ));
         let cbor: CBOR = ur.clone().into();
         assert_eq!(cbor, *ur.cbor());

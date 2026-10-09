@@ -6,11 +6,12 @@ import { UrError } from "../src/error.ts";
 import {
   FountainDecoder,
   FountainEncoder,
-  Part,
+  decodePart,
+  encodePart,
   fragmentLength,
-  nextSequence,
   partition,
 } from "../src/fountain/index.ts";
+import type { Part } from "../src/fountain/index.ts";
 import { makeMessage } from "./message.ts";
 import { vectorJson, vectorLines } from "./vectors.ts";
 
@@ -39,26 +40,37 @@ function errorOf(fn: () => void): UrError {
   throw new Error("expected UrError");
 }
 
+function nextPart(encoder: FountainEncoder): Part {
+  const { done, value } = encoder.next();
+  if (done !== false || value === undefined) {
+    throw new Error("encoder exhausted");
+  }
+  return value;
+}
+
 test("fragment_length", () => {
   expect(fragmentLength(12345, 1955)).toBe(1764);
-  expect(fragmentLength(10, 4)).toBe(4);
-  expect(fragmentLength(10, 6)).toBe(5);
+  // Default min binds: len 10 < 2*10 forces a single fragment.
+  expect(fragmentLength(10, 4)).toBe(10);
+  expect(fragmentLength(10, 6)).toBe(10);
+  expect(fragmentLength(10, 4, 1)).toBe(4);
+  expect(fragmentLength(10, 6, 1)).toBe(5);
 });
 
 test("fountain roundtrip", () => {
   const message = makeMessage("Wolf", 256);
-  const encoder = FountainEncoder.create(message, 30);
+  const encoder = new FountainEncoder(message, { maxFragmentLength: 30 });
   const decoder = new FountainDecoder();
   while (!decoder.complete) {
-    decoder.receive(encoder.nextPart());
+    decoder.receive(nextPart(encoder));
   }
   expect(decoder.message()).toStrictEqual(message);
 });
 
 test("fountain encoder first part", () => {
   const message = makeMessage("Wolf", 256);
-  const encoder = FountainEncoder.create(message, 30);
-  const part = encoder.nextPart();
+  const encoder = new FountainEncoder(message, { maxFragmentLength: 30 });
+  const part = nextPart(encoder);
   expect(hex(part.data)).toBe(PART_CBOR.dataHex);
   expect(part.sequence).toBe(PART_CBOR.sequence);
   expect(part.sequenceCount).toBe(PART_CBOR.sequenceCount);
@@ -68,10 +80,10 @@ test("fountain encoder first part", () => {
 
 test("cbor golden", () => {
   const message = makeMessage("Wolf", 256);
-  const encoder = FountainEncoder.create(message, 30);
-  const part = encoder.nextPart();
-  expect(hex(part.toCbor())).toBe(PART_CBOR.cborHex);
-  const decoded = Part.fromCbor(part.toCbor());
+  const encoder = new FountainEncoder(message, { maxFragmentLength: 30 });
+  const part = nextPart(encoder);
+  expect(hex(encodePart(part))).toBe(PART_CBOR.cborHex);
+  const decoded = decodePart(encodePart(part));
   expect(decoded.sequence).toBe(part.sequence);
   expect(decoded.sequenceCount).toBe(part.sequenceCount);
   expect(decoded.messageLength).toBe(part.messageLength);
@@ -80,37 +92,61 @@ test("cbor golden", () => {
 });
 
 test("empty encoder", () => {
-  expect(() => FountainEncoder.create(new Uint8Array(), 1)).toThrow(UrError);
+  const err = errorOf(() => new FountainEncoder(new Uint8Array(), { maxFragmentLength: 1 }));
+  expect(err.code).toBe("EmptyMessage");
 });
 
 test("invalid maxFragmentLength", () => {
   const message = makeMessage("Wolf", 100);
   const cases = [Number.NaN, -1, 0, 0.5, 1.5, Number.POSITIVE_INFINITY];
   for (const len of cases) {
-    expect(errorOf(() => FountainEncoder.create(message, len)).code).toBe("InvalidFragmentLen");
+    expect(errorOf(() => new FountainEncoder(message, { maxFragmentLength: len })).code).toBe(
+      "InvalidFragmentLength",
+    );
+  }
+});
+
+test("invalid minFragmentLength", () => {
+  const message = makeMessage("Wolf", 100);
+  expect(
+    errorOf(() => new FountainEncoder(message, { maxFragmentLength: 10, minFragmentLength: 0 }))
+      .code,
+  ).toBe("InvalidFragmentLength");
+  expect(
+    errorOf(() => new FountainEncoder(message, { maxFragmentLength: 10, minFragmentLength: 11 }))
+      .code,
+  ).toBe("InvalidFragmentLength");
+});
+
+test("invalid firstSequence is RangeError", () => {
+  const message = makeMessage("Wolf", 100);
+  for (const first of [-1, 0.5, 0x1_00_00_00_00, Number.NaN]) {
+    expect(
+      () => new FountainEncoder(message, { maxFragmentLength: 10, firstSequence: first }),
+    ).toThrow(RangeError);
   }
 });
 
 test("decoder from rateless parts only (BCR-2024-001 §6 testDecoder)", () => {
   const message = makeMessage("Wolf", 32767);
-  const encoder = FountainEncoder.create(message, 1000);
+  const encoder = new FountainEncoder(message, { maxFragmentLength: 1000 });
   for (let i = 0; i < 99; i++) {
-    encoder.nextPart();
+    encoder.next();
   }
   const decoder = new FountainDecoder();
   while (!decoder.complete) {
-    decoder.receive(encoder.nextPart());
+    decoder.receive(nextPart(encoder));
   }
   expect(decoder.message()).toStrictEqual(message);
 });
 
 test("skip fragments", () => {
   const message = makeMessage("Wolf", 32767);
-  const encoder = FountainEncoder.create(message, 1000);
+  const encoder = new FountainEncoder(message, { maxFragmentLength: 1000 });
   const decoder = new FountainDecoder();
   while (!decoder.complete) {
-    decoder.receive(encoder.nextPart());
-    encoder.nextPart();
+    decoder.receive(nextPart(encoder));
+    encoder.next();
   }
   expect(decoder.message()).toStrictEqual(message);
 });
@@ -155,62 +191,83 @@ test("ur-rs partition and join hex", () => {
 
 test("inconsistent part rejected", () => {
   const message = makeMessage("Wolf", 64);
-  const encoderA = FountainEncoder.create(message, 16);
-  const encoderB = FountainEncoder.create(makeMessage("Other", 64), 16);
+  const encoderA = new FountainEncoder(message, { maxFragmentLength: 16 });
+  const encoderB = new FountainEncoder(makeMessage("Other", 64), { maxFragmentLength: 16 });
   const decoder = new FountainDecoder();
-  decoder.receive(encoderA.nextPart());
-  expect(() => decoder.receive(encoderB.nextPart())).toThrow(UrError);
+  decoder.receive(nextPart(encoderA));
+  expect(errorOf(() => decoder.receive(nextPart(encoderB))).code).toBe("InconsistentPart");
 });
 
 test("duplicate part ignored", () => {
   const message = makeMessage("Wolf", 64);
-  const encoder = FountainEncoder.create(message, 16);
-  const part = encoder.nextPart();
+  const encoder = new FountainEncoder(message, { maxFragmentLength: 16 });
+  const part = nextPart(encoder);
   const decoder = new FountainDecoder();
   expect(decoder.receive(part)).toBe(true);
   expect(decoder.receive(part)).toBe(false);
 });
 
-test("resource limit fragment_count poisons", () => {
+test("resource limit fragmentCount poisons", () => {
   const decoder = new FountainDecoder({ maxFragmentCount: 1 });
   const message = makeMessage("Wolf", 64);
-  const encoder = FountainEncoder.create(message, 8);
+  const encoder = new FountainEncoder(message, { maxFragmentLength: 8, minFragmentLength: 1 });
   expect(encoder.fragmentCount).toBeGreaterThan(1);
-  expect(() => decoder.receive(encoder.nextPart())).toThrow(UrError);
+  expect(() => decoder.receive(nextPart(encoder))).toThrow(UrError);
   expect(decoder.isPoisoned).toBe(true);
-  expect(() => decoder.receive(encoder.nextPart())).toThrow(UrError);
+  expect(() => decoder.receive(nextPart(encoder))).toThrow(UrError);
 });
 
-test("padding wider than one fragment", () => {
+test("padding wider than one fragment is InvalidPart", () => {
   const decoder = new FountainDecoder();
-  const part = Part.fromFields(1, 2, 1, 0, new Uint8Array(8));
+  const part: Part = {
+    sequence: 1,
+    sequenceCount: 2,
+    messageLength: 1,
+    checksum: 0,
+    data: new Uint8Array(8),
+  };
   const err = errorOf(() => decoder.receive(part));
-  expect(err.code).toBe("InconsistentPart");
+  expect(err.code).toBe("InvalidPart");
   expect(decoder.isPoisoned).toBe(false);
   expect(decoder.poisonState).toBeUndefined();
 });
 
-test("Part.fromCbor maxFragmentCount", () => {
-  const part = Part.fromFields(1, 9, 9, 0, new Uint8Array([0xab]));
-  const err = errorOf(() => Part.fromCbor(part.toCbor(), 8192, 8));
-  expect(err.code).toBe("ResourceLimit");
-  expect(err.limit).toBe("fragment_count");
+test("decodePart maxFragmentCount", () => {
+  const part: Part = {
+    sequence: 1,
+    sequenceCount: 9,
+    messageLength: 9,
+    checksum: 0,
+    data: new Uint8Array([0xab]),
+  };
+  const err = errorOf(() => decodePart(encodePart(part), { maxFragmentCount: 8 }));
+  expect(err.info).toStrictEqual({ code: "ResourceLimit", limit: "fragmentCount" });
 });
 
-test("Part.fromCbor sequence === 0", () => {
-  const part = Part.fromFields(0, 1, 1, 0, new Uint8Array([0]));
-  expect(errorOf(() => Part.fromCbor(part.toCbor())).code).toBe("InvalidSequence");
+test("decodePart sequence === 0", () => {
+  const cbor = new Uint8Array([0x85, 0x00, 0x01, 0x01, 0x00, 0x41, 0x00]);
+  expect(errorOf(() => decodePart(cbor)).code).toBe("InvalidPart");
 });
 
-test("nextSequence(0xffffffff)", () => {
-  const err = errorOf(() => nextSequence(0xffffffff));
-  expect(err.code).toBe("ResourceLimit");
-  expect(err.limit).toBe("sequence");
+test("encoder ends after sequence 0xffffffff", () => {
+  const encoder = new FountainEncoder(new Uint8Array([1, 2, 3]), {
+    maxFragmentLength: 64,
+    firstSequence: 0xff_ff_ff_fe,
+  });
+  const last = nextPart(encoder);
+  expect(last.sequence).toBe(0xff_ff_ff_ff);
+  expect(encoder.next().done).toBe(true);
 });
 
-test("FountainEncoder K==1 second nextPart", () => {
-  const encoder = FountainEncoder.create(new TextEncoder().encode("hello"), 64);
+test("FountainEncoder K==1 repeats identical parts", () => {
+  const encoder = new FountainEncoder(new TextEncoder().encode("hello"), {
+    maxFragmentLength: 64,
+  });
   expect(encoder.fragmentCount).toBe(1);
-  encoder.nextPart();
-  expect(errorOf(() => encoder.nextPart()).code).toBe("SinglePartExhausted");
+  const first = nextPart(encoder);
+  const second = nextPart(encoder);
+  const third = nextPart(encoder);
+  expect([first.sequence, second.sequence, third.sequence]).toStrictEqual([1, 2, 3]);
+  expect(second.data).toStrictEqual(first.data);
+  expect(third.data).toStrictEqual(first.data);
 });

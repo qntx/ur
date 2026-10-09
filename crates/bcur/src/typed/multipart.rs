@@ -3,7 +3,8 @@
 use dcbor::CBOR;
 
 use super::{Ur, map_cbor};
-use crate::{CborErrorKind, DecoderLimits, Error, Result, UrType};
+use crate::error::ErrorKind;
+use crate::{DecoderLimits, Error, Result, UrType};
 
 /// Fountain encoder that owns the CBOR payload bytes (no lifetime on [`Ur`]).
 #[derive(Debug)]
@@ -20,7 +21,7 @@ impl MultipartEncoder {
     /// # Errors
     ///
     /// Propagates fountain construction errors (`EmptyMessage`,
-    /// `InvalidFragmentLen`, size-to-`u32` limits).
+    /// `InvalidFragmentLength`, `MessageTooLong`).
     pub fn new(ur: &Ur, max_fragment_len: usize) -> Result<Self> {
         Ok(Self {
             encoder: crate::Encoder::new(
@@ -36,8 +37,8 @@ impl MultipartEncoder {
     ///
     /// # Errors
     ///
-    /// Multi-part: [`Error::ResourceLimit`] ([`crate::ResourceKind::Sequence`])
-    /// after `u32::MAX` parts. Single-part does not fail.
+    /// Multi-part: [`ErrorKind::Internal`] after `u32::MAX` parts
+    /// (iterator end). Single-part does not fail.
     pub fn next_part(&mut self) -> Result<String> {
         self.encoder.next_part()
     }
@@ -140,14 +141,14 @@ impl MultipartDecoder {
     ///
     /// # Errors
     ///
-    /// Fountain join errors, [`Error::Cbor`] if recovered bytes are not dCBOR,
-    /// or [`Error::DecoderState`] if complete without a pinned type.
+    /// Fountain join errors, [`ErrorKind::CborDecode`] if recovered bytes are
+    /// not dCBOR, or [`ErrorKind::Internal`] if complete without a pinned type.
     pub fn message(&self) -> Result<Option<Ur>> {
         let Some(data) = self.decoder.message()? else {
             return Ok(None);
         };
-        let ur_type = self.decoder.ur_type().ok_or(Error::DecoderState)?;
-        let cbor = map_cbor(CBOR::try_from_data(data), CborErrorKind::Decode)?;
+        let ur_type = self.decoder.ur_type().ok_or_else(Error::internal)?;
+        let cbor = map_cbor(CBOR::try_from_data(data), ErrorKind::CborDecode)?;
         Ur::new(ur_type, cbor).map(Some)
     }
 }
@@ -161,7 +162,7 @@ impl Default for MultipartDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Error, UrType};
+    use crate::UrType;
 
     fn large_ur() -> Ur {
         Ur::new("alpha", (0_u8..80).collect::<Vec<_>>()).unwrap()
@@ -220,7 +221,7 @@ mod tests {
         let mut decoder = MultipartDecoder::new().with_expected_type(UrType::new("beta").unwrap());
         assert!(matches!(
             decoder.receive(&encoder.next_part().unwrap()).unwrap_err(),
-            Error::UnexpectedType { .. }
+            ref e if e.kind() == ErrorKind::UnexpectedType
         ));
         assert!(decoder.ur_type().is_none());
         assert!(!decoder.is_poisoned());
@@ -237,7 +238,7 @@ mod tests {
         decoder.receive(&enc_a.next_part().unwrap()).unwrap();
         assert!(matches!(
             decoder.receive(&enc_b.next_part().unwrap()).unwrap_err(),
-            Error::UnexpectedType { .. }
+            ref e if e.kind() == ErrorKind::UnexpectedType
         ));
     }
 

@@ -1,7 +1,13 @@
 import * as bytewords from "../bytewords/index.ts";
-import { UrError, fail, failPoison } from "../error.ts";
-import type { DecoderPoison } from "../error.ts";
-import { FountainDecoder, FountainEncoder, Part, mergeLimits } from "../fountain/index.ts";
+import { UrError, fail } from "../error.ts";
+import type { UrErrorInfo, UrLimit } from "../error.ts";
+import {
+  FountainDecoder,
+  FountainEncoder,
+  decodePart,
+  encodePart,
+  mergeLimits,
+} from "../fountain/index.ts";
 import type { DecoderLimits } from "../fountain/index.ts";
 import { parse } from "./parse.ts";
 import type { Kind, ParsedUr } from "./parse.ts";
@@ -66,17 +72,26 @@ export class Encoder {
     this.message = message;
   }
 
-  static create(message: Uint8Array, maxFragmentLength: number, type: UrType): Encoder {
+  static create(
+    message: Uint8Array,
+    maxFragmentLength: number,
+    type: UrType,
+    options?: { minFragmentLength?: number; firstSequence?: number },
+  ): Encoder {
     return new Encoder(
-      FountainEncoder.create(message, maxFragmentLength),
+      new FountainEncoder(message, { maxFragmentLength, ...options }),
       type,
       // copy: later mutation of the caller buffer must not change K==1 output
       new Uint8Array(message),
     );
   }
 
-  static bytes(message: Uint8Array, maxFragmentLength: number): Encoder {
-    return Encoder.create(message, maxFragmentLength, UrType.bytes());
+  static bytes(
+    message: Uint8Array,
+    maxFragmentLength: number,
+    options?: { minFragmentLength?: number; firstSequence?: number },
+  ): Encoder {
+    return Encoder.create(message, maxFragmentLength, UrType.bytes(), options);
   }
 
   get isSinglePart(): boolean {
@@ -88,11 +103,11 @@ export class Encoder {
   }
 
   get currentIndex(): number {
-    return this.isSinglePart ? (this.singleEmitted ? 1 : 0) : this.fountain.currentSequenceNum;
+    return this.isSinglePart ? (this.singleEmitted ? 1 : 0) : this.fountain.sequence;
   }
 
   get complete(): boolean {
-    return this.isSinglePart ? this.singleEmitted : this.fountain.complete;
+    return this.isSinglePart ? this.singleEmitted : this.fountain.isComplete;
   }
 
   nextPart(): string {
@@ -100,77 +115,77 @@ export class Encoder {
       this.singleEmitted = true;
       return encode(this.message, this.urType);
     }
-    const part = this.fountain.nextPart();
-    const body = bytewords.encode(part.toCbor(), "minimal");
-    return `ur:${this.urType.value}/${part.sequenceId()}/${body}`;
+    const { value: part } = this.fountain.next();
+    if (part === undefined) {
+      fail("Internal");
+    }
+    const body = bytewords.encode(encodePart(part), "minimal");
+    return `ur:${this.urType.value}/${part.sequence}-${part.sequenceCount}/${body}`;
   }
 }
 
 /** UR decoder with type stickiness and URI limits. */
 export class Decoder {
   private readonly fountain: FountainDecoder;
-  private readonly maxUriLen: number;
-  private readonly maxMessageLength: number;
+  private readonly limits: DecoderLimits;
   private readonly expectedType: UrType | undefined;
   private seenType: UrType | undefined;
   private single: Uint8Array | undefined;
-  private poisoned: DecoderPoison | undefined;
+  private poisoned: UrErrorInfo | undefined;
 
   constructor(options?: { limits?: Partial<DecoderLimits>; expectedType?: UrType }) {
     const limits = mergeLimits(options?.limits);
     this.fountain = new FountainDecoder(limits);
-    this.maxUriLen = limits.maxUriLen;
-    this.maxMessageLength = limits.maxMessageLength;
+    this.limits = limits;
     this.expectedType = options?.expectedType;
   }
 
-  private poison(limit: string): never {
-    this.poisoned = { code: "ResourceLimit", limit };
-    fail("ResourceLimit", { limit });
+  private poisonLimit(limit: UrLimit): never {
+    const info: UrErrorInfo = { code: "ResourceLimit", limit };
+    this.poisoned = info;
+    fail(info);
   }
 
   private escalate(e: unknown): never {
-    if (e instanceof UrError) {
-      if (e.code === "ResourceLimit") {
-        this.poisoned ??= { code: "ResourceLimit", limit: e.limit ?? "unknown" };
-      } else if (e.code === "DecoderState") {
-        this.poisoned ??= { code: "DecoderState" };
-      }
+    if (e instanceof UrError && (e.info.code === "ResourceLimit" || e.info.code === "Internal")) {
+      this.poisoned ??= e.info;
     }
     throw e;
   }
 
-  get poisonState(): DecoderPoison | undefined {
+  get poisonState(): UrErrorInfo | undefined {
     return this.poisoned ?? this.fountain.poisonState;
   }
 
   receive(uri: string): void {
     if (this.poisoned) {
-      failPoison(this.poisoned);
+      throw new UrError(this.poisoned);
     }
     if (this.fountain.isPoisoned) {
       const poison = this.fountain.poisonState;
       if (poison === undefined) {
-        fail("DecoderState");
+        fail("Internal");
       }
       this.poisoned ??= poison;
-      failPoison(poison);
+      throw new UrError(poison);
     }
-    if (uri.length > this.maxUriLen) {
-      this.poison("uri_len");
+    if (uri.length > this.limits.maxUriLen) {
+      this.poisonLimit("uriLength");
     }
 
     const parsed = parse(uri);
     if (this.expectedType && !parsed.type.equals(this.expectedType)) {
-      fail("UnexpectedType", {
-        expected: this.expectedType.value,
-        found: parsed.type.value,
+      fail({
+        code: "UnexpectedType",
+        expected: [this.expectedType],
+        found: parsed.type,
       });
     }
     if (this.seenType && !this.seenType.equals(parsed.type)) {
-      fail("UnexpectedType", {
-        expected: this.seenType.value,
-        found: parsed.type.value,
+      fail({
+        code: "UnexpectedType",
+        expected: [this.seenType],
+        found: parsed.type,
       });
     }
 
@@ -193,8 +208,8 @@ export class Decoder {
       return;
     }
     const data = bytewords.decode(parsed.body, "minimal");
-    if (data.length > this.maxMessageLength) {
-      this.poison("message_length");
+    if (data.length > this.limits.maxMessageLength) {
+      this.poisonLimit("messageLength");
     }
     this.seenType = parsed.type;
     this.single = data;
@@ -205,11 +220,7 @@ export class Decoder {
       fail("InconsistentPart");
     }
     const decoded = bytewords.decode(parsed.body, "minimal");
-    const part = Part.fromCbor(
-      decoded,
-      this.fountain.maxFragmentDataLength,
-      this.fountain.maxFragmentCount,
-    );
+    const part = decodePart(decoded, this.limits);
     const { indices } = parsed;
     if (!indices) {
       fail("InvalidIndices");
@@ -227,14 +238,14 @@ export class Decoder {
 
   message(): Uint8Array | undefined {
     if (this.poisoned) {
-      failPoison(this.poisoned);
+      throw new UrError(this.poisoned);
     }
     if (this.fountain.isPoisoned) {
       const poison = this.fountain.poisonState;
       if (poison === undefined) {
-        fail("DecoderState");
+        fail("Internal");
       }
-      failPoison(poison);
+      throw new UrError(poison);
     }
     if (this.single) {
       return new Uint8Array(this.single);

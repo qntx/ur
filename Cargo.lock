@@ -118,7 +118,6 @@ dependencies = [
  "rand_xoshiro",
  "serde_json",
  "sha2",
- "thiserror",
 ]
 
 [[package]]

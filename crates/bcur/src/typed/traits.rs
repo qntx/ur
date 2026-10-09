@@ -3,27 +3,28 @@
 use dcbor::{CBORTagged, CBORTaggedDecodable, CBORTaggedEncodable};
 
 use super::{Ur, map_cbor};
-use crate::{CborErrorKind, Error, Result, UrType};
+use crate::error::ErrorKind;
+use crate::{Error, Result, UrType};
 
 /// First registered CBOR tag name, validated as a UR type.
 fn first_tag_ur_type<T: CBORTagged>() -> Result<UrType> {
     let name = T::cbor_tags()
         .first()
         .and_then(dcbor::Tag::name)
-        .ok_or(Error::InvalidType)?;
+        .ok_or_else(|| Error::new(ErrorKind::InvalidType))?;
     UrType::new(&name)
 }
 
 /// Encode as a UR using the first registered CBOR tag **name** as the type.
 ///
 /// The payload is **untagged** dCBOR. Missing or unnamed tags yield
-/// [`Error::InvalidType`] — this method never panics.
+/// [`ErrorKind::InvalidType`] — this method never panics.
 pub trait UrEncodable {
     /// Typed UR for this value.
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidType`] if the first `cbor_tags()` entry has no name or
+    /// [`ErrorKind::InvalidType`] if the first `cbor_tags()` entry has no name or
     /// the name is not a valid UR type token.
     fn ur(&self) -> Result<Ur>;
 
@@ -43,9 +44,9 @@ pub trait UrDecodable: Sized {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidType`] if this type's first tag is unnamed;
-    /// [`Error::UnexpectedType`] if the UR type does not match that name;
-    /// [`Error::Cbor`] if untagged decode fails.
+    /// [`ErrorKind::InvalidType`] if this type's first tag is unnamed;
+    /// [`ErrorKind::UnexpectedType`] if the UR type does not match that name;
+    /// [`ErrorKind::CborDecode`] if untagged decode fails.
     fn from_ur(ur: &Ur) -> Result<Self>;
 
     /// Parse a single-part UR string and decode it.
@@ -72,7 +73,7 @@ impl<T: CBORTaggedDecodable> UrDecodable for T {
         ur.check_type(&first_tag_ur_type::<T>()?)?;
         map_cbor(
             Self::from_untagged_cbor(ur.cbor().clone()),
-            CborErrorKind::Type,
+            ErrorKind::CborType,
         )
     }
 }
@@ -84,7 +85,6 @@ mod tests {
     use dcbor::{CBOR, CBORTagged, CBORTaggedDecodable, CBORTaggedEncodable, Tag};
 
     use super::*;
-    use crate::Error;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct NamedNote(String);
@@ -159,8 +159,11 @@ mod tests {
 
     #[test]
     fn unnamed_or_empty_tags_are_invalid_type() {
-        assert_eq!(UnnamedByte(1).ur().unwrap_err(), Error::InvalidType);
-        assert_eq!(EmptyTags.ur().unwrap_err(), Error::InvalidType);
+        assert_eq!(
+            UnnamedByte(1).ur().unwrap_err().kind(),
+            ErrorKind::InvalidType
+        );
+        assert_eq!(EmptyTags.ur().unwrap_err().kind(), ErrorKind::InvalidType);
     }
 
     #[test]
@@ -168,7 +171,7 @@ mod tests {
         let ur = Ur::new("bytes", NamedNote(String::from("x")).untagged_cbor()).unwrap();
         assert!(matches!(
             NamedNote::from_ur(&ur).unwrap_err(),
-            Error::UnexpectedType { .. }
+            ref e if e.kind() == ErrorKind::UnexpectedType
         ));
     }
 
@@ -177,7 +180,7 @@ mod tests {
         let ur = Ur::new("note", 1_u8).unwrap();
         assert!(matches!(
             NamedNote::from_ur(&ur).unwrap_err(),
-            Error::Cbor(ref e) if e.kind() == CborErrorKind::Type
+            ref e if e.kind() == ErrorKind::CborType
         ));
     }
 }

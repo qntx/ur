@@ -11,7 +11,7 @@
 
 //! Fountain encode/decode throughput.
 
-use bcur::fountain::{Decoder, Encoder};
+use bcur::fountain::{Decoder, Encoder, EncoderOptions};
 use criterion::{Criterion, criterion_group, criterion_main};
 
 fn bench_fountain(c: &mut Criterion) {
@@ -19,19 +19,19 @@ fn bench_fountain(c: &mut Criterion) {
 
     c.bench_function("fountain_encode_9_parts", |b| {
         b.iter(|| {
-            let mut enc = Encoder::new(&message, 30).unwrap();
+            let mut enc = Encoder::new(message.clone(), EncoderOptions::new(30)).unwrap();
             for _ in 0..9 {
-                let _ = enc.next_part().unwrap();
+                let _ = enc.next().unwrap();
             }
         });
     });
 
     c.bench_function("fountain_roundtrip_256", |b| {
         b.iter(|| {
-            let mut enc = Encoder::new(&message, 30).unwrap();
+            let mut enc = Encoder::new(message.clone(), EncoderOptions::new(30)).unwrap();
             let mut dec = Decoder::default();
             while !dec.complete() {
-                dec.receive(enc.next_part().unwrap()).unwrap();
+                dec.receive(enc.next().unwrap()).unwrap();
             }
             let _ = dec.message().unwrap();
         });

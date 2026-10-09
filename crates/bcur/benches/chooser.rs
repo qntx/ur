@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use bcur::fountain::Encoder;
+use bcur::fountain::{Encoder, EncoderOptions};
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 
 fn bench_chooser(c: &mut Criterion) {
@@ -29,15 +29,15 @@ fn bench_chooser(c: &mut Criterion) {
         group.bench_function(format!("k{k}_seq_mixed_1000"), |b| {
             b.iter_batched(
                 || {
-                    let mut enc = Encoder::new(&message, 1).unwrap();
+                    let mut enc = Encoder::new(message.clone(), EncoderOptions::new(1)).unwrap();
                     for _ in 0..k {
-                        enc.next_part().unwrap();
+                        enc.next().unwrap();
                     }
                     enc
                 },
                 |mut enc| {
                     for _ in 0..1000 {
-                        enc.next_part().unwrap();
+                        enc.next().unwrap();
                     }
                 },
                 BatchSize::SmallInput,

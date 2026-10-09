@@ -20,7 +20,7 @@ use crate::constants::BYTES_INDEXED_BY_HASH;
 pub use crate::constants::MINIMALS;
 /// BCR-2020-012 four-letter bytewords table.
 pub use crate::constants::WORDS;
-use crate::{Error, Result};
+use crate::error::{Error, ErrorKind, Result};
 
 /// The three bytewords encoding styles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -72,7 +72,7 @@ fn encode_words(data: impl Iterator<Item = u8>, style: Style) -> String {
 /// has an invalid length for the style, or fails the checksum.
 pub fn decode(encoded: &str, style: Style) -> Result<Vec<u8>> {
     if !encoded.is_ascii() {
-        return Err(Error::NonAscii);
+        return Err(Error::new(ErrorKind::NonAscii));
     }
     // BCR-2020-012 encodings are case-insensitive; normalize before lookup.
     let lowered = encoded.to_ascii_lowercase();
@@ -86,14 +86,14 @@ pub fn decode(encoded: &str, style: Style) -> Result<Vec<u8>> {
     // decoder and the official vectors do, before `split` yields one empty
     // "word" that would surface as `InvalidWord`.
     if lowered.is_empty() {
-        return Err(Error::InvalidBytewordsChecksum);
+        return Err(Error::new(ErrorKind::InvalidBytewordsChecksum));
     }
     decode_parts(lowered.split(separator), false)
 }
 
 fn decode_minimal(encoded: &str) -> Result<Vec<u8>> {
     if !encoded.len().is_multiple_of(2) {
-        return Err(Error::InvalidBytewordsLength);
+        return Err(Error::new(ErrorKind::InvalidBytewordsLength));
     }
     let parts = (0..encoded.len())
         .step_by(2)
@@ -137,13 +137,13 @@ where
     let data: Vec<u8> = parts
         .map(|part| encoded_byte(part, minimal))
         .collect::<Option<Vec<_>>>()
-        .ok_or(Error::InvalidWord)?;
+        .ok_or_else(|| Error::new(ErrorKind::InvalidWord))?;
     strip_checksum(data)
 }
 
 fn strip_checksum(mut data: Vec<u8>) -> Result<Vec<u8>> {
     if data.len() < 4 {
-        return Err(Error::InvalidBytewordsChecksum);
+        return Err(Error::new(ErrorKind::InvalidBytewordsChecksum));
     }
     let split = data.len() - 4;
     let (payload, checksum) = data.split_at(split);
@@ -151,7 +151,7 @@ fn strip_checksum(mut data: Vec<u8>) -> Result<Vec<u8>> {
         data.truncate(split);
         Ok(data)
     } else {
-        Err(Error::InvalidBytewordsChecksum)
+        Err(Error::new(ErrorKind::InvalidBytewordsChecksum))
     }
 }
 
@@ -236,17 +236,20 @@ mod tests {
                 Style::Standard
             )
             .unwrap_err(),
-            Error::InvalidBytewordsChecksum
+            Error::new(ErrorKind::InvalidBytewordsChecksum)
         );
         assert_eq!(
             decode("axxe tied also webs lung", Style::Standard).unwrap_err(),
-            Error::InvalidWord
+            Error::new(ErrorKind::InvalidWord)
         );
         assert_eq!(
             decode("aea", Style::Minimal).unwrap_err(),
-            Error::InvalidBytewordsLength
+            Error::new(ErrorKind::InvalidBytewordsLength)
         );
-        assert_eq!(decode("₿", Style::Standard).unwrap_err(), Error::NonAscii);
+        assert_eq!(
+            decode("₿", Style::Standard).unwrap_err(),
+            Error::new(ErrorKind::NonAscii)
+        );
     }
 
     #[test]

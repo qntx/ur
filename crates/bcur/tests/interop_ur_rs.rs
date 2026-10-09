@@ -122,7 +122,7 @@ fn crypto_request_single_part_matches_ur_rs() {
 #[test]
 fn multipart_roundtrip_lossy_channel() {
     let data = b"Ten chars!".repeat(20);
-    let mut encoder = Encoder::bytes(&data, 8).unwrap();
+    let mut encoder = Encoder::bytes(&data, 10).unwrap();
     let mut decoder = Decoder::default();
     while !decoder.complete() {
         let part = encoder.next_part().unwrap();

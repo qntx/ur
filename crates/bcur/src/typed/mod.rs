@@ -19,11 +19,12 @@ pub use multipart::{MultipartDecoder, MultipartEncoder};
 pub use traits::{UrCodable, UrDecodable, UrEncodable};
 pub use ur_value::Ur;
 
-use crate::{CborError, CborErrorKind, Error, Result};
+use crate::error::{Error, ErrorKind, Result};
 
-/// Maps a `dcbor` failure into [`Error::Cbor`].
-fn map_cbor<T>(result: dcbor::Result<T>, kind: CborErrorKind) -> Result<T> {
-    result.map_err(|e| Error::Cbor(CborError::new(kind, e.to_string())))
+/// Maps a `dcbor` failure into [`ErrorKind::CborDecode`] or
+/// [`ErrorKind::CborType`]; the `dcbor` error is kept as `source()`.
+fn map_cbor<T>(result: dcbor::Result<T>, kind: ErrorKind) -> Result<T> {
+    result.map_err(|e| Error::cbor(kind, e))
 }
 
 #[cfg(test)]

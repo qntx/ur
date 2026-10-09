@@ -37,7 +37,11 @@
         "module": "crates/bcur/src/fountain/part_cbor.rs",
         "tests": ["crates/bcur/tests/contract.rs", "crates/bcur/tests/official/mur.rs"]
       },
-      "vectors": ["vectors/fountain/part-cbor.json", "vectors/official/mur/part-cbor.json"]
+      "vectors": [
+        "vectors/fountain/part-cbor.json",
+        "vectors/fountain/part-cbor-decode.json",
+        "vectors/official/mur/part-cbor.json"
+      ]
     },
     {
       "id": "consensus.chooser",
@@ -273,7 +277,7 @@
         "module": "crates/bcur/src/fountain/mod.rs",
         "tests": ["crates/bcur/src/official_vectors.rs"]
       },
-      "vectors": ["vectors/official/mur/encoder.json"]
+      "vectors": ["vectors/official/mur/encoder.json", "vectors/fountain/encoder-options.json"]
     },
     {
       "id": "fountain.decoder",

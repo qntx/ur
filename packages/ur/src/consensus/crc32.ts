@@ -18,7 +18,7 @@ const TABLE = (() => {
 export function checksum(data: Uint8Array): number {
   let crc = 0xff_ff_ff_ff;
   for (const b of data) {
-    crc = (TABLE[(crc ^ b) & 0xff] ?? fail("DecoderState")) ^ (crc >>> 8);
+    crc = (TABLE[(crc ^ b) & 0xff] ?? fail("Internal")) ^ (crc >>> 8);
   }
   return (crc ^ 0xff_ff_ff_ff) >>> 0;
 }

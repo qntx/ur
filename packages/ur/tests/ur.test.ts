@@ -99,8 +99,8 @@ test("case fold", () => {
 
 test("type stickiness", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(5));
-  const encA = Encoder.create(data, 5, UrType.parse("alpha"));
-  const encB = Encoder.create(data, 5, UrType.parse("beta"));
+  const encA = Encoder.create(data, 10, UrType.parse("alpha"));
+  const encB = Encoder.create(data, 10, UrType.parse("beta"));
   const decoder = new Decoder();
   decoder.receive(encA.nextPart());
   expect(() => decoder.receive(encB.nextPart())).toThrow(UrError);
@@ -114,13 +114,15 @@ test("invalid maxFragmentLength through Encoder.bytes", () => {
   const data = new TextEncoder().encode("data");
   const cases = [Number.NaN, -1, 0, 0.5, 1.5, Number.POSITIVE_INFINITY];
   for (const len of cases) {
-    expect(errorOf(() => Encoder.bytes(data, len)).code).toBe("InvalidFragmentLen");
+    expect(errorOf(() => Encoder.bytes(data, len)).code).toBe("InvalidFragmentLength");
   }
 });
 
 test("custom encoder", () => {
   const data = new TextEncoder().encode("Ten chars!");
-  const encoder = Encoder.create(data, 5, UrType.parse("my-scheme"));
+  const encoder = Encoder.create(data, 5, UrType.parse("my-scheme"), {
+    minFragmentLength: 5,
+  });
   expect(encoder.nextPart()).toBe("ur:my-scheme/1-2/lpadaobkcywkwmhfwnfeghihjtcxiansvomopr");
 });
 
@@ -162,13 +164,13 @@ test("Encoder K==1 idempotent", () => {
 test("mix single then multi", () => {
   const decoder = new Decoder();
   decoder.receive(encode(new TextEncoder().encode("data"), UrType.bytes()));
-  const enc = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(5)), 5);
+  const enc = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(5)), 10);
   expect(errorOf(() => decoder.receive(enc.nextPart())).code).toBe("InconsistentPart");
 });
 
 test("mix fountain then single", () => {
   const decoder = new Decoder();
-  const enc = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(5)), 5);
+  const enc = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(5)), 10);
   decoder.receive(enc.nextPart());
   expect(errorOf(() => decoder.receive("ur:bytes/iehsjyhspmwfwfia")).code).toBe("InconsistentPart");
 });
@@ -190,14 +192,14 @@ test("decodeMessage success", () => {
 
 test("test_decode_message_rejects_multipart", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(8));
-  const encoder = Encoder.bytes(data, 5);
+  const encoder = Encoder.bytes(data, 10);
   const part = encoder.nextPart();
   expect(errorOf(() => decodeMessage(part)).code).toBe("NotSinglePart");
 });
 
 test("test_garbage_does_not_pin_type", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(6));
-  const encoder = Encoder.create(data, 5, UrType.parse("alpha"));
+  const encoder = Encoder.create(data, 10, UrType.parse("alpha"));
   const decoder = new Decoder();
   expect(() => decoder.receive("ur:beta/1-2/zzzz")).toThrow(UrError);
   expect(decoder.type).toBeUndefined();

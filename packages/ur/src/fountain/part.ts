@@ -1,64 +1,51 @@
-import { FragmentChooser } from "../consensus/chooser.ts";
-import { DEFAULT_LIMITS } from "./limits.ts";
-import { decodePart, encodePart } from "./part-cbor.ts";
+import { fail } from "../error.ts";
 
-/** A fountain part (wire metadata + fragment data). */
-export class Part {
-  readonly sequence: number;
-  readonly sequenceCount: number;
-  readonly messageLength: number;
-  readonly checksum: number;
-  readonly data: Uint8Array;
+/**
+ * A fountain part: wire metadata plus the (possibly mixed) fragment data. Produced by
+ * `FountainEncoder` or `decodePart`; consumed by `FountainDecoder`.
+ */
+export type Part = Readonly<{
+  /** 1-based sequence number. */
+  sequence: number;
+  /** Total source fragment count `K`. */
+  sequenceCount: number;
+  /** Original message length in bytes. */
+  messageLength: number;
+  /** CRC-32 of the original message. */
+  checksum: number;
+  /** Part payload bytes (a fragment, or an XOR mix for complex parts). */
+  data: Uint8Array;
+}>;
 
-  #chooser: FragmentChooser | undefined;
+const MAX_U32 = 0xff_ff_ff_ff;
 
-  private constructor(
-    sequence: number,
-    sequenceCount: number,
-    messageLength: number,
-    checksum: number,
-    data: Uint8Array,
+function isU32(v: number): boolean {
+  return Number.isSafeInteger(v) && v >= 0 && v <= MAX_U32;
+}
+
+/**
+ * Semantic part validation shared by `decodePart`, the encoder, and the decoder ingest path:
+ * `sequence`, `sequenceCount`, and `messageLength` are nonzero u32; `checksum` is a u32; `data` is
+ * nonempty; and `data.length` is a consistent fragment length, i.e. `K · fragLen ≥ messageLength`
+ * with padding under one fragment.
+ */
+export function validatePart(part: Part): void {
+  const fragLen = part.data.length;
+  if (
+    !isU32(part.sequence) ||
+    part.sequence === 0 ||
+    !isU32(part.sequenceCount) ||
+    part.sequenceCount === 0 ||
+    !isU32(part.messageLength) ||
+    part.messageLength === 0 ||
+    !isU32(part.checksum) ||
+    fragLen === 0
   ) {
-    this.sequence = sequence;
-    this.sequenceCount = sequenceCount;
-    this.messageLength = messageLength;
-    this.checksum = checksum;
-    this.data = data;
+    fail("InvalidPart");
   }
-
-  static fromFields(
-    sequence: number,
-    sequenceCount: number,
-    messageLength: number,
-    checksum: number,
-    data: Uint8Array,
-  ): Part {
-    return new Part(sequence, sequenceCount, messageLength, checksum, data);
-  }
-
-  indexes(): number[] {
-    this.#chooser ??= new FragmentChooser(this.sequenceCount, this.checksum);
-    return this.#chooser.choose(this.sequence);
-  }
-
-  isSimple(): boolean {
-    return this.indexes().length === 1;
-  }
-
-  toCbor(): Uint8Array {
-    return encodePart(this);
-  }
-
-  static fromCbor(
-    bytes: Uint8Array,
-    maxDataLen: number = DEFAULT_LIMITS.maxFragmentDataLength,
-    maxFragmentCount: number = DEFAULT_LIMITS.maxFragmentCount,
-  ): Part {
-    const f = decodePart(bytes, maxDataLen, maxFragmentCount);
-    return Part.fromFields(f.sequence, f.sequenceCount, f.messageLength, f.checksum, f.data);
-  }
-
-  sequenceId(): string {
-    return `${this.sequence}-${this.sequenceCount}`;
+  const product = BigInt(part.sequenceCount) * BigInt(fragLen);
+  const length = BigInt(part.messageLength);
+  if (product < length || product - length >= BigInt(fragLen)) {
+    fail("InvalidPart");
   }
 }

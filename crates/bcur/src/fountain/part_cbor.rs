@@ -1,62 +1,110 @@
 //! Fixed-schema CBOR codec for fountain [`Part`](super::Part) (5-element array).
 //!
-//! Wire layout: `array(5) [ sequence:u32, sequence_count:u32, message_length:u32,
-//! checksum:u32, data:bstr ]` using shortest-form major-type-0 integers.
+//! Wire layout: `array(5) [ sequence:u32, sequence_count:u32, message_len:u32,
+//! checksum:u32, data:bstr ]`.
+//!
+//! Encoding is always shortest-form. Decoding is lenient about integer widths:
+//! the array header, uint fields, and bstr length accept any definite-width
+//! encoding (UR-ADR-017); tags, indefinite lengths, other major types,
+//! overflows, truncation, and trailing bytes are rejected.
 
 use alloc::vec::Vec;
 
-use super::Part;
-use crate::{Error, ResourceKind, Result};
+use super::{DecoderLimits, Part};
+use crate::error::{Error, ErrorKind, Limit, Result};
 
-/// Encodes a part to deterministic CBOR bytes.
+/// Encodes a part to deterministic (shortest-form) CBOR bytes.
 #[must_use]
 pub(crate) fn encode_part(part: &Part) -> Vec<u8> {
     let mut out = Vec::with_capacity(16 + part.data().len());
     out.push(0x85); // array of 5
     encode_u32(&mut out, part.sequence());
     encode_u32(&mut out, part.sequence_count());
-    encode_u32(&mut out, part.message_length());
+    encode_u32(&mut out, part.message_len());
     encode_u32(&mut out, part.checksum());
     encode_bstr(&mut out, part.data());
     out
 }
 
-/// Decodes a part from CBOR with data-length and fragment-count caps.
-pub(crate) fn decode_part(
-    bytes: &[u8],
-    max_data_len: usize,
-    max_fragment_count: usize,
-) -> Result<Part> {
+/// Decodes a part from CBOR, enforcing `limits` and semantic validation.
+pub(crate) fn decode_part(bytes: &[u8], limits: &DecoderLimits) -> Result<Part> {
     let mut i = 0;
     let head = next_byte(bytes, &mut i)?;
-    if head != 0x85 {
-        return Err(Error::InvalidPartCbor);
+    let array_len = decode_argument(head, &mut i, bytes)?;
+    if head >> 5 != 4 || array_len != 5 {
+        return Err(Error::new(ErrorKind::InvalidPartCbor));
     }
     let sequence = decode_u32(bytes, &mut i)?;
     let sequence_count = decode_u32(bytes, &mut i)?;
-    let message_length = decode_u32(bytes, &mut i)?;
+    let message_len = decode_u32(bytes, &mut i)?;
     let checksum = decode_u32(bytes, &mut i)?;
-    let data = decode_bstr(bytes, &mut i, max_data_len)?;
+    let data = decode_bstr(bytes, &mut i, limits)?;
     if i != bytes.len() {
-        return Err(Error::InvalidPartCbor);
+        return Err(Error::new(ErrorKind::InvalidPartCbor));
     }
-    if sequence == 0 {
-        return Err(Error::InvalidSequence);
+    let part = Part::new(sequence, sequence_count, message_len, checksum, data)?;
+    if usize::try_from(part.sequence_count()).unwrap_or(usize::MAX) > limits.max_fragment_count {
+        return Err(Error::resource_limit(Limit::FragmentCount));
     }
-    if sequence_count == 0 || message_length == 0 || data.is_empty() {
-        return Err(Error::EmptyPart);
+    Ok(part)
+}
+
+/// Reads the additional-information argument for `head` in any width
+/// (`ai` 0..=27). Returns `None` for `ai` 28..=31 (indefinite/reserved).
+fn decode_argument(head: u8, i: &mut usize, bytes: &[u8]) -> Result<u64> {
+    match head & 0x1f {
+        n @ 0..=23 => Ok(u64::from(n)),
+        24 => Ok(u64::from(next_byte(bytes, i)?)),
+        25 => {
+            let b0 = next_byte(bytes, i)?;
+            let b1 = next_byte(bytes, i)?;
+            Ok(u64::from(u16::from_be_bytes([b0, b1])))
+        }
+        26 => {
+            let b0 = next_byte(bytes, i)?;
+            let b1 = next_byte(bytes, i)?;
+            let b2 = next_byte(bytes, i)?;
+            let b3 = next_byte(bytes, i)?;
+            Ok(u64::from(u32::from_be_bytes([b0, b1, b2, b3])))
+        }
+        27 => {
+            let mut buf = [0_u8; 8];
+            for slot in &mut buf {
+                *slot = next_byte(bytes, i)?;
+            }
+            Ok(u64::from_be_bytes(buf))
+        }
+        _ => Err(Error::new(ErrorKind::InvalidPartCbor)),
     }
-    let count = usize::try_from(sequence_count).unwrap_or(usize::MAX);
-    if count > max_fragment_count {
-        return Err(Error::ResourceLimit(ResourceKind::FragmentCount));
+}
+
+fn decode_u32(bytes: &[u8], i: &mut usize) -> Result<u32> {
+    let head = next_byte(bytes, i)?;
+    if head >> 5 != 0 {
+        return Err(Error::new(ErrorKind::InvalidPartCbor));
     }
-    Ok(Part::from_fields(
-        sequence,
-        sequence_count,
-        message_length,
-        checksum,
-        data,
-    ))
+    u32::try_from(decode_argument(head, i, bytes)?)
+        .map_err(|_| Error::new(ErrorKind::InvalidPartCbor))
+}
+
+fn decode_bstr(bytes: &[u8], i: &mut usize, limits: &DecoderLimits) -> Result<Vec<u8>> {
+    let head = next_byte(bytes, i)?;
+    if head >> 5 != 2 {
+        return Err(Error::new(ErrorKind::InvalidPartCbor));
+    }
+    let len = usize::try_from(decode_argument(head, i, bytes)?)
+        .map_err(|_| Error::new(ErrorKind::InvalidPartCbor))?;
+    if len > limits.max_fragment_data_length {
+        return Err(Error::resource_limit(Limit::FragmentLength));
+    }
+    let end = i
+        .checked_add(len)
+        .ok_or_else(|| Error::new(ErrorKind::InvalidPartCbor))?;
+    let slice = bytes
+        .get(*i..end)
+        .ok_or_else(|| Error::new(ErrorKind::InvalidPartCbor))?;
+    *i = end;
+    Ok(slice.to_vec())
 }
 
 fn encode_u32(out: &mut Vec<u8>, v: u32) {
@@ -116,180 +164,158 @@ fn encode_bstr(out: &mut Vec<u8>, data: &[u8]) {
 }
 
 fn next_byte(bytes: &[u8], i: &mut usize) -> Result<u8> {
-    let b = *bytes.get(*i).ok_or(Error::InvalidPartCbor)?;
+    let b = *bytes
+        .get(*i)
+        .ok_or_else(|| Error::new(ErrorKind::InvalidPartCbor))?;
     *i += 1;
     Ok(b)
-}
-
-fn decode_u32(bytes: &[u8], i: &mut usize) -> Result<u32> {
-    let head = next_byte(bytes, i)?;
-    let major = head >> 5;
-    let ai = head & 0x1f;
-    if major != 0 {
-        return Err(Error::InvalidPartCbor);
-    }
-    match ai {
-        n @ 0..=23 => Ok(u32::from(n)),
-        24 => {
-            let v = u32::from(next_byte(bytes, i)?);
-            // Shortest-form: values 0..=23 must use the compact ai encoding.
-            if v <= 23 {
-                return Err(Error::InvalidPartCbor);
-            }
-            Ok(v)
-        }
-        25 => {
-            let b0 = next_byte(bytes, i)?;
-            let b1 = next_byte(bytes, i)?;
-            let v = u32::from(u16::from_be_bytes([b0, b1]));
-            if v <= 0xff {
-                return Err(Error::InvalidPartCbor);
-            }
-            Ok(v)
-        }
-        26 => {
-            let b0 = next_byte(bytes, i)?;
-            let b1 = next_byte(bytes, i)?;
-            let b2 = next_byte(bytes, i)?;
-            let b3 = next_byte(bytes, i)?;
-            let v = u32::from_be_bytes([b0, b1, b2, b3]);
-            if v <= 0xffff {
-                return Err(Error::InvalidPartCbor);
-            }
-            Ok(v)
-        }
-        // Reject u64 and indefinite forms for shortest-form / schema strictness.
-        _ => Err(Error::InvalidPartCbor),
-    }
-}
-
-fn decode_bstr(bytes: &[u8], i: &mut usize, max_data_len: usize) -> Result<Vec<u8>> {
-    let head = next_byte(bytes, i)?;
-    let major = head >> 5;
-    let ai = head & 0x1f;
-    if major != 2 {
-        return Err(Error::InvalidPartCbor);
-    }
-    let len = match ai {
-        n @ 0..=23 => usize::from(n),
-        24 => {
-            let len = usize::from(next_byte(bytes, i)?);
-            if len <= 23 {
-                return Err(Error::InvalidPartCbor);
-            }
-            len
-        }
-        25 => {
-            let b0 = next_byte(bytes, i)?;
-            let b1 = next_byte(bytes, i)?;
-            let len = usize::from(u16::from_be_bytes([b0, b1]));
-            if len <= 0xff {
-                return Err(Error::InvalidPartCbor);
-            }
-            len
-        }
-        26 => {
-            let b0 = next_byte(bytes, i)?;
-            let b1 = next_byte(bytes, i)?;
-            let b2 = next_byte(bytes, i)?;
-            let b3 = next_byte(bytes, i)?;
-            let len = usize::try_from(u32::from_be_bytes([b0, b1, b2, b3]))
-                .map_err(|_| Error::InvalidPartCbor)?;
-            if len <= 0xffff {
-                return Err(Error::InvalidPartCbor);
-            }
-            len
-        }
-        _ => return Err(Error::InvalidPartCbor),
-    };
-    if len > max_data_len {
-        return Err(Error::ResourceLimit(ResourceKind::FragmentData));
-    }
-    let end = i.checked_add(len).ok_or(Error::InvalidPartCbor)?;
-    let slice = bytes.get(*i..end).ok_or(Error::InvalidPartCbor)?;
-    *i = end;
-    Ok(slice.to_vec())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn roundtrip_and_golden() {
-        let part = Part::from_fields(
+    fn part() -> Part {
+        Part::new(
             1,
             9,
             256,
             23_570_951,
             hex::decode("916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c").unwrap(),
-        );
-        let cbor = encode_part(&part);
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn roundtrip_and_golden() {
+        let cbor = encode_part(&part());
         assert_eq!(
             hex::encode(&cbor),
             "8501091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
         );
-        let decoded = decode_part(&cbor, 8192, 2000).unwrap();
-        assert_eq!(decoded, part);
+        let decoded = decode_part(&cbor, &DecoderLimits::default()).unwrap();
+        assert_eq!(decoded, part());
     }
 
     #[test]
-    fn rejects_non_shortest_integer() {
+    fn accepts_non_shortest_integers() {
         // array(5) with sequence encoded as 0x18 0x01 (non-shortest for 1)
         let cbor = hex::decode(
             "851801091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
         )
         .unwrap();
-        assert!(matches!(
-            decode_part(&cbor, 8192, 2000),
-            Err(Error::InvalidPartCbor)
-        ));
+        assert_eq!(
+            decode_part(&cbor, &DecoderLimits::default()).unwrap(),
+            part()
+        );
+        // 8-byte uint encoding of 1
+        let cbor_wide = hex::decode(
+            "851b0000000000000001091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+        )
+        .unwrap();
+        assert_eq!(
+            decode_part(&cbor_wide, &DecoderLimits::default()).unwrap(),
+            part()
+        );
     }
 
     #[test]
-    fn rejects_zero_sequence_fields() {
+    fn rejects_invalid_schema() {
+        // tag(5)
+        assert_eq!(
+            decode_part(&hex::decode("c505").unwrap(), &DecoderLimits::default())
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidPartCbor
+        );
+        // indefinite array
+        assert_eq!(
+            decode_part(
+                &hex::decode("9f01010101ff").unwrap(),
+                &DecoderLimits::default()
+            )
+            .unwrap_err()
+            .kind(),
+            ErrorKind::InvalidPartCbor
+        );
+        // uint64 value over u32
+        assert_eq!(
+            decode_part(
+                &hex::decode("851b00000001000000000101014100").unwrap(),
+                &DecoderLimits::default()
+            )
+            .unwrap_err()
+            .kind(),
+            ErrorKind::InvalidPartCbor
+        );
+        // truncated
+        assert_eq!(
+            decode_part(&hex::decode("8501").unwrap(), &DecoderLimits::default())
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidPartCbor
+        );
+    }
+
+    #[test]
+    fn rejects_zero_fields() {
         // [0, 1, 1, 0, h'00']
-        let zero_seq = hex::decode("85000101004100").unwrap();
-        assert!(matches!(
-            decode_part(&zero_seq, 8192, 2000),
-            Err(Error::InvalidSequence)
-        ));
+        assert_eq!(
+            decode_part(
+                &hex::decode("85000101004100").unwrap(),
+                &DecoderLimits::default()
+            )
+            .unwrap_err()
+            .kind(),
+            ErrorKind::InvalidPart
+        );
         // [1, 0, 1, 0, h'00']
-        let zero_count = hex::decode("85010001004100").unwrap();
-        assert!(matches!(
-            decode_part(&zero_count, 8192, 2000),
-            Err(Error::EmptyPart)
-        ));
+        assert_eq!(
+            decode_part(
+                &hex::decode("85010001004100").unwrap(),
+                &DecoderLimits::default()
+            )
+            .unwrap_err()
+            .kind(),
+            ErrorKind::InvalidPart
+        );
     }
 
     #[test]
     fn rejects_trailing_bytes() {
-        let part = Part::from_fields(1, 1, 1, 0, alloc::vec![0xab]);
-        let mut cbor = encode_part(&part);
+        let mut cbor = encode_part(&part());
         cbor.push(0x00);
-        assert!(matches!(
-            decode_part(&cbor, 8192, 2000),
-            Err(Error::InvalidPartCbor)
-        ));
+        assert_eq!(
+            decode_part(&cbor, &DecoderLimits::default())
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidPartCbor
+        );
     }
 
     #[test]
     fn rejects_oversized_data() {
-        let part = Part::from_fields(1, 1, 1, 0, alloc::vec![0; 32]);
+        let part = Part::new(1, 1, 32, 0, alloc::vec![0; 32]).unwrap();
         let cbor = encode_part(&part);
-        assert!(matches!(
-            decode_part(&cbor, 16, 2000),
-            Err(Error::ResourceLimit(ResourceKind::FragmentData))
-        ));
+        let limits = DecoderLimits {
+            max_fragment_data_length: 16,
+            ..DecoderLimits::default()
+        };
+        let err = decode_part(&cbor, &limits).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::ResourceLimit);
+        assert_eq!(err.limit(), Some(Limit::FragmentLength));
     }
 
     #[test]
     fn rejects_oversize_fragment_count() {
-        let part = Part::from_fields(1, 9, 9, 0, alloc::vec![0xab]);
+        let part = Part::new(1, 9, 17, 0, alloc::vec![0xab; 2]).unwrap();
         let cbor = encode_part(&part);
-        assert!(matches!(
-            decode_part(&cbor, 8192, 8),
-            Err(Error::ResourceLimit(ResourceKind::FragmentCount))
-        ));
+        let limits = DecoderLimits {
+            max_fragment_count: 8,
+            ..DecoderLimits::default()
+        };
+        let err = decode_part(&cbor, &limits).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::ResourceLimit);
+        assert_eq!(err.limit(), Some(Limit::FragmentCount));
     }
 }

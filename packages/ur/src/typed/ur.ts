@@ -77,7 +77,7 @@ export class Ur {
   checkType(expected: UrType | string): void {
     const want = parseType(expected);
     if (!this.type.equals(want)) {
-      fail("UnexpectedType", { expected: want.value, found: this.type.value });
+      fail({ code: "UnexpectedType", expected: [want], found: this.type });
     }
   }
 }

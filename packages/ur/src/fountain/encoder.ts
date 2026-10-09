@@ -1,18 +1,12 @@
 import { FragmentChooser } from "../consensus/chooser.ts";
 import { checksum } from "../consensus/crc32.ts";
 import { fail } from "../error.ts";
-import { Part } from "./part.ts";
+import type { Part } from "./part.ts";
 
+/** XOR `src` into `target`; buffers are equal-length by construction. */
 function xorInto(target: Uint8Array, src: Uint8Array): void {
-  if (target.length !== src.length) {
-    fail("DecoderState");
-  }
   for (const [i, a] of target.entries()) {
-    const b = src[i];
-    if (b === undefined) {
-      fail("DecoderState");
-    }
-    target[i] = a ^ b;
+    target[i] = a ^ (src[i] ?? 0);
   }
 }
 
@@ -20,13 +14,27 @@ function divCeil(a: number, b: number): number {
   return Math.trunc((a + b - 1) / b);
 }
 
-/** Optimal equal fragment length under a max cap. */
-export function fragmentLength(dataLength: number, maxFragmentLength: number): number {
-  const fragmentCount = divCeil(dataLength, maxFragmentLength);
-  return divCeil(dataLength, fragmentCount);
+const MAX_U32 = 0xff_ff_ff_ff;
+const DEFAULT_MIN_FRAGMENT_LENGTH = 10;
+
+/**
+ * URKit `findNominalFragmentLength` in closed form: the smallest fragment count that fits `max` is
+ * `ceil(len / max)`, bounded above by `floor(len / min)` (and at least 1). When `min` binds,
+ * fragments may exceed `maxFragmentLength` — that is the reference behavior.
+ */
+export function fragmentLength(
+  dataLength: number,
+  maxFragmentLength: number,
+  minFragmentLength: number = DEFAULT_MIN_FRAGMENT_LENGTH,
+): number {
+  const count = Math.min(
+    divCeil(dataLength, maxFragmentLength),
+    Math.max(1, Math.floor(dataLength / minFragmentLength)),
+  );
+  return divCeil(dataLength, count);
 }
 
-/** Pad and split message into equal fragments. */
+/** Pad and split a message into `fragmentLength`-sized fragments. */
 export function partition(data: Uint8Array, fragLen: number): Uint8Array[] {
   const pad = (fragLen - (data.length % fragLen)) % fragLen;
   const padded = new Uint8Array(data.length + pad);
@@ -38,90 +46,115 @@ export function partition(data: Uint8Array, fragLen: number): Uint8Array[] {
   return out;
 }
 
-/** Next 1-based fountain seqNum. Does not wrap. */
-export function nextSequence(current: number): number {
-  if (current === 0xff_ff_ff_ff) {
-    fail("ResourceLimit", { limit: "sequence" });
-  }
-  return current + 1;
-}
+export type FountainEncoderOptions = Readonly<{
+  /** Required; fragments are at most this long unless `minFragmentLength` binds. */
+  maxFragmentLength: number;
+  /** Lower bound on fragment length (default 10). */
+  minFragmentLength?: number;
+  /** Sequence number before the first emitted part (default 0). */
+  firstSequence?: number;
+}>;
 
-/** Fountain encoder. */
-export class FountainEncoder {
-  private readonly parts: Uint8Array[];
-  private readonly sequenceCount: number;
-  private readonly messageLength: number;
-  private readonly messageChecksum: number;
-  private readonly chooser: FragmentChooser;
-  private currentSequence = 0;
+/**
+ * Fountain encoder. An infinite iterator: produces parts with sequence `firstSequence + 1`, `+2`, …
+ * and ends after `0xFFFFFFFF` (UR-ADR-028). For `K == 1` it keeps producing identical parts with
+ * rising sequences.
+ */
+export class FountainEncoder implements IterableIterator<Part> {
+  readonly #parts: Uint8Array[];
+  readonly #chooser: FragmentChooser;
+  readonly #fragLen: number;
+  readonly #msgLen: number;
+  readonly #seqCount: number;
+  readonly #messageChecksum: number;
+  #seq: number;
+  #lastIndexes: ReadonlyArray<number> = [];
 
-  private constructor(
-    parts: Uint8Array[],
-    sequenceCount: number,
-    messageLength: number,
-    messageChecksum: number,
-  ) {
-    this.parts = parts;
-    this.sequenceCount = sequenceCount;
-    this.messageLength = messageLength;
-    this.messageChecksum = messageChecksum;
-    this.chooser = new FragmentChooser(sequenceCount, messageChecksum);
-  }
-
-  static create(message: Uint8Array, maxFragmentLength: number): FountainEncoder {
+  constructor(message: Uint8Array, options: FountainEncoderOptions) {
+    const { maxFragmentLength, minFragmentLength = 10, firstSequence = 0 } = options;
     if (message.length === 0) {
       fail("EmptyMessage");
     }
-    if (!Number.isSafeInteger(maxFragmentLength) || maxFragmentLength < 1) {
-      fail("InvalidFragmentLen");
+    if (message.length > MAX_U32) {
+      fail("MessageTooLong");
     }
-    if (message.length > 0xff_ff_ff_ff) {
-      fail("ResourceLimit", { limit: "message_length" });
+    if (
+      !Number.isSafeInteger(maxFragmentLength) ||
+      maxFragmentLength < 1 ||
+      !Number.isSafeInteger(minFragmentLength) ||
+      minFragmentLength < 1 ||
+      minFragmentLength > maxFragmentLength
+    ) {
+      fail("InvalidFragmentLength");
     }
-    const fragLen = fragmentLength(message.length, maxFragmentLength);
+    if (!Number.isSafeInteger(firstSequence) || firstSequence < 0 || firstSequence > MAX_U32) {
+      throw new RangeError("firstSequence must be an integer in 0..=0xFFFFFFFF");
+    }
+    const fragLen = fragmentLength(message.length, maxFragmentLength, minFragmentLength);
     const fragments = partition(message, fragLen);
-    if (fragments.length > 0xff_ff_ff_ff) {
-      fail("ResourceLimit", { limit: "fragment_count" });
-    }
-    return new FountainEncoder(fragments, fragments.length, message.length, checksum(message));
-  }
-
-  get currentSequenceNum(): number {
-    return this.currentSequence;
+    const messageChecksum = checksum(message);
+    this.#parts = fragments;
+    this.#chooser = new FragmentChooser(fragments.length, messageChecksum);
+    this.#fragLen = fragLen;
+    this.#msgLen = message.length;
+    this.#seqCount = fragments.length;
+    this.#messageChecksum = messageChecksum;
+    this.#seq = firstSequence;
   }
 
   get fragmentCount(): number {
-    return this.sequenceCount;
+    return this.#seqCount;
   }
 
-  get complete(): boolean {
-    return this.currentSequence >= this.sequenceCount;
+  get fragmentLength(): number {
+    return this.#fragLen;
   }
 
-  nextPart(): Part {
-    if (this.sequenceCount === 1 && this.currentSequence >= 1) {
-      fail("SinglePartExhausted");
+  get messageLength(): number {
+    return this.#msgLen;
+  }
+
+  /** Last emitted sequence number, or `firstSequence` before any part. */
+  get sequence(): number {
+    return this.#seq;
+  }
+
+  get isComplete(): boolean {
+    return this.#seq >= this.#seqCount;
+  }
+
+  /** Fragment indexes mixed into the most recently produced part. */
+  get lastFragmentIndexes(): ReadonlyArray<number> {
+    return this.#lastIndexes;
+  }
+
+  next(): IteratorResult<Part, undefined> {
+    if (this.#seq === MAX_U32) {
+      return { value: undefined, done: true };
     }
-    this.currentSequence = nextSequence(this.currentSequence);
-    const indexes = this.chooser.choose(this.currentSequence);
-    const [first] = this.parts;
-    if (first === undefined) {
-      fail("DecoderState");
-    }
-    const mixed = new Uint8Array(first.length);
-    for (const idx of indexes) {
-      const fragment = this.parts[idx];
-      if (fragment === undefined) {
-        fail("DecoderState");
+    this.#seq += 1;
+    const indexes = this.#chooser.choose(this.#seq);
+    // `indexes` is sorted ascending; merge-scan the fragments.
+    const mixed = new Uint8Array(this.#fragLen);
+    let nextIndex = 0;
+    for (const [i, fragment] of this.#parts.entries()) {
+      if (indexes[nextIndex] === i) {
+        xorInto(mixed, fragment);
+        nextIndex += 1;
       }
-      xorInto(mixed, fragment);
     }
-    return Part.fromFields(
-      this.currentSequence,
-      this.sequenceCount,
-      this.messageLength,
-      this.messageChecksum,
-      mixed,
-    );
+    const part: Part = {
+      sequence: this.#seq,
+      sequenceCount: this.#seqCount,
+      messageLength: this.#msgLen,
+      checksum: this.#messageChecksum,
+      data: mixed,
+    };
+    this.#lastIndexes = indexes;
+    return { value: part, done: false };
+  }
+
+  [Symbol.iterator](): this {
+    return this;
   }
 }

@@ -1,6 +1,7 @@
 import { fail } from "../error.ts";
 import { fromUr, tagUrTypes, Ur } from "../typed/index.ts";
 import type { UrCodec } from "../typed/index.ts";
+import { UrType } from "../ur/index.ts";
 
 export function codecMap(
   codecs: ReadonlyArray<UrCodec<unknown>>,
@@ -24,9 +25,10 @@ export function fromUrStringWith(
   const ur = Ur.fromUrString(uri);
   const codec = codecs.get(ur.type.value);
   if (codec === undefined) {
-    fail("UnexpectedType", {
-      expected: [...codecs.keys()].join("|"),
-      found: ur.type.value,
+    fail({
+      code: "UnexpectedType",
+      expected: [...codecs.keys()].map((t) => UrType.parse(t)),
+      found: ur.type,
     });
   }
   return { type: ur.type.value, value: fromUr(ur, codec) };

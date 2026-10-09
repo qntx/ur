@@ -121,8 +121,12 @@ fn fit_fragment_len(data: &[u8], ur_type: &UrType, max_chars: usize) -> Result<u
                 best = Some(mid);
                 lo = mid.saturating_add(1);
             }
-            Ok(_) | Err(Error::Bcur(_)) => {
+            Ok(_) => {
                 hi = mid.saturating_sub(1);
+            }
+            // Construction fails only for `mid < min_fragment_len`: search upward.
+            Err(Error::Bcur(_)) => {
+                lo = mid.saturating_add(1);
             }
             Err(e) => return Err(e),
         }

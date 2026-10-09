@@ -11,10 +11,12 @@ import {
 import {
   FountainDecoder,
   FountainEncoder,
-  Part,
+  decodePart,
+  encodePart,
   fragmentLength,
   partition,
 } from "../../src/fountain/index.ts";
+import type { FountainEncoderOptions } from "../../src/fountain/index.ts";
 import { makeMessage } from "../message.ts";
 import { vectorJson } from "../vectors.ts";
 
@@ -50,6 +52,52 @@ const FRAG_LEN = vectorJson<{
     expected: number;
   }>;
 }>("official/mur/fragment-length.json");
+const PART_CBOR_DECODE = vectorJson<{
+  cases: Array<{
+    name: string;
+    cborHex: string;
+    limits?: { maxFragmentCount?: number; maxFragmentDataLength?: number };
+    part?: {
+      sequence: number;
+      sequenceCount: number;
+      messageLength: number;
+      checksum: number;
+      dataHex: string;
+    };
+    reencodedHex?: string;
+    error?: { code: string; limit?: string };
+  }>;
+}>("fountain/part-cbor-decode.json");
+const ENCODER_OPTIONS = vectorJson<{
+  cases: Array<
+    | {
+        name: string;
+        kind: "fragment-length";
+        message: Msg;
+        maxFragmentLength: number;
+        minFragmentLength?: number;
+        fragmentLength: number;
+        fragmentCount: number;
+      }
+    | {
+        name: string;
+        kind: "sequences";
+        message: Msg;
+        maxFragmentLength: number;
+        minFragmentLength?: number;
+        firstSequence?: number;
+        sequences: number[];
+        isCompleteAfter: boolean[];
+        dataHex: string[];
+        lastFragmentIndexes: number[][];
+        doneAfter: boolean;
+      }
+  >;
+}>("fountain/encoder-options.json");
+const optionFragLenCases = ENCODER_OPTIONS.cases.flatMap((c) =>
+  c.kind === "fragment-length" ? [c] : [],
+);
+const optionSeqCases = ENCODER_OPTIONS.cases.flatMap((c) => (c.kind === "sequences" ? [c] : []));
 const PARTITION = vectorJson<{
   cases: Array<{
     message: Msg;
@@ -109,6 +157,7 @@ const ENCODER = vectorJson<{
     kind: string;
     message: Msg;
     maxFragmentLength: number;
+    minFragmentLength?: number;
     parts?: Array<{
       seqNum: number;
       seqLen: number;
@@ -179,10 +228,23 @@ function countsByKey(values: number[]): number[] {
   return [...counts.keys()].toSorted((a, b) => a - b).map((k) => counts.get(k) ?? 0);
 }
 
-function fragmentCount(c: { message?: Msg; maxFragmentLength?: number }): number {
+function fragmentCount(c: {
+  message?: Msg;
+  maxFragmentLength?: number;
+  minFragmentLength?: number;
+}): number {
   const msg = c.message ?? { seed: "", length: 0 };
-  const fragLen = fragmentLength(msg.length, c.maxFragmentLength ?? 0);
+  const fragLen = fragmentLength(msg.length, c.maxFragmentLength ?? 0, c.minFragmentLength);
   return partition(makeMessage(msg.seed, msg.length), fragLen).length;
+}
+
+function errorCodeOf(fn: () => void): string {
+  try {
+    fn();
+    return "none";
+  } catch (error) {
+    return error instanceof Error && "code" in error ? String(error.code) : "other";
+  }
 }
 
 function degreesFor(c: (typeof DEGREE.cases)[number], fragmentCount: number): number[] {
@@ -227,6 +289,7 @@ const encoderPartRows = encoderPartCases.map((c) => ({
   name: c.name,
   message: c.message,
   maxFragmentLength: c.maxFragmentLength,
+  minFragmentLength: c.minFragmentLength,
   parts: c.parts ?? [],
 }));
 
@@ -254,14 +317,14 @@ test.each(NEXT_DOUBLE.cases)("consensus.xoshiro next-double $name", (c) => {
 });
 
 test.each(FRAG_LEN.cases)("fountain.fragment-length $messageLength@$maxFragmentLength", (c) => {
-  // minFragmentLength is not yet supported (F-11); both official cases pass because the
-  // minimum bound does not bind (fragmentLength ignores it).
-  expect(fragmentLength(c.messageLength, c.maxFragmentLength)).toBe(c.expected);
+  expect(fragmentLength(c.messageLength, c.maxFragmentLength, c.minFragmentLength)).toBe(
+    c.expected,
+  );
 });
 
 test.each(PARTITION.cases)("fountain.partition %#", (c) => {
   const message = makeMessage(c.message.seed, c.message.length);
-  const fragLen = fragmentLength(c.message.length, c.maxFragmentLength);
+  const fragLen = fragmentLength(c.message.length, c.maxFragmentLength, c.minFragmentLength);
   expect(partition(message, fragLen).map(hex)).toStrictEqual(c.fragmentsHex);
 });
 
@@ -300,34 +363,69 @@ test.each(shufflePrefix)("consensus.shuffle $name", (c) => {
 
 test.each(CHOOSER.cases)("consensus.chooser %#", (c) => {
   const message = makeMessage(c.message.seed, c.message.length);
-  const fragLen = fragmentLength(c.message.length, c.maxFragmentLength);
+  const fragLen = fragmentLength(c.message.length, c.maxFragmentLength, c.minFragmentLength);
   const fragments = partition(message, fragLen);
   const chooser = new FragmentChooser(fragments.length, checksum(message));
   const indexes = c.sequences.map((seq) => chooser.choose(seq));
   expect(indexes).toStrictEqual(c.indexes);
 });
 
-test.each(PART_CBOR.cases)("fountain.part-cbor %#", (c) => {
-  const part = Part.fromFields(
-    c.seqNum,
-    c.seqLen,
-    c.messageLen,
-    Number.parseInt(c.checksum, 16),
-    unhex(c.dataHex),
-  );
-  expect(hex(part.toCbor())).toBe(c.cborHex);
-  const round = Part.fromCbor(unhex(c.cborHex));
-  expect(hex(round.toCbor())).toBe(c.cborHex);
+const partCborValid = PART_CBOR.cases.flatMap((c) =>
+  BigInt(c.seqLen) * BigInt(c.dataHex.length / 2) >= BigInt(c.messageLen) ? [c] : [],
+);
+const partCborInvalid = PART_CBOR.cases.flatMap((c) =>
+  BigInt(c.seqLen) * BigInt(c.dataHex.length / 2) >= BigInt(c.messageLen) ? [] : [c],
+);
+const partCborDecodeAccept = PART_CBOR_DECODE.cases.flatMap((c) =>
+  c.error === undefined ? [c] : [],
+);
+const partCborDecodeReject = PART_CBOR_DECODE.cases.flatMap((c) =>
+  c.error === undefined ? [] : [c],
+);
+
+// The official fixture is synthetic CBOR whose K * fragLen < messageLen;
+// R1b rejects it at decode while the reference implementation does not check.
+test.each(partCborValid)("fountain.part-cbor %#", (c) => {
+  const cbor = unhex(c.cborHex);
+  const part = {
+    sequence: c.seqNum,
+    sequenceCount: c.seqLen,
+    messageLength: c.messageLen,
+    checksum: Number.parseInt(c.checksum, 16),
+    data: unhex(c.dataHex),
+  };
+  expect(hex(encodePart(part))).toBe(c.cborHex);
+  const round = decodePart(cbor);
+  expect(hex(encodePart(round))).toBe(c.cborHex);
   expect(round.sequence).toBe(c.seqNum);
   expect(hex(round.data)).toBe(c.dataHex);
 });
 
+test.each(partCborInvalid)("fountain.part-cbor invalid %#", (c) => {
+  expect(errorCodeOf(() => decodePart(unhex(c.cborHex)))).toBe("InvalidPart");
+});
+
+test.each(partCborDecodeAccept)("fountain.part-cbor decode $name", (c) => {
+  const part = decodePart(unhex(c.cborHex), c.limits);
+  const want = c.part!;
+  expect(part.sequence).toBe(want.sequence);
+  expect(part.sequenceCount).toBe(want.sequenceCount);
+  expect(part.messageLength).toBe(want.messageLength);
+  expect(part.checksum).toBe(want.checksum);
+  expect(hex(part.data)).toBe(want.dataHex);
+  expect(hex(encodePart(part))).toBe(c.reencodedHex);
+});
+
+test.each(partCborDecodeReject)("fountain.part-cbor decode rejects $name", (c) => {
+  expect(errorCodeOf(() => decodePart(unhex(c.cborHex), c.limits))).toBe(c.error!.code);
+});
+
 test.each(encoderPartRows)("fountain.encoder $name", (c) => {
-  const encoder = FountainEncoder.create(
+  const encoder = new FountainEncoder(
     makeMessage(c.message.seed, c.message.length),
-    c.maxFragmentLength,
+    fountainOptions(c),
   );
-  const parts = Array.from({ length: c.parts.length }, () => encoder.nextPart());
+  const parts = Array.from({ length: c.parts.length }, () => encoder.next().value!);
   expect(
     parts.map((p) => ({
       seqNum: p.sequence,
@@ -335,19 +433,18 @@ test.each(encoderPartRows)("fountain.encoder $name", (c) => {
       messageLen: p.messageLength,
       checksum: p.checksum.toString(16).padStart(8, "0"),
       dataHex: hex(p.data),
-      cborHex: hex(p.toCbor()),
+      cborHex: hex(encodePart(p)),
     })),
   ).toStrictEqual(c.parts);
 });
 
 test.each(encoderCompleteCases)("fountain.encoder $name", (c) => {
-  const encoder = FountainEncoder.create(
-    makeMessage(c.message.seed, c.message.length),
-    c.maxFragmentLength,
-  );
+  const encoder = new FountainEncoder(makeMessage(c.message.seed, c.message.length), {
+    maxFragmentLength: c.maxFragmentLength,
+  });
   let generated = 0;
-  while (!encoder.complete) {
-    encoder.nextPart();
+  while (!encoder.isComplete) {
+    encoder.next();
     generated += 1;
   }
   expect(generated).toBe(c.expectCompleteAfterParts);
@@ -355,15 +452,96 @@ test.each(encoderCompleteCases)("fountain.encoder $name", (c) => {
 
 test.each(decoderRows)("fountain.decoder %#", (c) => {
   const message = makeMessage(c.message.seed, c.message.length);
-  const encoder = FountainEncoder.create(message, c.maxFragmentLength);
-  // firstSeqNum is not supported (F-11): discarding the first N emitted parts is equivalent
-  // wire behavior to constructing the encoder with firstSeqNum = N.
-  for (let i = 0; i < c.firstSeqNum; i += 1) {
-    encoder.nextPart();
-  }
+  const encoder = new FountainEncoder(message, {
+    maxFragmentLength: c.maxFragmentLength,
+    firstSequence: c.firstSeqNum,
+  });
   const decoder = new FountainDecoder();
   while (!decoder.complete) {
-    decoder.receive(encoder.nextPart());
+    decoder.receive(encoder.next().value!);
   }
   expect(decoder.message()).toStrictEqual(message);
+});
+
+function fountainOptions(c: {
+  maxFragmentLength: number;
+  minFragmentLength?: number | undefined;
+  firstSequence?: number | undefined;
+}): FountainEncoderOptions {
+  return {
+    maxFragmentLength: c.maxFragmentLength,
+    ...(c.minFragmentLength === undefined ? {} : { minFragmentLength: c.minFragmentLength }),
+    ...(c.firstSequence === undefined ? {} : { firstSequence: c.firstSequence }),
+  };
+}
+
+test.each(optionFragLenCases)("fountain.encoder options $name", (c) => {
+  const got = fragmentLength(c.message.length, c.maxFragmentLength, c.minFragmentLength);
+  expect(got).toBe(c.fragmentLength);
+  expect(Math.ceil(c.message.length / got)).toBe(c.fragmentCount);
+});
+
+test.each(optionSeqCases)("fountain.encoder options $name", (c) => {
+  const encoder = new FountainEncoder(
+    makeMessage(c.message.seed, c.message.length),
+    fountainOptions(c),
+  );
+  const sequences: number[] = [];
+  const completes: boolean[] = [];
+  const dataHex: string[] = [];
+  const lastIndexes: number[][] = [];
+  for (const _seq of c.sequences) {
+    const { value } = encoder.next();
+    sequences.push(value!.sequence);
+    completes.push(encoder.isComplete);
+    dataHex.push(hex(value!.data));
+    lastIndexes.push([...encoder.lastFragmentIndexes]);
+  }
+  expect(sequences).toStrictEqual(c.sequences);
+  expect(completes).toStrictEqual(c.isCompleteAfter);
+  expect(dataHex).toStrictEqual(c.dataHex);
+  expect(lastIndexes).toStrictEqual(c.lastFragmentIndexes);
+  expect(encoder.next().done).toBe(c.doneAfter);
+});
+
+test.each(degreeChooserCases)("consensus.sampler $name", (c) => {
+  const degrees = degreesFor(c, fragmentCount(c));
+  expect({ degrees, totals: countsByKey(degrees) }).toStrictEqual({
+    degrees: c.degrees,
+    totals: c.totals,
+  });
+});
+
+test.each(degreeNonceCases)("consensus.sampler $name", (c) => {
+  expect(degreesFor(c, fragmentCount(c))).toStrictEqual(c.degrees);
+});
+
+test.each(samplerRows)("consensus.sampler $name", (c) => {
+  const sampler = Sampler.new(c.probabilities);
+  const rng = Xoshiro256.fromString(c.rngSeed);
+  const samples = Array.from({ length: c.count }, () => sampler.next(rng));
+  expect({ samples, totals: countsByKey(samples) }).toStrictEqual({
+    samples: c.samples,
+    totals: c.totals,
+  });
+});
+
+test.each(shuffleContinuedRows)("consensus.shuffle $name", (c) => {
+  const rng = Xoshiro256.fromString(c.rngSeed);
+  const rounds = Array.from({ length: c.rounds }, () => rng.shuffled(c.values));
+  expect(rounds).toStrictEqual(c.expected);
+});
+
+test.each(shufflePrefix)("consensus.shuffle $name", (c) => {
+  const rng = Xoshiro256.fromString(c.rngSeed);
+  expect(rng.shuffled(c.values, c.count)).toStrictEqual(c.expected);
+});
+
+test.each(CHOOSER.cases)("consensus.chooser %#", (c) => {
+  const message = makeMessage(c.message.seed, c.message.length);
+  const fragLen = fragmentLength(c.message.length, c.maxFragmentLength, c.minFragmentLength);
+  const fragments = partition(message, fragLen);
+  const chooser = new FragmentChooser(fragments.length, checksum(message));
+  const indexes = c.sequences.map((seq) => chooser.choose(seq));
+  expect(indexes).toStrictEqual(c.indexes);
 });

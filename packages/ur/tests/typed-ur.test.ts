@@ -50,7 +50,7 @@ test("non-canonical integer body is CborDecode", () => {
 });
 
 test("multipart URI is NotSinglePart", () => {
-  const encoder = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(8)), 5);
+  const encoder = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(8)), 10);
   expect(encoder.isSinglePart).toBe(false);
   expect(errorOf(() => Ur.fromUrString(encoder.nextPart())).code).toBe("NotSinglePart");
 });

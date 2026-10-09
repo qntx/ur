@@ -31,7 +31,7 @@ fn uppercase_qr_roundtrip_single_and_multi() {
     assert_eq!(decode(&upper).unwrap(), decode(&lower).unwrap());
 
     let data = b"bc-ur multipath".repeat(8);
-    let mut encoder = Encoder::bytes(&data, 6).unwrap();
+    let mut encoder = Encoder::bytes(&data, 10).unwrap();
     let mut decoder = Decoder::default();
     while !decoder.complete() {
         let part = encoder.next_part().unwrap();
