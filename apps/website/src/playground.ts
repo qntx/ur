@@ -1,5 +1,5 @@
 import { UrDecoder } from "@qntx/ur";
-import { Ur, fromUr, psbtCodec, seedCodec, toUr, toUrString } from "@qntx/ur/registry";
+import { Ur, fromUr, psbtCodec, seedCodec, toUr } from "@qntx/ur/registry";
 
 export const SEED_ENTROPY_BYTES = 16;
 export const PSBT_MAX_FRAGMENT_LENGTH = 50;
@@ -33,7 +33,7 @@ export function randomBytes(n: number): Uint8Array {
 }
 
 export function encodeSeed(payload: Uint8Array): string {
-  return toUrString({ payload }, seedCodec);
+  return toUr({ payload }, seedCodec).toString();
 }
 
 export function encodePsbtParts(bytes: Uint8Array): string[] {

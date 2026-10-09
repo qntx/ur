@@ -21,17 +21,20 @@ export const seedYinmnFull = {
   ur: "ur:seed/oxadgdhkwzdtfthptokigtvwnnjsqzcxknsktdaosecyidbbwnnnaxjyhkinjtjnjtcxfwjzkpihcxfpiainiecxfekshsjnaaksdighisinjkcxinjkcxjlkpjpcxjkjyhsjtiehsjpiecxeheyetdpidinjycxjyihjkjycxjkihihiedmksjpaate",
 } as const;
 
-/** BCR-2020-006 historical example: creation-date tag 100. Negative test only. */
+/** BCR-2020-006 historical example: creation-date tag 100 (UR-ADR-019 read form). */
 export const seedHistoricalTag100Ur =
   "ur:seed/oeadgdstaslplabghydrpfmkbggufgludprfgmaotpiecffltnlpqdenos" as const;
 
 /**
  * Official crypto-seed vector, BCR-2020-006 papers/bcr-2020-006-urtypes.md @
- * bd51df477da12d49f09f1727b018b5cb50c6e929. Body carries creation-date tag 100, which stays
- * rejected: negative test only.
+ * bd51df477da12d49f09f1727b018b5cb50c6e929. Body carries creation-date tag 100.
  */
 export const seedHistoricalTag100V1Ur =
   "ur:crypto-seed/oeadgdstaslplabghydrpfmkbggufgludprfgmaotpiecffltnlpqdenos" as const;
+
+/** Canonical re-encode of the tag-100 body: writes tag 1 (18394 days = 1589241600 s). */
+export const seedTag1RoundTripUr =
+  "ur:seed/oeadgdstaslplabghydrpfmkbggufgludprfgmaosecyhyrhvdaednlbbywe" as const;
 
 /**
  * No official v1 seed UR without tag 100 exists; token swapped on the v2 c709 golden (v1/v2 bodies

@@ -67,7 +67,7 @@ test("multipart URI is NotSinglePart", () => {
   expect(errorOf(() => Ur.parse(nextUr(encoder))).code).toBe("NotSinglePart");
 });
 
-test("uppercase fromUrString matches golden", () => {
+test("uppercase Ur.parse matches golden", () => {
   const decoded = Ur.parse(L4.uriUpper);
   expect(decoded.toString()).toBe(L4.uri);
   expect(decoded.type).toBe(L4.type);

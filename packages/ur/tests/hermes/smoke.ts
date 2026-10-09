@@ -7,15 +7,7 @@ import {
   parseUr,
   parseUrType,
 } from "../../src/index.ts";
-import {
-  Ur,
-  fromUr,
-  fromUrString,
-  psbtCodec,
-  seedCodec,
-  toUr,
-  toUrString,
-} from "../../src/registry/index.ts";
+import { Ur, fromUr, psbtCodec, seedCodec, toUr } from "../../src/registry/index.ts";
 
 /**
  * Hermes smoke test: bundled to a single classic script and run on the Hermes V1 CLI that React
@@ -108,9 +100,9 @@ export function main(): void {
   // The `name` field forces a dCBOR text-string decode through the TextDecoder
   // shim (dcbor decodes text with `{ fatal: true }`).
   const seedPayload = hexToBytes("000102030405060708090a0b0c0d0e0f");
-  const seedUri = toUrString({ payload: seedPayload, name: "hermes" }, seedCodec);
+  const seedUri = toUr({ payload: seedPayload, name: "hermes" }, seedCodec).toString();
   assert(seedUri.startsWith("ur:seed/"), "seed ur type");
-  const seed = fromUrString(seedUri, seedCodec);
+  const seed = fromUr(Ur.parse(seedUri), seedCodec);
   eq(bytesToHex(seed.payload), bytesToHex(seedPayload), "seed round trip");
   eq(seed.name, "hermes", "seed name text decode");
 

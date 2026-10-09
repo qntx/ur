@@ -1,14 +1,15 @@
 export {
   type UrCodec,
+  codecUrTypes,
   toUr,
   fromUr,
-  toUrString,
-  fromUrString,
+  toTagged,
+  fromTagged,
+  codecMap,
+  fromUrWith,
   Ur,
-  firstTagUrType,
   isUrType,
   parseUrType,
-  tagUrTypes,
   type UrType,
 } from "../typed/index.ts";
 export { UrError, type UrErrorCode, type UrErrorInfo, type UrLimit } from "../error.ts";
@@ -20,6 +21,5 @@ export { coinInfoCodec, type CoinInfo, CoinType, Network } from "./coin-info.ts"
 export { hdKeyCodec, type HdKey, type MasterHdKey, type DerivedHdKey } from "./hdkey.ts";
 export { sskrCodec, type SskrShare } from "./sskr.ts";
 export { envelopeCodec, assertEnvelopeContent, ENVELOPE_MAX_DEPTH } from "./envelope.ts";
-export { codecMap, fromUrStringWith } from "./codecs.ts";
 export { seedDigest, hdKeyDigestSource, hdKeyDigest } from "./digest.ts";
 export * from "./tags.ts";

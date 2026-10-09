@@ -6,13 +6,16 @@ use super::{Ur, map_cbor};
 use crate::error::ErrorKind;
 use crate::{Error, Result, UrType};
 
-/// Valid UR types for `T`: the names of every registered CBOR tag that are
-/// themselves valid type tokens.
-fn tag_ur_types<T: CBORTagged>() -> Vec<UrType> {
+/// Valid UR types for `T`: every `cbor_tags()` name must be a valid type token.
+fn tag_ur_types<T: CBORTagged>() -> Result<Vec<UrType>> {
     T::cbor_tags()
         .iter()
-        .filter_map(dcbor::Tag::name)
-        .filter_map(|name| UrType::new(&name).ok())
+        .map(|tag| {
+            let name = tag
+                .name()
+                .ok_or_else(|| Error::new(ErrorKind::InvalidType))?;
+            UrType::new(&name)
+        })
         .collect()
 }
 
@@ -62,7 +65,7 @@ impl<T: CBORTaggedEncodable> UrEncodable for T {
 
 impl<T: CBORTaggedDecodable> UrDecodable for T {
     fn from_ur(ur: &Ur) -> Result<Self> {
-        let expected = tag_ur_types::<T>();
+        let expected = tag_ur_types::<T>()?;
         if expected.is_empty() {
             return Err(Error::new(ErrorKind::InvalidType));
         }

@@ -143,6 +143,87 @@ const _: fn(&Error) -> bool = Error::is_fatal;
 const _: fn(&Progress) -> u32 = Progress::fragment_count;
 const _: fn(&Progress) -> f64 = Progress::ratio;
 
+// ---- typed (L4, feature `dcbor`) --------------------------------------------
+
+#[cfg(feature = "dcbor")]
+mod l4 {
+    use std::fmt::Display;
+    use std::str::FromStr;
+
+    use dcbor::{CBOR, CBORTagged, CBORTaggedDecodable, CBORTaggedEncodable, Tag};
+
+    use bcur::fountain::EncoderOptions;
+    use bcur::ur::{self, Encoder};
+    use bcur::{Result, Ur, UrDecodable, UrEncodable, UrType};
+
+    const _: fn(UrType, CBOR) -> Ur = ur_new::<CBOR>;
+
+    fn ur_new<C: Into<CBOR>>(ur_type: UrType, cbor: C) -> Ur {
+        Ur::new(ur_type, cbor)
+    }
+    const _: fn(UrType, &[u8]) -> Result<Ur> = Ur::from_cbor_data;
+    const _: fn(&Ur) -> &UrType = Ur::ur_type;
+    const _: fn(&Ur) -> &CBOR = Ur::cbor;
+    const _: fn(Ur) -> CBOR = Ur::into_cbor;
+    const _: fn(&Ur) -> Vec<u8> = Ur::to_cbor_data;
+    const _: fn(&Ur) -> String = Ur::to_qr_string;
+    const _: fn(&Ur, EncoderOptions) -> Result<Encoder> = Ur::encoder;
+    const _: fn(ur::Decoded) -> Result<Ur> = decoded_into_ur;
+
+    fn decoded_into_ur(decoded: ur::Decoded) -> Result<Ur> {
+        Ur::try_from(decoded)
+    }
+    const _: fn(&Ur, &mut std::fmt::Formatter<'_>) -> std::fmt::Result = <Ur as Display>::fmt;
+    const _: fn(&str) -> Result<Ur> = ur_from_str;
+
+    fn ur_from_str(s: &str) -> Result<Ur> {
+        Ur::from_str(s)
+    }
+
+    fn encodable<T: UrEncodable>(value: &T) -> Result<Ur> {
+        value.to_ur()
+    }
+
+    fn decodable<T: UrDecodable>(ur: &Ur) -> Result<T> {
+        T::from_ur(ur)
+    }
+
+    /// Minimal named-tag type for the trait-bound checks.
+    struct ApiNote(u8);
+
+    impl CBORTagged for ApiNote {
+        fn cbor_tags() -> Vec<Tag> {
+            vec![Tag::with_static_name(40_002, "api-note")]
+        }
+    }
+
+    impl CBORTaggedEncodable for ApiNote {
+        fn untagged_cbor(&self) -> CBOR {
+            self.0.into()
+        }
+    }
+
+    impl CBORTaggedDecodable for ApiNote {
+        fn from_untagged_cbor(cbor: CBOR) -> dcbor::Result<Self> {
+            Ok(Self(cbor.try_into()?))
+        }
+    }
+
+    impl TryFrom<CBOR> for ApiNote {
+        type Error = dcbor::Error;
+
+        fn try_from(cbor: CBOR) -> dcbor::Result<Self> {
+            Self::from_tagged_cbor(cbor)
+        }
+    }
+
+    #[test]
+    fn l4_api_items_exist() {
+        let ur = encodable(&ApiNote(7)).unwrap();
+        let _note = decodable::<ApiNote>(&ur).unwrap();
+    }
+}
+
 #[test]
 fn public_api_items_exist() {
     // Referencing the items above is the check; keep a trivial runtime anchor.

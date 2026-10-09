@@ -1,3 +1,4 @@
+import { extractTaggedContent, taggedValue, validateTag } from "@blockchaincommons/dcbor";
 import type { Cbor, Tag } from "@blockchaincommons/dcbor";
 
 import { fail } from "../error.ts";
@@ -5,57 +6,95 @@ import { parseUrType } from "../ur/index.ts";
 import type { UrType } from "../ur/index.ts";
 import { Ur, mapCborType } from "./ur.ts";
 
-/** `tags[0]` is written; every tag is accepted on read. Body is untagged. */
-export type UrCodec<T> = {
+/**
+ * Bidirectional codec between a value and its untagged dCBOR body.
+ *
+ * `tags[0]` is written (its name is the UR type); every tag is accepted on read. Tag names must be
+ * non-empty valid UR type tokens, validated each time the codec is used (`InvalidType` otherwise).
+ */
+export type UrCodec<T> = Readonly<{
   /** Most-preferred first. Every `tag.name` is a UR type token accepted on read. */
-  readonly tags: ReadonlyArray<Tag>;
+  tags: readonly [Tag, ...Tag[]];
   // oxlint-disable-next-line typescript/method-signature-style -- bivariance in T keeps UrCodec<Specific> assignable to UrCodec<unknown> for codecMap
-  untaggedCbor(value: T): Cbor;
-  readonly fromUntaggedCbor: (cbor: Cbor) => T;
-};
+  encode(value: T): Cbor;
+  readonly decode: (cbor: Cbor) => T;
+}>;
 
-export function tagUrTypes(tags: ReadonlyArray<Tag>): UrType[] {
-  if (tags.length === 0) {
-    fail("InvalidType");
-  }
-  return tags.map((tag) => {
-    if (tag.name === undefined || tag.name === "") {
-      fail("InvalidType");
-    }
-    return parseUrType(tag.name);
-  });
+/** UR types a codec accepts on read: every tag name, write-preferred first. */
+export function codecUrTypes<T>(codec: UrCodec<T>): readonly [UrType, ...UrType[]] {
+  const [first, ...rest] = codec.tags;
+  return [toUrType(first), ...rest.map(toUrType)];
 }
 
-export function firstTagUrType(tags: ReadonlyArray<Tag>): UrType {
-  const [first] = tagUrTypes(tags);
-  if (first === undefined) {
+function toUrType(tag: Tag): UrType {
+  const { name } = tag;
+  if (name === undefined || name === "") {
     fail("InvalidType");
   }
-  return first;
+  return parseUrType(name);
 }
 
+/** Typed UR for `value`: first tag name as the type, untagged body. */
 export function toUr<T>(value: T, codec: UrCodec<T>): Ur {
-  const type = firstTagUrType(codec.tags);
-  const body = mapCborType(() => codec.untaggedCbor(value));
+  const [type] = codecUrTypes(codec);
+  const body = mapCborType(() => codec.encode(value));
   return Ur.fromCbor(type, body);
 }
 
+/** Decode `ur`'s body when its type is one of the codec's tag names. */
 export function fromUr<T>(ur: Ur, codec: UrCodec<T>): T {
-  const accepted = tagUrTypes(codec.tags);
-  if (!accepted.some((t) => ur.type === t)) {
+  const expected = codecUrTypes(codec);
+  if (!expected.some((t) => ur.type === t)) {
     fail({
       code: "UnexpectedType",
-      expected: accepted,
+      expected,
       found: ur.type,
     });
   }
-  return mapCborType(() => codec.fromUntaggedCbor(ur.cbor));
+  return mapCborType(() => codec.decode(ur.cbor));
 }
 
-export function toUrString<T>(value: T, codec: UrCodec<T>): string {
-  return toUr(value, codec).toString();
+/** `tags[0]`-wrapped dCBOR for `value`. */
+export function toTagged<T>(value: T, codec: UrCodec<T>): Cbor {
+  return mapCborType(() => taggedValue(codec.tags[0], codec.encode(value)));
 }
 
-export function fromUrString<T>(uri: string, codec: UrCodec<T>): T {
-  return fromUr(Ur.parse(uri), codec);
+/** Unwraps any of the codec's tags, then decodes the body. */
+export function fromTagged<T>(cbor: Cbor, codec: UrCodec<T>): T {
+  return mapCborType(() => {
+    validateTag(cbor, [...codec.tags]);
+    return codec.decode(extractTaggedContent(cbor));
+  });
+}
+
+/** `UrType -> codec` map covering every tag name; a duplicate type is `InvalidType`. */
+export function codecMap(
+  codecs: ReadonlyArray<UrCodec<unknown>>,
+): ReadonlyMap<UrType, UrCodec<unknown>> {
+  const map = new Map<UrType, UrCodec<unknown>>();
+  for (const codec of codecs) {
+    for (const type of codecUrTypes(codec)) {
+      if (map.has(type)) {
+        fail("InvalidType");
+      }
+      map.set(type, codec);
+    }
+  }
+  return map;
+}
+
+/** Decodes `ur` through the codec registered for its type. */
+export function fromUrWith(
+  ur: Ur,
+  codecs: ReadonlyMap<UrType, UrCodec<unknown>>,
+): Readonly<{ type: UrType; value: unknown }> {
+  const codec = codecs.get(ur.type);
+  if (codec === undefined) {
+    fail({
+      code: "UnexpectedType",
+      expected: [...codecs.keys()],
+      found: ur.type,
+    });
+  }
+  return { type: ur.type, value: fromUr(ur, codec) };
 }

@@ -8,15 +8,7 @@ import {
 } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
 
-import {
-  Ur,
-  UrError,
-  fromUr,
-  fromUrString,
-  psbtCodec,
-  toUr,
-  toUrString,
-} from "../../src/registry/index.ts";
+import { Ur, UrError, fromUr, psbtCodec, toUr } from "../../src/registry/index.ts";
 import type { Psbt } from "../../src/registry/index.ts";
 import { psbt167, psbt167V1Ur } from "./goldens.ts";
 
@@ -44,9 +36,9 @@ test("psbt codec tag", () => {
 test("167-byte PSBT write golden", () => {
   const psbt: Psbt = { bytes: psbtBytes() };
   expect(psbt.bytes.byteLength).toBe(167);
-  expect(bytesToHex(encodeCbor(psbtCodec.untaggedCbor(psbt)))).toBe(psbt167.cborHex);
-  expect(toUrString(psbt, psbtCodec)).toBe(psbt167.ur);
-  const decoded = fromUrString(psbt167.ur, psbtCodec);
+  expect(bytesToHex(encodeCbor(psbtCodec.encode(psbt)))).toBe(psbt167.cborHex);
+  expect(toUr(psbt, psbtCodec).toString()).toBe(psbt167.ur);
+  const decoded = fromUr(Ur.parse(psbt167.ur), psbtCodec);
   expect(bytesToHex(decoded.bytes)).toBe(bytesToHex(psbt.bytes));
 });
 
@@ -67,19 +59,19 @@ test("fromUr copies decoded bytes", () => {
 test("PSBT without magic prefix is CborType", () => {
   const bytes = new Uint8Array(167);
   bytes.set([0x70, 0x73, 0x62, 0x74, 0xfe]);
-  const encodeErr = errorOf(() => toUrString({ bytes }, psbtCodec));
+  const encodeErr = errorOf(() => toUr({ bytes }, psbtCodec).toString());
   expect(encodeErr.code).toBe("CborType");
   expect(encodeErr.cause).toBeInstanceOf(CborError);
   expect(encodeErr.cause).toMatchObject({ code: "WrongType" });
 
   const uri = Ur.fromCbor("psbt", bytes).toString();
-  const decodeErr = errorOf(() => fromUrString(uri, psbtCodec));
+  const decodeErr = errorOf(() => fromUr(Ur.parse(uri), psbtCodec));
   expect(decodeErr.code).toBe("CborType");
 });
 
 test("PSBT shorter than magic is CborType OutOfRange", () => {
   const err = errorOf(() =>
-    toUrString({ bytes: new Uint8Array([0x70, 0x73, 0x62, 0x74]) }, psbtCodec),
+    toUr({ bytes: new Uint8Array([0x70, 0x73, 0x62, 0x74]) }, psbtCodec).toString(),
   );
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
@@ -87,8 +79,8 @@ test("PSBT shorter than magic is CborType OutOfRange", () => {
 });
 
 test("v1 crypto-psbt decodes and re-encodes as v2", () => {
-  const v1 = fromUrString(psbt167V1Ur, psbtCodec);
-  expect(v1).toStrictEqual(fromUrString(psbt167.ur, psbtCodec));
-  expect(fromUrString(psbt167V1Ur.toUpperCase(), psbtCodec)).toStrictEqual(v1);
-  expect(toUrString(v1, psbtCodec)).toBe(psbt167.ur);
+  const v1 = fromUr(Ur.parse(psbt167V1Ur), psbtCodec);
+  expect(v1).toStrictEqual(fromUr(Ur.parse(psbt167.ur), psbtCodec));
+  expect(fromUr(Ur.parse(psbt167V1Ur.toUpperCase()), psbtCodec)).toStrictEqual(v1);
+  expect(toUr(v1, psbtCodec).toString()).toBe(psbt167.ur);
 });

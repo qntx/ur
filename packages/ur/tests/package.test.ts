@@ -61,7 +61,7 @@ test("packed UrError is one class across entries", async () => {
     assertEnvelopeContent: unknown;
     ENVELOPE_MAX_DEPTH: unknown;
     codecMap: unknown;
-    fromUrStringWith: unknown;
+    fromUrWith: unknown;
   };
   expect(index.UrError).toBe(typed.UrError);
   expect(index.UrError).toBe(registry.UrError);
@@ -78,5 +78,5 @@ test("packed UrError is one class across entries", async () => {
   expect(registry.assertEnvelopeContent).toBeDefined();
   expect(registry.ENVELOPE_MAX_DEPTH).toBe(64);
   expect(registry.codecMap).toBeTypeOf("function");
-  expect(registry.fromUrStringWith).toBeTypeOf("function");
+  expect(registry.fromUrWith).toBeTypeOf("function");
 });

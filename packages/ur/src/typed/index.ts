@@ -1,12 +1,13 @@
 export { Ur } from "./ur.ts";
 export {
   type UrCodec,
-  firstTagUrType,
-  tagUrTypes,
+  codecUrTypes,
   toUr,
   fromUr,
-  toUrString,
-  fromUrString,
+  toTagged,
+  fromTagged,
+  codecMap,
+  fromUrWith,
 } from "./codec.ts";
 export { isUrType, parseUrType, type UrType } from "../ur/index.ts";
 export { UrError, type UrErrorCode, type UrErrorInfo, type UrLimit } from "../error.ts";

@@ -1,0 +1,20 @@
+{
+  "description": "Two-tag codec contract: write uses the first tag name, read accepts any tag name. bodyHex is untagged dCBOR of {1: id, 2: note}.",
+  "type": "x-test",
+  "legacyType": "x-test-legacy",
+  "foreignType": "seed",
+  "primaryTag": 9999,
+  "legacyTag": 9998,
+  "id": 7,
+  "note": "hi",
+  "bodyHex": "a2010702626869",
+  "taggedHex": "d9270fa2010702626869",
+  "legacyTaggedHex": "d9270ea2010702626869",
+  "uri": "ur:x-test/oeadataoidisingseezccy",
+  "legacyUri": "ur:x-test-legacy/oeadataoidisingseezccy",
+  "foreignUri": "ur:seed/oeadataoidisingseezccy",
+  "expectedTypes": [
+    "x-test",
+    "x-test-legacy"
+  ]
+}

@@ -25,10 +25,10 @@ function copyPsbt(bytes: Uint8Array): Uint8Array {
 
 export const psbtCodec: UrCodec<Psbt> = {
   tags: [TAGS.psbt, TAGS["crypto-psbt"]],
-  untaggedCbor(psbt) {
+  encode(psbt) {
     return cbor(copyPsbt(psbt.bytes));
   },
-  fromUntaggedCbor(value: Cbor) {
+  decode(value: Cbor) {
     return Object.freeze({ bytes: copyPsbt(copyBytes(value)) });
   },
 };
