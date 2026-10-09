@@ -30,7 +30,7 @@ function assertInt32(n: number): number {
 
 export const coinInfoCodec: UrCodec<CoinInfo> = {
   tags: [TAGS["coin-info"], TAGS["crypto-coin-info"]],
-  untaggedCbor(info) {
+  encode(info) {
     const map = new CborMap();
     if (info.type !== undefined && info.type !== 0) {
       map.set(1, assertUint31(info.type));
@@ -40,7 +40,7 @@ export const coinInfoCodec: UrCodec<CoinInfo> = {
     }
     return cbor(map);
   },
-  fromUntaggedCbor(value) {
+  decode(value) {
     const map = expectClosedIntMap(value, COIN_INFO_KEYS);
     const type = map.get(1);
     const network = map.get(2);

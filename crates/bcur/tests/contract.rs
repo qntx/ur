@@ -392,3 +392,104 @@ fn published_singles_contract() {
         assert!(matches!(parsed, ParsedUr::Single { .. }));
     }
 }
+
+#[cfg(feature = "dcbor")]
+mod multi_tag {
+    use dcbor::prelude::*;
+    use dcbor::{CBORCase, CBORTagged, CBORTaggedDecodable, CBORTaggedEncodable, Tag};
+
+    use super::{json, json_str, json_u32};
+    use bcur::typed::{Ur, UrDecodable, UrEncodable};
+    use bcur::ur_type;
+    use bcur::{ErrorKind, UrType};
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct MultiTagNote {
+        id: u64,
+        note: String,
+    }
+
+    impl CBORTagged for MultiTagNote {
+        fn cbor_tags() -> Vec<Tag> {
+            vec![
+                Tag::with_static_name(9999, "x-test"),
+                Tag::with_static_name(9998, "x-test-legacy"),
+            ]
+        }
+    }
+
+    impl CBORTaggedEncodable for MultiTagNote {
+        fn untagged_cbor(&self) -> CBOR {
+            let mut map = Map::new();
+            map.insert(1_u64, self.id);
+            map.insert(2_u64, self.note.clone());
+            map.into()
+        }
+    }
+
+    impl CBORTaggedDecodable for MultiTagNote {
+        fn from_untagged_cbor(cbor: CBOR) -> dcbor::Result<Self> {
+            let CBORCase::Map(map) = cbor.into_case() else {
+                return Err(dcbor::Error::WrongType);
+            };
+            Ok(Self {
+                id: map.extract(1_u64)?,
+                note: map.extract(2_u64)?,
+            })
+        }
+    }
+
+    impl TryFrom<CBOR> for MultiTagNote {
+        type Error = dcbor::Error;
+
+        fn try_from(cbor: CBOR) -> dcbor::Result<Self> {
+            Self::from_tagged_cbor(cbor)
+        }
+    }
+
+    #[test]
+    fn l4_multi_tag_contract() {
+        let spec = json(vector!("typed/multi-tag.json"));
+        let value = MultiTagNote {
+            id: u64::from(json_u32(&spec, "id")),
+            note: json_str(&spec, "note").to_owned(),
+        };
+
+        // Write: first tag name, untagged body.
+        let ur = value.to_ur().unwrap();
+        assert_eq!(ur.to_string(), json_str(&spec, "uri"));
+        assert_eq!(hex::encode(ur.to_cbor_data()), json_str(&spec, "bodyHex"));
+
+        // Tagged CBOR under both tags round-trips.
+        let tagged = CBOR::try_from_hex(json_str(&spec, "taggedHex")).unwrap();
+        assert_eq!(MultiTagNote::try_from(tagged).unwrap(), value);
+        let legacy_tagged = CBOR::try_from_hex(json_str(&spec, "legacyTaggedHex")).unwrap();
+        assert_eq!(MultiTagNote::try_from(legacy_tagged).unwrap(), value);
+        assert_eq!(
+            hex::encode(value.tagged_cbor().to_cbor_data()),
+            json_str(&spec, "taggedHex")
+        );
+
+        // Read: either tag name accepted.
+        for key in ["uri", "legacyUri"] {
+            let parsed: Ur = json_str(&spec, key).parse().unwrap();
+            assert_eq!(MultiTagNote::from_ur(&parsed).unwrap(), value);
+        }
+
+        // Foreign type lists every accepted name.
+        let foreign: Ur = json_str(&spec, "foreignUri").parse().unwrap();
+        let err = MultiTagNote::from_ur(&foreign).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::UnexpectedType);
+        let expected: Vec<String> = err.expected_types().iter().map(UrType::to_string).collect();
+        assert_eq!(expected, vec!["x-test", "x-test-legacy"]);
+    }
+
+    #[test]
+    fn l4_multi_tag_write_type_is_first_name() {
+        let value = MultiTagNote {
+            id: 7,
+            note: "hi".to_owned(),
+        };
+        assert_eq!(value.to_ur().unwrap().ur_type(), &ur_type!("x-test"));
+    }
+}

@@ -1,4 +1,13 @@
-import { CborDate, CborError, CborMap, cbor, expectText } from "@blockchaincommons/dcbor";
+import {
+  CborDate,
+  CborError,
+  CborMap,
+  MajorType,
+  cbor,
+  expectInteger,
+  expectText,
+} from "@blockchaincommons/dcbor";
+import type { Cbor } from "@blockchaincommons/dcbor";
 
 import type { UrCodec } from "../typed/codec.ts";
 import { copyBuf, copyBytes } from "./bytes.ts";
@@ -7,10 +16,12 @@ import { TAGS } from "./tags.ts";
 
 const SEED_KEYS: ReadonlySet<number> = new Set([1, 2, 3, 4]);
 const MAX_PAYLOAD = 64;
+const TAG_EPOCH_DAYS = 100;
+const SECONDS_PER_DAY = 86_400;
 
 export type Seed = {
   readonly payload: Uint8Array; // 1..=64 bytes
-  readonly creationDate?: CborDate; // tag 1 only
+  readonly creationDate?: CborDate; // tag 1 on write; tag 1 or 100 on read
   readonly name?: string; // omitted on write if empty
   readonly note?: string;
 };
@@ -21,9 +32,18 @@ function assertPayloadLen(bytes: Uint8Array): void {
   }
 }
 
+/** UR-ADR-019: read tag 1 (seconds) or tag 100 (RFC 8943 days); write is tag 1. */
+function expectSeedDate(value: Cbor): CborDate {
+  if (value.type === MajorType.Tagged && Number(value.tag) === TAG_EPOCH_DAYS) {
+    const days = expectInteger(value.value);
+    return CborDate.fromEpochSeconds(Number(days) * SECONDS_PER_DAY);
+  }
+  return CborDate.fromTaggedCbor(value);
+}
+
 export const seedCodec: UrCodec<Seed> = {
   tags: [TAGS.seed, TAGS["crypto-seed"]],
-  untaggedCbor(seed) {
+  encode(seed) {
     assertPayloadLen(seed.payload);
     const map = new CborMap();
     map.set(1, cbor(copyBuf(seed.payload)));
@@ -38,7 +58,7 @@ export const seedCodec: UrCodec<Seed> = {
     }
     return cbor(map);
   },
-  fromUntaggedCbor(value) {
+  decode(value) {
     const map = expectClosedIntMap(value, SEED_KEYS);
     const payload = copyBytes(map.getOrThrow(1));
     assertPayloadLen(payload);
@@ -47,7 +67,7 @@ export const seedCodec: UrCodec<Seed> = {
     const note = map.get(4);
     return Object.freeze({
       payload,
-      ...(date === undefined ? {} : { creationDate: CborDate.fromTaggedCbor(date) }),
+      ...(date === undefined ? {} : { creationDate: expectSeedDate(date) }),
       ...(name === undefined ? {} : { name: expectText(name) }),
       ...(note === undefined ? {} : { note: expectText(note) }),
     });

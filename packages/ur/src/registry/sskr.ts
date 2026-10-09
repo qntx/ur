@@ -79,10 +79,10 @@ function unpack(bytes: Uint8Array): SskrShare {
 
 export const sskrCodec: UrCodec<SskrShare> = {
   tags: [TAGS.sskr, TAGS["crypto-sskr"]],
-  untaggedCbor(share) {
+  encode(share) {
     return cbor(pack(share));
   },
-  fromUntaggedCbor(value: Cbor) {
+  decode(value: Cbor) {
     return unpack(copyBytes(value));
   },
 };

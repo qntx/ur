@@ -23,8 +23,7 @@ import {
   assertEnvelopeContent,
   envelopeCodec,
   fromUr,
-  fromUrString,
-  toUrString,
+  toUr,
 } from "../../src/registry/index.ts";
 import { envelopeAlice, envelopeNode } from "./goldens.ts";
 
@@ -89,8 +88,8 @@ test("TAGS.envelope and codec tag", () => {
 test("IETF Alice leaf write golden", () => {
   const value = aliceLeaf();
   expect(bytesToHex(encodeCbor(value))).toBe(envelopeAlice.cborHex);
-  expect(envelopeCodec.untaggedCbor(value)).toBe(value);
-  expect(cborEquals(envelopeCodec.fromUntaggedCbor(value), value)).toBe(true);
+  expect(envelopeCodec.encode(value)).toBe(value);
+  expect(cborEquals(envelopeCodec.decode(value), value)).toBe(true);
 });
 
 test("IETF wrapped Alice hex", () => {
@@ -101,9 +100,9 @@ test("IETF wrapped Alice hex", () => {
 
 test("IETF Alice knows Bob node write golden", () => {
   const value = aliceKnowsBob();
-  expect(bytesToHex(encodeCbor(envelopeCodec.untaggedCbor(value)))).toBe(envelopeNode.cborHex);
-  expect(toUrString(value, envelopeCodec)).toBe(envelopeNode.ur);
-  const decoded = fromUrString(envelopeNode.ur, envelopeCodec);
+  expect(bytesToHex(encodeCbor(envelopeCodec.encode(value)))).toBe(envelopeNode.cborHex);
+  expect(toUr(value, envelopeCodec).toString()).toBe(envelopeNode.ur);
+  const decoded = fromUr(Ur.parse(envelopeNode.ur), envelopeCodec);
   expect(cborEquals(decoded, value)).toBe(true);
 });
 
@@ -126,11 +125,11 @@ test("array of length 1 is CborType WrongType", () => {
 test("wrap-chain innermost depth 64 succeeds; 65 is OutOfRange", () => {
   const at64 = wrap(aliceLeaf(), ENVELOPE_MAX_DEPTH);
   assertEnvelopeContent(at64);
-  expect(envelopeCodec.fromUntaggedCbor(at64)).toBe(at64);
+  expect(envelopeCodec.decode(at64)).toBe(at64);
 
   const at65 = wrap(aliceLeaf(), ENVELOPE_MAX_DEPTH + 1);
   expect(cborErrorOf(() => assertEnvelopeContent(at65)).code).toBe("OutOfRange");
-  const err = urErrorOf(() => toUrString(at65, envelopeCodec));
+  const err = urErrorOf(() => toUr(at65, envelopeCodec).toString());
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "OutOfRange" });

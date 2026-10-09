@@ -8,8 +8,7 @@ import {
   UrError,
   coinInfoCodec,
   fromUr,
-  fromUrString,
-  toUrString,
+  toUr,
 } from "../../src/registry/index.ts";
 import type { CoinInfo } from "../../src/registry/index.ts";
 
@@ -26,7 +25,7 @@ function errorOf(fn: () => void): UrError {
 }
 
 function cborHex(info: CoinInfo): string {
-  return bytesToHex(encodeCbor(coinInfoCodec.untaggedCbor(info)));
+  return bytesToHex(encodeCbor(coinInfoCodec.encode(info)));
 }
 
 test("coin-info codec tag", () => {
@@ -37,7 +36,7 @@ test("coin-info codec tag", () => {
 test("empty map is BTC mainnet", () => {
   expect(cborHex({})).toBe("a0");
   expect(cborHex({ type: CoinType.btc, network: Network.mainnet })).toBe("a0");
-  const decoded = fromUrString(toUrString({}, coinInfoCodec), coinInfoCodec);
+  const decoded = fromUr(Ur.parse(toUr({}, coinInfoCodec).toString()), coinInfoCodec);
   expect(decoded.type).toBeUndefined();
   expect(decoded.network).toBeUndefined();
 });
@@ -51,8 +50,8 @@ test("eth type and btc testnet encode hex", () => {
   expect(cborHex({ type: CoinType.eth })).toBe("a101183c");
   expect(cborHex({ network: Network.btcTestnet })).toBe("a10201");
   expect(cborHex({ type: CoinType.eth, network: Network.btcTestnet })).toBe("a201183c0201");
-  const decoded = fromUrString(
-    toUrString({ type: CoinType.eth, network: Network.btcTestnet }, coinInfoCodec),
+  const decoded = fromUr(
+    Ur.parse(toUr({ type: CoinType.eth, network: Network.btcTestnet }, coinInfoCodec).toString()),
     coinInfoCodec,
   );
   expect(decoded.type).toBe(0x3c);
@@ -61,7 +60,7 @@ test("eth type and btc testnet encode hex", () => {
 
 test("network is int32", () => {
   expect(cborHex({ network: -1 })).toBe("a10220");
-  const decoded = fromUrString(toUrString({ network: -1 }, coinInfoCodec), coinInfoCodec);
+  const decoded = fromUr(Ur.parse(toUr({ network: -1 }, coinInfoCodec).toString()), coinInfoCodec);
   expect(decoded.network).toBe(-1);
 });
 
@@ -77,15 +76,15 @@ test("extra map key is CborType", () => {
 test("v1 crypto-coin-info decodes and re-encodes as v2", () => {
   // No official standalone v1 coin-info UR exists; v1/v2 bodies share the CDDL (BCR-2020-006).
   const info: CoinInfo = { type: CoinType.eth, network: Network.btcTestnet };
-  const v1Uri = Ur.fromCbor("crypto-coin-info", coinInfoCodec.untaggedCbor(info)).toString();
-  const v2 = fromUrString(toUrString(info, coinInfoCodec), coinInfoCodec);
-  expect(fromUrString(v1Uri, coinInfoCodec)).toStrictEqual(v2);
-  expect(fromUrString(v1Uri.toUpperCase(), coinInfoCodec)).toStrictEqual(v2);
-  expect(toUrString(v2, coinInfoCodec).startsWith("ur:coin-info/")).toBe(true);
+  const v1Uri = Ur.fromCbor("crypto-coin-info", coinInfoCodec.encode(info)).toString();
+  const v2 = fromUr(Ur.parse(toUr(info, coinInfoCodec).toString()), coinInfoCodec);
+  expect(fromUr(Ur.parse(v1Uri), coinInfoCodec)).toStrictEqual(v2);
+  expect(fromUr(Ur.parse(v1Uri.toUpperCase()), coinInfoCodec)).toStrictEqual(v2);
+  expect(toUr(v2, coinInfoCodec).toString().startsWith("ur:coin-info/")).toBe(true);
 });
 
 test("type above uint31 is CborType OutOfRange", () => {
-  const err = errorOf(() => toUrString({ type: 0x80_00_00_00 }, coinInfoCodec));
+  const err = errorOf(() => toUr({ type: 0x80_00_00_00 }, coinInfoCodec).toString());
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "OutOfRange" });

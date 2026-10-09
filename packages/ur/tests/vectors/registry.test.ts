@@ -9,7 +9,7 @@ import {
   psbtCodec,
   seedCodec,
   sskrCodec,
-  toUrString,
+  toUr,
 } from "../../src/registry/index.ts";
 import type { UrCodec } from "../../src/typed/index.ts";
 import { vectorJson } from "../vectors.ts";
@@ -71,34 +71,42 @@ const shareRows = SSKR.flatMap((c) =>
 
 test.each([...SEED.slice(1), ...PSBT, ...HDKEY])("registry.$urType $name", (c) => {
   const codec = codecFor(c);
-  const value = codec.fromUntaggedCbor(decodeCbor(cborBytes(c)));
-  expect(bytesToHex(encodeCbor(codec.untaggedCbor(value)))).toBe(c.cborHex);
-  expect(toUrString(value, codec)).toBe(c.ur);
+  const value = codec.decode(decodeCbor(cborBytes(c)));
+  expect(bytesToHex(encodeCbor(codec.encode(value)))).toBe(c.cborHex);
+  expect(toUr(value, codec).toString()).toBe(c.ur);
 });
 
 test.each(digestCases)("registry.hdkey $name digest", (c) => {
-  const value = hdKeyCodec.fromUntaggedCbor(decodeCbor(cborBytes(c)));
+  const value = hdKeyCodec.decode(decodeCbor(cborBytes(c)));
   expect(bytesToHex(hdKeyDigestSource(value))).toBe(c.digestSourceHex);
   expect(bytesToHex(hdKeyDigest(value))).toBe(c.digestHex);
 });
 
-// F-01: seedCodec rejects the v2 creation-date form (CBOR tag 100); decode round-trip cannot
-// succeed until the seed schema is redesigned (R4).
-const [SEED_V2] = SEED;
-if (SEED_V2 !== undefined) {
-  test.fails(`registry.seed ${SEED_V2.name} [F-01]`, () => {
-    const codec = codecFor(SEED_V2);
-    const value = codec.fromUntaggedCbor(decodeCbor(cborBytes(SEED_V2)));
-    expect(bytesToHex(encodeCbor(codec.untaggedCbor(value)))).toBe(SEED_V2.cborHex);
-    expect(toUrString(value, codec)).toBe(SEED_V2.ur);
-  });
+// UR-ADR-019 (was F-01): the tag-100 creation date reads as the tag-1 date and
+// re-encodes as tag 1 — the official vector's input is the tag-100 form.
+function must<T>(value: T | undefined, what: string): T {
+  if (value === undefined) {
+    throw new Error(`missing ${what}`);
+  }
+  return value;
 }
 
+const SEED_V2 = must(SEED[0], "seed tag-100 case");
+const SEED_V2_TAG1_CBOR_HEX = "a20150c7098580125e2ab0981253468b2dbc5202c11a5eb9e700";
+const SEED_V2_TAG1_UR = "ur:seed/oeadgdstaslplabghydrpfmkbggufgludprfgmaosecyhyrhvdaednlbbywe";
+
+test(`registry.seed ${SEED_V2.name} round trip`, () => {
+  const codec = codecFor(SEED_V2);
+  const value = codec.decode(decodeCbor(cborBytes(SEED_V2)));
+  expect(bytesToHex(encodeCbor(codec.encode(value)))).toBe(SEED_V2_TAG1_CBOR_HEX);
+  expect(toUr(value, codec).toString()).toBe(SEED_V2_TAG1_UR);
+});
+
 test.each(shareRows)("registry.sskr $name share $index", (share) => {
-  const value = sskrCodec.fromUntaggedCbor(decodeCbor(hexToBytes(share.cborHex)));
-  expect(bytesToHex(encodeCbor(sskrCodec.untaggedCbor(value)))).toBe(share.cborHex);
+  const value = sskrCodec.decode(decodeCbor(hexToBytes(share.cborHex)));
+  expect(bytesToHex(encodeCbor(sskrCodec.encode(value)))).toBe(share.cborHex);
   // Tagged share as standard bytewords (the doc's display form).
   const tagged = decodeBytewords(share.bytewords, "standard");
   expect(bytesToHex(tagged)).toBe(share.taggedCborHex);
-  expect(toUrString(value, sskrCodec)).toBe(share.ur);
+  expect(toUr(value, sskrCodec).toString()).toBe(share.ur);
 });

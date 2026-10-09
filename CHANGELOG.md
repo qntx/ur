@@ -17,21 +17,29 @@
 - `parseUr`/`ur::parse` replace the decode family. TS removes `decode`, `decodeWithType`, `decodeMessage`, `normalizeUr`, `parse`, `parseNormalized`, `Kind`, and the old `ParsedUr`; the new `parseUr(text, limits?)` returns `{ kind: "single"; type; message } | { kind: "multi"; type; part }`. Rust removes `ur::decode`, `decode_message`, `decode_with_type`, `normalize_ur`, and `Kind`; `ur::parse(text, &DecoderLimits)` returns the new `ParsedUr::{Single, Multi}` enum. Encoding is `encodeUr`/`ur::encode` and `toQrString`/`ur::to_qr_string`.
 - `UrEncoder`/`ur::Encoder` are iterators of UR strings. TS `new UrEncoder(type, message, options)` implements `IterableIterator<string>` with `type`/`fragmentCount`/`isSinglePart`/`isComplete`/`lastFragmentIndexes`; K = 1 repeats the single-part UR. Rust `ur::Encoder::new(ur_type, message, EncoderOptions)` implements `Iterator<Item = String>` + `FusedIterator`; `next_part`, `Encoder::bytes`, `Encoder::with_options`, and `qr_string` are removed.
 - UR part headers follow a strict grammar `seq = 1*DIGIT "-" 1*DIGIT` with both fields in `1..=0xFFFFFFFF`: no signs, no whitespace, no extra separators; leading zeros are allowed.
+- `UrCodec<T>` is a flat `{ tags: readonly [Tag, ...Tag[]], encode(value): Cbor, decode(cbor): T }` contract: `tags[0]` is written, every named tag is accepted on read, and every tag name must be a valid UR type (`InvalidType`). The codec helpers are `codecUrTypes`, `toUr`, `fromUr`, `toTagged`, `fromTagged`, `codecMap`, and `fromUrWith`; `toUrString`, `fromUrString`, `firstTagUrType`, `tagUrTypes`, and the registry's `fromUrStringWith` are removed.
+- `Ur` is the single L4 value type. TS: `Ur.fromCbor`/`fromCborData`/`fromDecoded`/`parse`, `type`/`cbor`, `toCborData`/`toString`/`toQrString`/`encoder(options)`. Rust `typed::Ur` keeps `new`/`from_cbor_data`/`ur_type`/`cbor`/`into_cbor`/`to_cbor_data`/`to_qr_string`/`encoder` plus `Display`, `FromStr` (single-part only, `NotSinglePart`), and `TryFrom<ur::Decoded>`; `string`, `from_ur_string`, `ur`, `check_type`, and `UrCodable` are removed. Rust `UrEncodable`/`UrDecodable` blanket-impl over `dcbor`'s tagged traits: writes use the first tag name, reads accept any `cbor_tags()` name.
 
 ### Added
 
-- Read-only decode of deprecated BCR-2020-006 v1 tokens/tags: `crypto-seed` (300), `crypto-hdkey` (303), `crypto-keypath` (304), `crypto-coin-info` (305), `crypto-sskr` (309), `crypto-psbt` (310). Writes always emit v2. New `tagUrTypes` helper parses every `UrCodec.tags` name.
+- Read-only decode of deprecated BCR-2020-006 v1 tokens/tags: `crypto-seed` (300), `crypto-hdkey` (303), `crypto-keypath` (304), `crypto-coin-info` (305), `crypto-sskr` (309), `crypto-psbt` (310). Writes always emit v2. `codecUrTypes` validates and returns every `UrCodec.tags` name as a `UrType`.
 - Hermes smoke test in CI: `packages/ur` sources are bundled to a classic script and run on the Hermes V1 CLI that React Native ships. Runtime requirements on Hermes: the root transport needs only `TextEncoder`; `@qntx/ur/typed` and `@qntx/ur/registry` additionally need a WHATWG `TextDecoder` supporting `{ fatal: true }` (Expo provides one; bare React Native needs a polyfill).
 
 ### Changed
 
 - Fountain decoding needs ~35–50% fewer frames at K ≥ 20 (measured frames-to-complete ÷ K, random start, no loss: K=50 → 1.129, K=100 → 1.044, K=200 → 1.055; reference: `docs/internal/research.mdx` Gauss column) and is much faster: K=2000, fragLen 200, 20% loss decodes in ~0.57 s in TypeScript (was ~18.3 s) and ~40 ms in Rust (was ~223 ms).
 - `fromTagged` accepts any tag in `codec.tags`, so v1 nested keypath/coin-info tags 304/305 decode; `codecMap` registers every accepted name, including the v1 tokens.
+
 - License is now `MIT OR Apache-2.0` (1.8.0 and earlier remain MIT). New `LICENSE-MIT` / `LICENSE-APACHE` files replace `LICENSE`.
 - Repository moved to `github.com/qntx/ur` (was `qntx/ur.js`).
 - Fountain index sorting no longer uses ES2023 `Array.prototype.toSorted`, so the package runs on Hermes V1 (React Native).
 - Rust crates `bcur` and `bcur-cli` moved into this repository from qntx-labs/bcur (b2c1fb1); their earlier history lives in that repository's CHANGELOG. Workspace version is lockstep with `@qntx/ur`; MSRV is Rust 1.99.
 - Test vectors moved to a shared repository-root `vectors/` tree consumed by both the TypeScript and Rust suites, and capabilities are tracked in `parity.json`. No user-facing API change.
+
+### Fixed
+
+- F-01 (UR-ADR-019): `seedCodec` now reads a creation date tagged 1 **or** the historical tag 100 (days since epoch, per the BCR-2020-006 `100(18394)` example); writes always emit tag 1.
+- Rust `UrDecodable::from_ur` accepted only the first `cbor_tags()` name; it now accepts every named tag, matching the TS `fromUr` semantics.
 
 ## 1.8.0 - 2026-09-27
 

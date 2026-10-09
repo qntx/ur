@@ -1,15 +1,7 @@
 import { CborError, CborMap, bytesToHex, encodeCbor } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
 
-import {
-  Ur,
-  UrError,
-  fromUr,
-  fromUrString,
-  keypathCodec,
-  toUr,
-  toUrString,
-} from "../../src/registry/index.ts";
+import { Ur, UrError, fromUr, keypathCodec, toUr } from "../../src/registry/index.ts";
 import type { Keypath, PathComponent } from "../../src/registry/index.ts";
 
 function errorOf(fn: () => void): UrError {
@@ -25,7 +17,7 @@ function errorOf(fn: () => void): UrError {
 }
 
 function cborHex(keypath: Keypath): string {
-  return bytesToHex(encodeCbor(keypathCodec.untaggedCbor(keypath)));
+  return bytesToHex(encodeCbor(keypathCodec.encode(keypath)));
 }
 
 test("keypath codec tag", () => {
@@ -38,7 +30,7 @@ test("index component encode hex", () => {
     components: [{ kind: "index", index: 44, hardened: true }],
   };
   expect(cborHex(keypath)).toBe("a10182182cf5");
-  const decoded = fromUrString(toUrString(keypath, keypathCodec), keypathCodec);
+  const decoded = fromUr(Ur.parse(toUr(keypath, keypathCodec).toString()), keypathCodec);
   expect(decoded.components).toStrictEqual(keypath.components);
 });
 
@@ -47,9 +39,9 @@ test("wildcard component encode hex", () => {
   const unhardened: Keypath = { components: [{ kind: "wildcard", hardened: false }] };
   expect(cborHex(hardened)).toBe("a1018280f5");
   expect(cborHex(unhardened)).toBe("a1018280f4");
-  expect(fromUrString(toUrString(hardened, keypathCodec), keypathCodec).components).toStrictEqual(
-    hardened.components,
-  );
+  expect(
+    fromUr(Ur.parse(toUr(hardened, keypathCodec).toString()), keypathCodec).components,
+  ).toStrictEqual(hardened.components);
 });
 
 test("range component encode hex", () => {
@@ -57,9 +49,9 @@ test("range component encode hex", () => {
     components: [{ kind: "range", low: 0, high: 1, hardened: false }],
   };
   expect(cborHex(keypath)).toBe("a10182820001f4");
-  expect(fromUrString(toUrString(keypath, keypathCodec), keypathCodec).components).toStrictEqual(
-    keypath.components,
-  );
+  expect(
+    fromUr(Ur.parse(toUr(keypath, keypathCodec).toString()), keypathCodec).components,
+  ).toStrictEqual(keypath.components);
 });
 
 test("pair component encode hex", () => {
@@ -73,9 +65,9 @@ test("pair component encode hex", () => {
     ],
   };
   expect(cborHex(keypath)).toBe("a101818400f401f5");
-  expect(fromUrString(toUrString(keypath, keypathCodec), keypathCodec).components).toStrictEqual(
-    keypath.components,
-  );
+  expect(
+    fromUr(Ur.parse(toUr(keypath, keypathCodec).toString()), keypathCodec).components,
+  ).toStrictEqual(keypath.components);
 });
 
 test("mixed index wildcard range pair walker", () => {
@@ -91,22 +83,22 @@ test("mixed index wildcard range pair walker", () => {
   ];
   const keypath: Keypath = { components };
   expect(cborHex(keypath)).toBe("a10187182cf580f4820001f58400f401f4");
-  expect(fromUrString(toUrString(keypath, keypathCodec), keypathCodec).components).toStrictEqual(
-    components,
-  );
+  expect(
+    fromUr(Ur.parse(toUr(keypath, keypathCodec).toString()), keypathCodec).components,
+  ).toStrictEqual(components);
 });
 
 test("empty components with source fingerprint", () => {
   const keypath: Keypath = { components: [], sourceFingerprint: 0xe9181cf3, depth: 0 };
   expect(cborHex(keypath)).toBe("a30180021ae9181cf30300");
-  const decoded = fromUrString(toUrString(keypath, keypathCodec), keypathCodec);
+  const decoded = fromUr(Ur.parse(toUr(keypath, keypathCodec).toString()), keypathCodec);
   expect(decoded.components).toStrictEqual([]);
   expect(decoded.sourceFingerprint).toBe(0xe9181cf3);
   expect(decoded.depth).toBe(0);
 });
 
 test("empty components without fingerprint is CborType", () => {
-  const encodeErr = errorOf(() => toUrString({ components: [] }, keypathCodec));
+  const encodeErr = errorOf(() => toUr({ components: [] }, keypathCodec).toString());
   expect(encodeErr.code).toBe("CborType");
   expect(encodeErr.cause).toBeInstanceOf(CborError);
   expect(encodeErr.cause).toMatchObject({ code: "WrongType" });
@@ -136,7 +128,10 @@ test("extra map key is CborType", () => {
 
 test("range low >= high is CborType OutOfRange", () => {
   const err = errorOf(() =>
-    toUrString({ components: [{ kind: "range", low: 1, high: 1, hardened: false }] }, keypathCodec),
+    toUr(
+      { components: [{ kind: "range", low: 1, high: 1, hardened: false }] },
+      keypathCodec,
+    ).toString(),
   );
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
@@ -145,10 +140,10 @@ test("range low >= high is CborType OutOfRange", () => {
 
 test("index 0x80000000 is CborType OutOfRange", () => {
   const err = errorOf(() =>
-    toUrString(
+    toUr(
       { components: [{ kind: "index", index: 0x80_00_00_00, hardened: false }] },
       keypathCodec,
-    ),
+    ).toString(),
   );
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
@@ -156,7 +151,9 @@ test("index 0x80000000 is CborType OutOfRange", () => {
 });
 
 test("source fingerprint 0 is CborType OutOfRange", () => {
-  const err = errorOf(() => toUrString({ components: [], sourceFingerprint: 0 }, keypathCodec));
+  const err = errorOf(() =>
+    toUr({ components: [], sourceFingerprint: 0 }, keypathCodec).toString(),
+  );
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
   expect(err.cause).toMatchObject({ code: "OutOfRange" });
@@ -179,11 +176,11 @@ test("pair does not consume a trailing bool", () => {
 test("v1 crypto-keypath decodes and re-encodes as v2", () => {
   // No official standalone v1 keypath UR exists; v1/v2 bodies share the CDDL (BCR-2020-006).
   const keypath: Keypath = { components: [{ kind: "index", index: 44, hardened: true }] };
-  const v1Uri = Ur.fromCbor("crypto-keypath", keypathCodec.untaggedCbor(keypath)).toString();
-  const v2 = fromUrString(toUrString(keypath, keypathCodec), keypathCodec);
-  expect(fromUrString(v1Uri, keypathCodec)).toStrictEqual(v2);
-  expect(fromUrString(v1Uri.toUpperCase(), keypathCodec)).toStrictEqual(v2);
-  expect(toUrString(v2, keypathCodec).startsWith("ur:keypath/")).toBe(true);
+  const v1Uri = Ur.fromCbor("crypto-keypath", keypathCodec.encode(keypath)).toString();
+  const v2 = fromUr(Ur.parse(toUr(keypath, keypathCodec).toString()), keypathCodec);
+  expect(fromUr(Ur.parse(v1Uri), keypathCodec)).toStrictEqual(v2);
+  expect(fromUr(Ur.parse(v1Uri.toUpperCase()), keypathCodec)).toStrictEqual(v2);
+  expect(toUr(v2, keypathCodec).toString().startsWith("ur:keypath/")).toBe(true);
 });
 
 test("toUr copies caller path object by encoding immediately", () => {
@@ -191,6 +188,6 @@ test("toUr copies caller path object by encoding immediately", () => {
   const ur = toUr({ components }, keypathCodec);
   components[0] = { kind: "index", index: 0, hardened: false };
   expect(ur.toString()).toBe(
-    toUrString({ components: [{ kind: "index", index: 44, hardened: true }] }, keypathCodec),
+    toUr({ components: [{ kind: "index", index: 44, hardened: true }] }, keypathCodec).toString(),
   );
 });

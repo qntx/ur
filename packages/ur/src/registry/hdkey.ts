@@ -2,13 +2,13 @@ import { CborError, CborMap, cbor, expectMap, expectText } from "@blockchaincomm
 import type { Cbor } from "@blockchaincommons/dcbor";
 
 import type { UrCodec } from "../typed/codec.ts";
+import { fromTagged, toTagged } from "../typed/index.ts";
 import { copyBuf, copyBytes } from "./bytes.ts";
 import { coinInfoCodec } from "./coin-info.ts";
 import type { CoinInfo } from "./coin-info.ts";
 import { keypathCodec } from "./keypath.ts";
 import type { Keypath } from "./keypath.ts";
 import { expectBool, expectClosedIntMap, expectUint32Ne0 } from "./map.ts";
-import { fromTagged, toTagged } from "./tagged.ts";
 import { TAGS } from "./tags.ts";
 
 const MASTER_KEYS: ReadonlySet<number> = new Set([1, 3, 4]);
@@ -61,7 +61,7 @@ function assertUint32Ne0(n: number): number {
 
 export const hdKeyCodec: UrCodec<HdKey> = {
   tags: [TAGS.hdkey, TAGS["crypto-hdkey"]],
-  untaggedCbor(key) {
+  encode(key) {
     const map = new CborMap();
     if (key.kind === "master") {
       map.set(1, true);
@@ -77,13 +77,13 @@ export const hdKeyCodec: UrCodec<HdKey> = {
       map.set(4, cbor(copyLen(key.chainCode, CHAIN_CODE_LEN)));
     }
     if (key.useInfo !== undefined) {
-      map.set(5, toTagged(coinInfoCodec, key.useInfo));
+      map.set(5, toTagged(key.useInfo, coinInfoCodec));
     }
     if (key.origin !== undefined) {
-      map.set(6, toTagged(keypathCodec, key.origin));
+      map.set(6, toTagged(key.origin, keypathCodec));
     }
     if (key.children !== undefined) {
-      map.set(7, toTagged(keypathCodec, key.children));
+      map.set(7, toTagged(key.children, keypathCodec));
     }
     if (key.parentFingerprint !== undefined) {
       map.set(8, assertUint32Ne0(key.parentFingerprint));
@@ -96,7 +96,7 @@ export const hdKeyCodec: UrCodec<HdKey> = {
     }
     return cbor(map);
   },
-  fromUntaggedCbor(value) {
+  decode(value) {
     const peek = expectMap(value);
     const masterFlag = peek.get(1);
     if (masterFlag !== undefined) {
@@ -125,9 +125,9 @@ export const hdKeyCodec: UrCodec<HdKey> = {
       ...(isPrivate === undefined ? {} : { isPrivate: expectBool(isPrivate) }),
       keyData: bytesOfLen(map.getOrThrow(3), KEY_DATA_LEN),
       ...(chainCode === undefined ? {} : { chainCode: bytesOfLen(chainCode, CHAIN_CODE_LEN) }),
-      ...(useInfo === undefined ? {} : { useInfo: fromTagged(coinInfoCodec, useInfo) }),
-      ...(origin === undefined ? {} : { origin: fromTagged(keypathCodec, origin) }),
-      ...(children === undefined ? {} : { children: fromTagged(keypathCodec, children) }),
+      ...(useInfo === undefined ? {} : { useInfo: fromTagged(useInfo, coinInfoCodec) }),
+      ...(origin === undefined ? {} : { origin: fromTagged(origin, keypathCodec) }),
+      ...(children === undefined ? {} : { children: fromTagged(children, keypathCodec) }),
       ...(parentFingerprint === undefined
         ? {}
         : { parentFingerprint: expectUint32Ne0(parentFingerprint) }),

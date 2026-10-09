@@ -92,6 +92,6 @@ function identity(value: Cbor): Cbor {
 
 export const envelopeCodec: UrCodec<Cbor> = {
   tags: [TAGS.envelope],
-  untaggedCbor: identity,
-  fromUntaggedCbor: identity,
+  encode: identity,
+  decode: identity,
 };

@@ -15,11 +15,9 @@ import {
   Ur,
   UrError,
   fromUr,
-  fromUrString,
   hdKeyCodec,
   keypathCodec,
   toUr,
-  toUrString,
 } from "../../src/registry/index.ts";
 import type { DerivedHdKey, HdKey, MasterHdKey } from "../../src/registry/index.ts";
 import { hdkey1, hdkey1V1Ur, hdkey2, hdkey2V1CborHex, hdkey2V1Ur } from "./goldens.ts";
@@ -37,7 +35,7 @@ function errorOf(fn: () => void): UrError {
 }
 
 function cborHex(key: HdKey): string {
-  return bytesToHex(encodeCbor(hdKeyCodec.untaggedCbor(key)));
+  return bytesToHex(encodeCbor(hdKeyCodec.encode(key)));
 }
 
 function master1(): MasterHdKey {
@@ -89,8 +87,8 @@ test("hdkey codec tag", () => {
 test("vector 1 master write golden", () => {
   const key = master1();
   expect(cborHex(key)).toBe(hdkey1.cborHex);
-  expect(toUrString(key, hdKeyCodec)).toBe(hdkey1.ur);
-  const decoded = asMaster(fromUrString(hdkey1.ur, hdKeyCodec));
+  expect(toUr(key, hdKeyCodec).toString()).toBe(hdkey1.ur);
+  const decoded = asMaster(fromUr(Ur.parse(hdkey1.ur), hdKeyCodec));
   expect(decoded.kind).toBe("master");
   expect(bytesToHex(decoded.keyData)).toBe(hdkey1.keyDataHex);
   expect(bytesToHex(decoded.chainCode)).toBe(hdkey1.chainCodeHex);
@@ -103,8 +101,8 @@ test("vector 2 nested tags write golden", () => {
   expect(hex.startsWith("d99d6f")).toBe(false);
   expect(hex).toContain("d99d70");
   expect(hex).toContain("d99d71");
-  expect(toUrString(key, hdKeyCodec)).toBe(hdkey2.ur);
-  const decoded = asDerived(fromUrString(hdkey2.ur, hdKeyCodec));
+  expect(toUr(key, hdKeyCodec).toString()).toBe(hdkey2.ur);
+  const decoded = asDerived(fromUr(Ur.parse(hdkey2.ur), hdKeyCodec));
   expect(decoded.kind).toBe("derived");
   expect(bytesToHex(decoded.keyData)).toBe(hdkey2.keyDataHex);
   expect(decoded.chainCode).toStrictEqual(hexToBytes(hdkey2.chainCodeHex));
@@ -116,8 +114,8 @@ test("vector 2 nested tags write golden", () => {
 });
 
 test("vector 2 official UR round-trips", () => {
-  const decoded = fromUrString(hdkey2.ur, hdKeyCodec);
-  expect(toUrString(decoded, hdKeyCodec)).toBe(hdkey2.ur);
+  const decoded = fromUr(Ur.parse(hdkey2.ur), hdKeyCodec);
+  expect(toUr(decoded, hdKeyCodec).toString()).toBe(hdkey2.ur);
   expect(cborHex(decoded)).toBe(hdkey2.cborHex);
   const ur = toUr(decoded, hdKeyCodec);
   const again = toUr(fromUr(ur, hdKeyCodec), hdKeyCodec);
@@ -125,7 +123,7 @@ test("vector 2 official UR round-trips", () => {
 });
 
 test("uppercase UR:HDKEY matches vector 1", () => {
-  const decoded = asMaster(fromUrString(hdkey1.ur.toUpperCase(), hdKeyCodec));
+  const decoded = asMaster(fromUr(Ur.parse(hdkey1.ur.toUpperCase()), hdKeyCodec));
   expect(decoded.kind).toBe("master");
   expect(bytesToHex(decoded.keyData)).toBe(hdkey1.keyDataHex);
 });
@@ -179,23 +177,23 @@ test("master with key 2 or 5 is CborType", () => {
 });
 
 test("v1 crypto-hdkey vector 1 decodes and re-encodes as v2", () => {
-  const v1 = asMaster(fromUrString(hdkey1V1Ur, hdKeyCodec));
-  expect(v1).toStrictEqual(asMaster(fromUrString(hdkey1.ur, hdKeyCodec)));
-  expect(asMaster(fromUrString(hdkey1V1Ur.toUpperCase(), hdKeyCodec))).toStrictEqual(v1);
-  expect(toUrString(v1, hdKeyCodec)).toBe(hdkey1.ur);
+  const v1 = asMaster(fromUr(Ur.parse(hdkey1V1Ur), hdKeyCodec));
+  expect(v1).toStrictEqual(asMaster(fromUr(Ur.parse(hdkey1.ur), hdKeyCodec)));
+  expect(asMaster(fromUr(Ur.parse(hdkey1V1Ur.toUpperCase()), hdKeyCodec))).toStrictEqual(v1);
+  expect(toUr(v1, hdKeyCodec).toString()).toBe(hdkey1.ur);
 });
 
 test("v1 crypto-hdkey vector 2 nested v1 tags decode, re-encode v2", () => {
-  const v1 = asDerived(fromUrString(hdkey2V1Ur, hdKeyCodec));
-  expect(v1).toStrictEqual(asDerived(fromUrString(hdkey2.ur, hdKeyCodec)));
+  const v1 = asDerived(fromUr(Ur.parse(hdkey2V1Ur), hdKeyCodec));
+  expect(v1).toStrictEqual(asDerived(fromUr(Ur.parse(hdkey2.ur), hdKeyCodec)));
   expect(cborHex(v1)).toBe(hdkey2.cborHex);
-  expect(toUrString(v1, hdKeyCodec)).toBe(hdkey2.ur);
+  expect(toUr(v1, hdKeyCodec).toString()).toBe(hdkey2.ur);
 });
 
 test("v2 hdkey token with nested v1 304/305 tags decodes", () => {
   const body = decodeCbor(hexToBytes(hdkey2V1CborHex));
   const decoded = asDerived(fromUr(Ur.fromCbor("hdkey", body), hdKeyCodec));
-  expect(decoded).toStrictEqual(asDerived(fromUrString(hdkey2.ur, hdKeyCodec)));
+  expect(decoded).toStrictEqual(asDerived(fromUr(Ur.parse(hdkey2.ur), hdKeyCodec)));
 });
 
 test("nested v1 origin tag 304 decodes", () => {
@@ -203,7 +201,7 @@ test("nested v1 origin tag 304 decodes", () => {
   const map = new CborMap();
   map.set(3, hexToBytes(hdkey2.keyDataHex));
   map.set(4, hexToBytes(hdkey2.chainCodeHex));
-  map.set(6, taggedValue(304, keypathCodec.untaggedCbor(key.origin!)));
+  map.set(6, taggedValue(304, keypathCodec.encode(key.origin!)));
   const decoded = asDerived(fromUr(Ur.fromCbor("hdkey", map), hdKeyCodec));
   expect(decoded.origin?.components).toStrictEqual(key.origin?.components);
 });
@@ -220,10 +218,10 @@ test("derived extra map key is CborType", () => {
 
 test("keyData length 32 is CborType OutOfRange", () => {
   const err = errorOf(() =>
-    toUrString(
+    toUr(
       { kind: "master", keyData: new Uint8Array(32), chainCode: new Uint8Array(32) },
       hdKeyCodec,
-    ),
+    ).toString(),
   );
   expect(err.code).toBe("CborType");
   expect(err.cause).toBeInstanceOf(CborError);
@@ -245,7 +243,7 @@ test("parent fingerprint without origin is allowed", () => {
     keyData: hexToBytes(hdkey2.keyDataHex),
     parentFingerprint: hdkey2.parentFingerprint,
   };
-  const decoded = asDerived(fromUrString(toUrString(key, hdKeyCodec), hdKeyCodec));
+  const decoded = asDerived(fromUr(Ur.parse(toUr(key, hdKeyCodec).toString()), hdKeyCodec));
   expect(decoded.parentFingerprint).toBe(hdkey2.parentFingerprint);
   expect(decoded.origin).toBeUndefined();
 });

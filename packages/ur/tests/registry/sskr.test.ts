@@ -1,15 +1,7 @@
 import { CborError, bytesToHex, encodeCbor, hexToBytes } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
 
-import {
-  Ur,
-  UrError,
-  fromUr,
-  fromUrString,
-  sskrCodec,
-  toUr,
-  toUrString,
-} from "../../src/registry/index.ts";
+import { Ur, UrError, fromUr, sskrCodec, toUr } from "../../src/registry/index.ts";
 import type { SskrShare } from "../../src/registry/index.ts";
 import { sskrShare, sskrV1Ur } from "./goldens.ts";
 
@@ -52,9 +44,9 @@ test("sskr codec tag", () => {
 
 test("BCR-2020-011 third share write golden", () => {
   const share = golden();
-  expect(bytesToHex(encodeCbor(sskrCodec.untaggedCbor(share)))).toBe(sskrShare.cborHex);
-  expect(toUrString(share, sskrCodec)).toBe(sskrShare.ur);
-  const decoded = fromUrString(sskrShare.ur, sskrCodec);
+  expect(bytesToHex(encodeCbor(sskrCodec.encode(share)))).toBe(sskrShare.cborHex);
+  expect(toUr(share, sskrCodec).toString()).toBe(sskrShare.ur);
+  const decoded = fromUr(Ur.parse(sskrShare.ur), sskrCodec);
   expect(decoded.identifier).toBe(0x4bbf);
   expect(decoded.groupThreshold).toBe(2);
   expect(decoded.groupCount).toBe(2);
@@ -104,7 +96,7 @@ test("groupThreshold greater than groupCount is CborType OutOfRange", () => {
   expect(decodeErr.cause).toBeInstanceOf(CborError);
   expect(decodeErr.cause).toMatchObject({ code: "OutOfRange" });
 
-  const encodeErr = errorOf(() => toUrString({ ...golden(), groupCount: 1 }, sskrCodec));
+  const encodeErr = errorOf(() => toUr({ ...golden(), groupCount: 1 }, sskrCodec).toString());
   expect(encodeErr.code).toBe("CborType");
   expect(encodeErr.cause).toBeInstanceOf(CborError);
   expect(encodeErr.cause).toMatchObject({ code: "OutOfRange" });
@@ -118,15 +110,15 @@ test("groupIndex at or above groupCount is CborType OutOfRange", () => {
   expect(decodeErr.cause).toBeInstanceOf(CborError);
   expect(decodeErr.cause).toMatchObject({ code: "OutOfRange" });
 
-  const encodeErr = errorOf(() => toUrString({ ...golden(), groupIndex: 2 }, sskrCodec));
+  const encodeErr = errorOf(() => toUr({ ...golden(), groupIndex: 2 }, sskrCodec).toString());
   expect(encodeErr.code).toBe("CborType");
   expect(encodeErr.cause).toBeInstanceOf(CborError);
   expect(encodeErr.cause).toMatchObject({ code: "OutOfRange" });
 });
 
 test("v1 crypto-sskr decodes and re-encodes as v2", () => {
-  const v1 = fromUrString(sskrV1Ur, sskrCodec);
-  expect(v1).toStrictEqual(fromUrString(sskrShare.ur, sskrCodec));
-  expect(fromUrString(sskrV1Ur.toUpperCase(), sskrCodec)).toStrictEqual(v1);
-  expect(toUrString(v1, sskrCodec)).toBe(sskrShare.ur);
+  const v1 = fromUr(Ur.parse(sskrV1Ur), sskrCodec);
+  expect(v1).toStrictEqual(fromUr(Ur.parse(sskrShare.ur), sskrCodec));
+  expect(fromUr(Ur.parse(sskrV1Ur.toUpperCase()), sskrCodec)).toStrictEqual(v1);
+  expect(toUr(v1, sskrCodec).toString()).toBe(sskrShare.ur);
 });

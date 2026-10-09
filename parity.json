@@ -165,6 +165,24 @@
       "vectors": ["vectors/typed/test-array.json"]
     },
     {
+      "id": "typed.codec",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/typed/codec.ts",
+        "tests": [
+          "packages/ur/tests/typed-codec.test.ts",
+          "packages/ur/tests/vectors/multi-tag.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur/src/typed/traits.rs",
+        "tests": ["crates/bcur/tests/contract.rs"]
+      },
+      "vectors": ["vectors/typed/multi-tag.json"]
+    },
+    {
       "id": "limits.defaults",
       "tier": "A",
       "status": "stable",
@@ -386,7 +404,7 @@
       "status": "ts-only",
       "milestone": "R4",
       "ts": {
-        "module": "packages/ur/src/registry/codecs.ts",
+        "module": "packages/ur/src/typed/codec.ts",
         "tests": ["packages/ur/tests/registry/codecs.test.ts"]
       },
       "rust": null,

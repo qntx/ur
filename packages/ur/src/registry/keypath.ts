@@ -142,7 +142,7 @@ function decodeComponents(value: Cbor): PathComponent[] {
 
 export const keypathCodec: UrCodec<Keypath> = {
   tags: [TAGS.keypath, TAGS["crypto-keypath"]],
-  untaggedCbor(keypath) {
+  encode(keypath) {
     if (keypath.components.length === 0 && keypath.sourceFingerprint === undefined) {
       throw CborError.wrongType();
     }
@@ -160,7 +160,7 @@ export const keypathCodec: UrCodec<Keypath> = {
     }
     return cbor(map);
   },
-  fromUntaggedCbor(value) {
+  decode(value) {
     const map = expectClosedIntMap(value, KEYPATH_KEYS);
     const components = decodeComponents(map.getOrThrow(1));
     const fingerprint = map.get(2);
