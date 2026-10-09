@@ -66,6 +66,7 @@ impl FragmentChooser {
     clippy::cast_possible_truncation,
     reason = "fragment indexes are u32-bounded and fit usize on all supported targets"
 )]
+#[cfg(test)]
 pub(crate) fn choose_fragments(
     sequence: NonZeroU32,
     fragment_count: NonZeroU32,

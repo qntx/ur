@@ -1,171 +1,314 @@
 //! Unified error type for the `bcur` crate.
 
-use alloc::string::String;
+#[cfg(feature = "dcbor")]
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+
+use crate::ur::UrType;
 
 /// Which decoder/encoder budget was exceeded.
+///
+/// `ReceivedParts` and `BufferParts` are transitional and leave with the
+/// decoder redesign (R1c).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum ResourceKind {
+pub enum Limit {
     /// Original payload length (`max_message_length` or `u32` wire field).
     MessageLength,
     /// Fragment count `K` (`max_fragment_count` or `u32` wire field).
     FragmentCount,
-    /// Fountain `seqNum` would exceed `u32::MAX`.
-    Sequence,
     /// Part payload length (`max_fragment_data_length`).
-    FragmentData,
+    FragmentLength,
+    /// UR string length (`max_uri_len`).
+    UriLength,
     /// Unique received index-set count (`max_received_parts`).
     ReceivedParts,
     /// Mixed-part XOR buffer size (`max_buffer_parts`).
     BufferParts,
-    /// UR string length (`max_uri_len`).
-    UriLen,
 }
 
-/// dCBOR failure from the typed layer. Transport never produces this.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CborError {
-    kind: CborErrorKind,
-    detail: String,
-}
-
-impl CborError {
-    #[cfg_attr(
-        not(feature = "dcbor"),
-        allow(dead_code, reason = "typed layer is the only constructor caller")
-    )]
-    pub(crate) fn new(kind: CborErrorKind, detail: impl Into<String>) -> Self {
-        Self {
-            kind,
-            detail: detail.into(),
+impl Limit {
+    /// TS `UrLimit` string form.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::MessageLength => "messageLength",
+            Self::FragmentCount => "fragmentCount",
+            Self::FragmentLength => "fragmentLength",
+            Self::UriLength => "uriLength",
+            Self::ReceivedParts => "receivedParts",
+            Self::BufferParts => "bufferParts",
         }
     }
+}
 
-    /// Failure class.
+/// Error kinds, one-to-one with the TS `UrErrorCode` union.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ErrorKind {
+    /// The input contained non-ASCII characters.
+    NonAscii,
+    /// An unrecognized or malformed byteword token was encountered.
+    InvalidWord,
+    /// The bytewords string length is inconsistent with the selected style.
+    InvalidBytewordsLength,
+    /// The CRC-32 checksum appended to a bytewords payload did not match.
+    InvalidBytewordsChecksum,
+    /// The URI did not start with the `ur:` scheme.
+    InvalidScheme,
+    /// No type token was present after the scheme.
+    TypeUnspecified,
+    /// The UR type token is empty or contains illegal characters.
+    InvalidType,
+    /// Multi-part sequence indices were missing or inconsistent with the part.
+    InvalidIndices,
+    /// The UR type did not match the expected type.
+    UnexpectedType,
+    /// The fountain part CBOR was malformed for our schema.
+    InvalidPartCbor,
+    /// A fountain part had zero/empty fields or inconsistent padding.
+    InvalidPart,
+    /// A part is inconsistent with previously received parts.
+    InconsistentPart,
+    /// A configured resource limit was exceeded.
+    ResourceLimit,
+    /// Joined fragments had non-zero padding past the message length.
+    InvalidPadding,
+    /// Joined fountain payload failed its CRC-32 check.
+    InvalidMessageChecksum,
+    /// The fountain encoder was given an empty message.
+    EmptyMessage,
+    /// Fragment length bounds are not positive or `min > max`.
+    InvalidFragmentLength,
+    /// The message exceeds the `u32` wire length field.
+    MessageTooLong,
+    /// A single-part API was used on a multi-part UR.
+    NotSinglePart,
+    /// The payload is not well-formed deterministic CBOR.
+    CborDecode,
+    /// Well-formed CBOR that cannot become the requested type.
+    CborType,
+    /// An internal invariant was broken.
+    Internal,
+}
+
+impl ErrorKind {
+    /// TS `UrError.message` text for kinds without detail.
+    const fn message(self) -> &'static str {
+        match self {
+            Self::NonAscii => "bytewords string is not ASCII",
+            Self::InvalidWord => "invalid bytewords word",
+            Self::InvalidBytewordsLength => "invalid bytewords length",
+            Self::InvalidBytewordsChecksum => "invalid bytewords checksum",
+            Self::InvalidScheme => "invalid UR scheme",
+            Self::TypeUnspecified => "UR type unspecified",
+            Self::InvalidType => "invalid UR type",
+            Self::InvalidIndices => "invalid multi-part indices",
+            Self::UnexpectedType => "unexpected UR type",
+            Self::InvalidPartCbor => "invalid fountain part CBOR",
+            Self::InvalidPart => "invalid fountain part",
+            Self::InconsistentPart => "fountain part inconsistent with previous parts",
+            Self::ResourceLimit => "resource limit exceeded",
+            Self::InvalidPadding => "invalid fountain part padding",
+            Self::InvalidMessageChecksum => "invalid fountain message checksum",
+            Self::EmptyMessage => "empty message",
+            Self::InvalidFragmentLength => "invalid fragment length",
+            Self::MessageTooLong => "message too long",
+            Self::NotSinglePart => "expected single-part UR",
+            Self::CborDecode => "dCBOR decode failed",
+            Self::CborType => "dCBOR type mismatch",
+            Self::Internal => "internal error",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum Detail {
+    None,
+    Limit(Limit),
+    UnexpectedType {
+        expected: Vec<UrType>,
+        found: UrType,
+    },
+    #[cfg(feature = "dcbor")]
+    Cbor {
+        source: Arc<dcbor::Error>,
+    },
+}
+
+/// Errors that can occur while encoding or decoding Uniform Resources.
+///
+/// Opaque: match on [`Self::kind`] (a `#[non_exhaustive]` [`ErrorKind`]) and
+/// read details through [`Self::limit`], [`Self::expected_types`], and
+/// [`Self::found_type`].
+#[derive(Debug, Clone)]
+pub struct Error {
+    kind: ErrorKind,
+    detail: Detail,
+}
+
+impl Error {
+    /// Error kind.
     #[must_use]
-    pub const fn kind(&self) -> CborErrorKind {
+    pub const fn kind(&self) -> ErrorKind {
         self.kind
     }
 
-    /// Underlying `dcbor` display text.
+    /// Whether this error is session-fatal for a decoder (the decoder enters
+    /// the failed state).
     #[must_use]
-    pub fn detail(&self) -> &str {
-        &self.detail
+    pub const fn is_fatal(&self) -> bool {
+        matches!(
+            self.kind,
+            ErrorKind::ResourceLimit
+                | ErrorKind::InvalidPadding
+                | ErrorKind::InvalidMessageChecksum
+                | ErrorKind::Internal
+        )
+    }
+
+    /// The exceeded budget, for [`ErrorKind::ResourceLimit`].
+    #[must_use]
+    pub const fn limit(&self) -> Option<Limit> {
+        match &self.detail {
+            Detail::Limit(limit) => Some(*limit),
+            _ => None,
+        }
+    }
+
+    /// Accepted types, for [`ErrorKind::UnexpectedType`]; empty otherwise.
+    #[must_use]
+    pub fn expected_types(&self) -> &[UrType] {
+        match &self.detail {
+            Detail::UnexpectedType { expected, .. } => expected,
+            _ => &[],
+        }
+    }
+
+    /// The mismatched type, for [`ErrorKind::UnexpectedType`].
+    #[must_use]
+    pub const fn found_type(&self) -> Option<&UrType> {
+        match &self.detail {
+            Detail::UnexpectedType { found, .. } => Some(found),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn new(kind: ErrorKind) -> Self {
+        Self {
+            kind,
+            detail: Detail::None,
+        }
+    }
+
+    pub(crate) const fn internal() -> Self {
+        Self::new(ErrorKind::Internal)
+    }
+
+    pub(crate) const fn resource_limit(limit: Limit) -> Self {
+        Self {
+            kind: ErrorKind::ResourceLimit,
+            detail: Detail::Limit(limit),
+        }
+    }
+
+    pub(crate) const fn unexpected_type(expected: Vec<UrType>, found: UrType) -> Self {
+        Self {
+            kind: ErrorKind::UnexpectedType,
+            detail: Detail::UnexpectedType { expected, found },
+        }
+    }
+
+    /// `kind` must be [`ErrorKind::CborDecode`] or [`ErrorKind::CborType`].
+    #[cfg(feature = "dcbor")]
+    pub(crate) fn cbor(kind: ErrorKind, source: dcbor::Error) -> Self {
+        Self {
+            kind,
+            detail: Detail::Cbor {
+                source: Arc::new(source),
+            },
+        }
     }
 }
 
-/// Class of dCBOR failure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum CborErrorKind {
-    /// `CBOR::try_from_data` / well-formedness / determinism.
-    Decode,
-    /// Well-formed CBOR that cannot become the requested Rust type.
-    Type,
+impl PartialEq for Error {
+    fn eq(&self, other: &Self) -> bool {
+        if self.kind != other.kind {
+            return false;
+        }
+        match (&self.detail, &other.detail) {
+            (Detail::None, Detail::None) => true,
+            (Detail::Limit(a), Detail::Limit(b)) => a == b,
+            (
+                Detail::UnexpectedType {
+                    expected: ae,
+                    found: af,
+                },
+                Detail::UnexpectedType {
+                    expected: be,
+                    found: bf,
+                },
+            ) => ae == be && af == bf,
+            #[cfg(feature = "dcbor")]
+            (Detail::Cbor { .. }, Detail::Cbor { .. }) => true,
+            #[allow(unreachable_patterns, reason = "dcbor-gated variants")]
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Error {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match &self.detail {
+            Detail::Limit(limit) => {
+                write!(f, "{}: {}", self.kind.message(), limit.as_str())
+            }
+            Detail::UnexpectedType { expected, found } => {
+                let expected = expected
+                    .iter()
+                    .map(UrType::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(
+                    f,
+                    "{}: expected {expected}, found {}",
+                    self.kind.message(),
+                    found.as_str()
+                )
+            }
+            Detail::None => f.write_str(self.kind.message()),
+            #[cfg(feature = "dcbor")]
+            Detail::Cbor { .. } => f.write_str(self.kind.message()),
+        }
+    }
+}
+
+impl core::error::Error for Error {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match &self.detail {
+            #[cfg(feature = "dcbor")]
+            Detail::Cbor { source } => Some(&**source),
+            _ => None,
+        }
+    }
 }
 
 /// Fail-closed decoder poison. Not re-exported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Poison {
-    Limit(ResourceKind),
-    DecoderState,
+    Limit(Limit),
+    Internal,
 }
 
 impl Poison {
     pub(crate) const fn to_error(self) -> Error {
         match self {
-            Self::Limit(kind) => Error::ResourceLimit(kind),
-            Self::DecoderState => Error::DecoderState,
+            Self::Limit(limit) => Error::resource_limit(limit),
+            Self::Internal => Error::internal(),
         }
     }
-}
-
-/// Errors that can occur while encoding or decoding Uniform Resources.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[non_exhaustive]
-#[allow(
-    clippy::error_impl_error,
-    reason = "crate-root Error is the standard library-facing error type name"
-)]
-pub enum Error {
-    // --- bytewords ---
-    /// An unrecognized or malformed byteword token was encountered.
-    #[error("invalid bytewords word")]
-    InvalidWord,
-    /// The CRC-32 checksum appended to a bytewords payload did not match.
-    #[error("invalid bytewords checksum")]
-    InvalidBytewordsChecksum,
-    /// The bytewords string length is inconsistent with the selected style.
-    #[error("invalid bytewords length")]
-    InvalidBytewordsLength,
-    /// The input contained non-ASCII characters.
-    #[error("bytewords string is not ASCII")]
-    NonAscii,
-
-    // --- fountain ---
-    /// The fountain encoder was given an empty message.
-    #[error("empty message")]
-    EmptyMessage,
-    /// A fountain part had empty payload or invalid empty metadata.
-    #[error("empty fountain part")]
-    EmptyPart,
-    /// Maximum fragment length must be greater than zero.
-    #[error("invalid maximum fragment length")]
-    InvalidFragmentLen,
-    /// Fountain part sequence numbers must be non-zero.
-    #[error("invalid sequence number")]
-    InvalidSequence,
-    /// A part is inconsistent with previously received parts.
-    #[error("fountain part inconsistent with previous parts")]
-    InconsistentPart,
-    /// Joined fragments had non-zero padding past the message length.
-    #[error("invalid fountain part padding")]
-    InvalidPadding,
-    /// Joined fountain payload failed its CRC-32 check.
-    #[error("invalid fountain message checksum")]
-    InvalidMessageChecksum,
-    /// The fountain part CBOR was malformed or non-canonical for our schema.
-    #[error("invalid fountain part CBOR")]
-    InvalidPartCbor,
-    /// Internal decoder invariant was broken.
-    #[error("fountain decoder internal state error")]
-    DecoderState,
-    /// Fountain `next_part` called again when `K == 1`.
-    #[error("single-part fountain encoder already emitted its only part")]
-    SinglePartExhausted,
-    /// A configured resource limit was exceeded.
-    #[error("decoder resource limit exceeded: {0:?}")]
-    ResourceLimit(ResourceKind),
-
-    // --- UR ---
-    /// The URI did not start with the `ur:` scheme.
-    #[error("invalid UR scheme")]
-    InvalidScheme,
-    /// No type token was present after the scheme.
-    #[error("UR type unspecified")]
-    TypeUnspecified,
-    /// The UR type token is empty or contains illegal characters.
-    #[error("invalid UR type")]
-    InvalidType,
-    /// Multi-part sequence indices were missing or inconsistent with the part.
-    #[error("invalid multi-part indices")]
-    InvalidIndices,
-    /// A single-part API was used on a multi-part UR.
-    #[error("expected single-part UR")]
-    NotSinglePart,
-    /// The UR type did not match the expected type.
-    #[error("unexpected UR type: expected {expected}, found {found}")]
-    UnexpectedType {
-        /// Expected type string.
-        expected: String,
-        /// Found type string.
-        found: String,
-    },
-
-    // --- typed / dCBOR ---
-    /// An error from the optional dCBOR layer.
-    #[error("dCBOR error ({kind:?}): {detail}", kind = .0.kind(), detail = .0.detail())]
-    Cbor(CborError),
 }
 
 /// Result alias for `bcur` operations.

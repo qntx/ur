@@ -4,6 +4,7 @@ import { expect, test } from "vite-plus/test";
 
 import {
   Ur,
+  UrType,
   UrError,
   firstTagUrType,
   fromUr,
@@ -75,8 +76,11 @@ test("fromUr type mismatch is UnexpectedType", () => {
   const note = new Note("hi");
   const err = errorOf(() => fromUr(Ur.create("bytes", noteCodec.untaggedCbor(note)), noteCodec));
   expect(err.code).toBe("UnexpectedType");
-  expect(err.expected).toBe("note");
-  expect(err.found).toBe("bytes");
+  expect(err.info).toStrictEqual({
+    code: "UnexpectedType",
+    expected: [UrType.parse("note")],
+    found: UrType.parse("bytes"),
+  });
 });
 
 test("fromUr accepts every tag name and writes the first", () => {
@@ -91,8 +95,11 @@ test("fromUr accepts every tag name and writes the first", () => {
 
   const err = errorOf(() => fromUr(Ur.create("bytes", body), aliased));
   expect(err.code).toBe("UnexpectedType");
-  expect(err.expected).toBe("note|crypto-note");
-  expect(err.found).toBe("bytes");
+  expect(err.info).toStrictEqual({
+    code: "UnexpectedType",
+    expected: [UrType.parse("note"), UrType.parse("crypto-note")],
+    found: UrType.parse("bytes"),
+  });
 });
 
 test("toUrString/fromUrString roundtrip", () => {

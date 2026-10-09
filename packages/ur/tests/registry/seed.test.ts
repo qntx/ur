@@ -12,6 +12,7 @@ import { expect, test } from "vite-plus/test";
 import {
   TAGS,
   Ur,
+  UrType,
   UrError,
   fromUr,
   fromUrString,
@@ -178,9 +179,11 @@ test("fromUr mismatch lists every accepted type", () => {
       seedCodec,
     ),
   );
-  expect(err.code).toBe("UnexpectedType");
-  expect(err.expected).toBe("seed|crypto-seed");
-  expect(err.found).toBe("bytes");
+  expect(err.info).toStrictEqual({
+    code: "UnexpectedType",
+    expected: [UrType.parse("seed"), UrType.parse("crypto-seed")],
+    found: UrType.parse("bytes"),
+  });
 });
 
 test("missing payload is CborType MissingMapKey", () => {

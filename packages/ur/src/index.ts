@@ -11,7 +11,7 @@
  * exports.
  */
 
-export { UrError, failPoison, type DecoderPoison, type UrErrorCode } from "./error.ts";
+export { UrError, type UrErrorCode, type UrErrorInfo, type UrLimit } from "./error.ts";
 export { checksum as crc32 } from "./consensus/crc32.ts";
 
 export * as bytewords from "./bytewords/index.ts";
@@ -28,7 +28,10 @@ export {
   type DecoderLimits,
   FountainDecoder,
   FountainEncoder,
-  Part,
+  type FountainEncoderOptions,
+  type Part,
+  decodePart,
+  encodePart,
 } from "./fountain/index.ts";
 
 export {

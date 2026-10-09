@@ -57,8 +57,11 @@ test("expectedType mismatch is UnexpectedType and is not poison", () => {
   const decoder = new MultipartDecoder({ expectedType: UrType.parse("beta") });
   const err = errorOf(() => decoder.receive(encoder.nextPart()));
   expect(err.code).toBe("UnexpectedType");
-  expect(err.expected).toBe("beta");
-  expect(err.found).toBe("alpha");
+  expect(err.info).toStrictEqual({
+    code: "UnexpectedType",
+    expected: [UrType.parse("beta")],
+    found: UrType.parse("alpha"),
+  });
   expect(decoder.isPoisoned).toBe(false);
 });
 
@@ -69,9 +72,9 @@ test("maxUriLen poisons on a longer URI", () => {
   expect(part.length).toBeGreaterThan(8);
   const err = errorOf(() => decoder.receive(part));
   expect(err.code).toBe("ResourceLimit");
-  expect(err.limit).toBe("uri_len");
+  expect(err.info).toStrictEqual({ code: "ResourceLimit", limit: "uriLength" });
   expect(decoder.isPoisoned).toBe(true);
-  expect(decoder.poisonState).toStrictEqual({ code: "ResourceLimit", limit: "uri_len" });
+  expect(decoder.poisonState).toStrictEqual({ code: "ResourceLimit", limit: "uriLength" });
 });
 
 test("non-dCBOR complete payload is CborDecode and not poison", () => {

@@ -26,7 +26,7 @@ fn official_bytewords() {
                 continue;
             }
             let err = decode(input, style(case["style"].as_str().unwrap())).unwrap_err();
-            assert_eq!(format!("{err:?}"), expected, "{name}");
+            assert_eq!(format!("{:?}", err.kind()), expected, "{name}");
             continue;
         }
         let input = unhex(case["inputHex"].as_str().unwrap());
@@ -48,5 +48,9 @@ fn official_bytewords() {
 #[test]
 fn official_bytewords_empty_input() {
     let err = decode("", Style::Standard).unwrap_err();
-    assert_eq!(format!("{err:?}"), "InvalidBytewordsChecksum");
+    assert_eq!(
+        err.kind(),
+        bcur::ErrorKind::InvalidBytewordsChecksum,
+        "{err:?}"
+    );
 }

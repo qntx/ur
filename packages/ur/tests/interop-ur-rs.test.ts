@@ -9,7 +9,7 @@
 import { expect, test } from "vite-plus/test";
 
 import * as bytewords from "../src/bytewords/index.ts";
-import { FountainEncoder } from "../src/fountain/index.ts";
+import { FountainEncoder, encodePart } from "../src/fountain/index.ts";
 import { Decoder, Encoder, UrType, decode, encode, parse, toQrString } from "../src/ur/index.ts";
 import { makeMessage } from "./message.ts";
 import { vectorJson, vectorLines } from "./vectors.ts";
@@ -79,10 +79,10 @@ test("decode full-uppercase multipart URIs", () => {
 
 test("test_foreign_1_1_fountain_uri_decodes", () => {
   const message = new TextEncoder().encode("hello");
-  const fountain = FountainEncoder.create(message, 64);
+  const fountain = new FountainEncoder(message, { maxFragmentLength: 64 });
   expect(fountain.fragmentCount).toBe(1);
-  const part = fountain.nextPart();
-  const body = bytewords.encode(part.toCbor(), "minimal");
+  const part = fountain.next().value;
+  const body = bytewords.encode(encodePart(part!), "minimal");
   const uri = `ur:bytes/1-1/${body}`;
   const decoder = new Decoder();
   decoder.receive(uri);

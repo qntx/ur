@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "capability": "fountain.encoder",
+  "source": {
+    "kind": "generated",
+    "name": "scripts/vectors/generate-encoder-options.ts",
+    "crossCheck": "python find_nominal_fragment_length (URKit linear search)"
+  },
+  "cases": [
+    {
+      "name": "min-fragment-length-binds",
+      "kind": "fragment-length",
+      "message": {
+        "seed": "Wolf",
+        "length": 15
+      },
+      "maxFragmentLength": 5,
+      "minFragmentLength": 10,
+      "fragmentLength": 15,
+      "fragmentCount": 1
+    },
+    {
+      "name": "min-fragment-length-not-binding",
+      "kind": "fragment-length",
+      "message": {
+        "seed": "Wolf",
+        "length": 100
+      },
+      "maxFragmentLength": 10,
+      "minFragmentLength": 5,
+      "fragmentLength": 10,
+      "fragmentCount": 10
+    },
+    {
+      "name": "max-fragment-length-equals-message",
+      "kind": "fragment-length",
+      "message": {
+        "seed": "Wolf",
+        "length": 32
+      },
+      "maxFragmentLength": 32,
+      "fragmentLength": 32,
+      "fragmentCount": 1
+    },
+    {
+      "name": "first-sequence-at-iterator-end",
+      "kind": "sequences",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "firstSequence": 4294967294,
+      "sequences": [
+        4294967295
+      ],
+      "isCompleteAfter": [
+        true
+      ],
+      "dataHex": [
+        "905b77adc36e4f2d3ccb"
+      ],
+      "lastFragmentIndexes": [
+        [
+          2
+        ]
+      ],
+      "doneAfter": true
+    },
+    {
+      "name": "single-part-repetition",
+      "kind": "sequences",
+      "message": {
+        "seed": "Wolf",
+        "length": 5
+      },
+      "maxFragmentLength": 64,
+      "sequences": [
+        1,
+        2,
+        3
+      ],
+      "isCompleteAfter": [
+        true,
+        true,
+        true
+      ],
+      "dataHex": [
+        "916ec65cf7",
+        "916ec65cf7",
+        "916ec65cf7"
+      ],
+      "lastFragmentIndexes": [
+        [
+          0
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "doneAfter": false
+    },
+    {
+      "name": "is-complete-transitions",
+      "kind": "sequences",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "sequences": [
+        1,
+        2,
+        3
+      ],
+      "isCompleteAfter": [
+        false,
+        false,
+        true
+      ],
+      "dataHex": [
+        "916ec65cf77cadf55cd7",
+        "f9cda1a1030026ddd42e",
+        "905b77adc36e4f2d3ccb"
+      ],
+      "lastFragmentIndexes": [
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ]
+      ],
+      "doneAfter": false
+    },
+    {
+      "name": "mixed-part-indexes",
+      "kind": "sequences",
+      "message": {
+        "seed": "Wolf",
+        "length": 1024
+      },
+      "maxFragmentLength": 100,
+      "firstSequence": 11,
+      "sequences": [
+        12,
+        13,
+        14
+      ],
+      "isCompleteAfter": [
+        true,
+        true,
+        true
+      ],
+      "dataHex": [
+        "23880789bdf9ed73be57fa84d555134630e8d0f7df48349f29869a477c13ccca9cd555ac42ad7f568416c3d61959d0ed568b2b81c7771e9088ad7fd55fd4386bafbf5a528c30f107139249357368ffa980de2c76ddd9ce4191376be0e6b5",
+        "e3d23f25bb4b1baabc5153b6c6355f08897e744d9bcfa3eeae3701e28a8518becd8a98ea8d3e9654c801559eaa611b328cb799321f9d4c5f5dd328defcc832ae0be37ec4cbc28239e33efa83a9dc2d5f0b999ba696013d1dc9c87e874ba3",
+        "fbefde2a7e9ae9dc1e5c2c48f74f6c824ce9ef3c89f68800d44587bedc4ab417cfb3e7447d90e1e417e6e05d30e87239d3a5d1d45993d4461e60a0192831640aa32dedde185a371ded2ae15f8a93dba8809482ce49225daadfbb0fec629e"
+      ],
+      "lastFragmentIndexes": [
+        [
+          9
+        ],
+        [
+          2,
+          5,
+          6,
+          8,
+          9,
+          10
+        ],
+        [
+          8
+        ]
+      ],
+      "doneAfter": false
+    }
+  ]
+}

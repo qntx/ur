@@ -134,11 +134,10 @@ fn official_xoshiro() {
 fn official_fragment_length() {
     let doc = vdoc!("official/mur/fragment-length.json");
     for case in doc["cases"].as_array().unwrap() {
-        // `minFragmentLength` is not supported yet (F-11); both official cases pass
-        // because the minimum bound does not bind.
         let len = fragment_length(
             case["messageLength"].as_u64().unwrap() as usize,
             case["maxFragmentLength"].as_u64().unwrap() as usize,
+            case["minFragmentLength"].as_u64().unwrap() as usize,
         );
         assert_eq!(len, case["expected"].as_u64().unwrap() as usize);
     }
@@ -150,7 +149,8 @@ fn official_partition() {
     for case in doc["cases"].as_array().unwrap() {
         let len = case["message"]["length"].as_u64().unwrap() as usize;
         let max = case["maxFragmentLength"].as_u64().unwrap() as usize;
-        let frag_len = fragment_length(len, max);
+        let min = case["minFragmentLength"].as_u64().unwrap_or(10) as usize;
+        let frag_len = fragment_length(len, max, min);
         let fragments: Vec<String> = partition(message_of(case), frag_len)
             .iter()
             .map(hex::encode)
@@ -177,7 +177,8 @@ fn official_sampler() {
             "degree-chooser" | "degree-chooser-per-nonce" => {
                 let len = case["message"]["length"].as_u64().unwrap() as usize;
                 let max = case["maxFragmentLength"].as_u64().unwrap() as usize;
-                let frag_len = fragment_length(len, max);
+                let min = case["minFragmentLength"].as_u64().unwrap_or(10) as usize;
+                let frag_len = fragment_length(len, max, min);
                 let fragment_count = partition(message_of(case), frag_len).len() as u32;
                 let degrees: Vec<u64> = if kind == "degree-chooser-per-nonce" {
                     (0..count)
@@ -247,8 +248,9 @@ fn official_chooser() {
     for case in doc["cases"].as_array().unwrap() {
         let len = case["message"]["length"].as_u64().unwrap() as usize;
         let max = case["maxFragmentLength"].as_u64().unwrap() as usize;
+        let min = case["minFragmentLength"].as_u64().unwrap_or(10) as usize;
         let message = message_of(case);
-        let frag_len = fragment_length(len, max);
+        let frag_len = fragment_length(len, max, min);
         let fragment_count = partition(message.clone(), frag_len).len();
         let checksum = crc32::checksum(&message);
         let indexes: Vec<Vec<u64>> = case["sequences"]
@@ -279,11 +281,15 @@ fn official_encoder() {
     for case in doc["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
         let max = case["maxFragmentLength"].as_u64().unwrap() as usize;
-        let mut enc = crate::fountain::Encoder::new(&message_of(case), max).unwrap();
+        let mut enc = crate::fountain::Encoder::new(
+            message_of(case),
+            crate::fountain::EncoderOptions::new(max),
+        )
+        .unwrap();
         match case["kind"].as_str().unwrap() {
             "parts" => {
                 for want in case["parts"].as_array().unwrap() {
-                    let part = enc.next_part().unwrap();
+                    let part = enc.next().unwrap();
                     assert_eq!(
                         u64::from(part.sequence()),
                         want["seqNum"].as_u64().unwrap(),
@@ -295,7 +301,7 @@ fn official_encoder() {
                         "{name}"
                     );
                     assert_eq!(
-                        u64::from(part.message_length()),
+                        u64::from(part.message_len()),
                         want["messageLen"].as_u64().unwrap(),
                         "{name}"
                     );
@@ -318,8 +324,8 @@ fn official_encoder() {
             }
             "complete" => {
                 let mut generated = 0_u64;
-                while !enc.complete() {
-                    enc.next_part().unwrap();
+                while !enc.is_complete() {
+                    enc.next().unwrap();
                     generated += 1;
                 }
                 assert_eq!(
@@ -333,21 +339,88 @@ fn official_encoder() {
     }
 }
 
+/// `vectors/fountain/encoder-options.json` (generated): encoder option
+/// behavior — `min_fragment_len` binding, `first_sequence`, iterator end at
+/// `u32::MAX`, `K == 1` repetition, `is_complete` transitions,
+/// `last_fragment_indexes`.
+#[test]
+fn fountain_encoder_options() {
+    let doc = vdoc!("fountain/encoder-options.json");
+    for case in doc["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let len = case["message"]["length"].as_u64().unwrap() as usize;
+        let max = case["maxFragmentLength"].as_u64().unwrap() as usize;
+        let min = case["minFragmentLength"].as_u64().unwrap_or(10) as usize;
+        match case["kind"].as_str().unwrap() {
+            "fragment-length" => {
+                let frag_len = fragment_length(len, max, min);
+                assert_eq!(
+                    frag_len,
+                    case["fragmentLength"].as_u64().unwrap() as usize,
+                    "{name}"
+                );
+                assert_eq!(
+                    len.div_ceil(frag_len),
+                    case["fragmentCount"].as_u64().unwrap() as usize,
+                    "{name}"
+                );
+            }
+            "sequences" => {
+                let options = crate::fountain::EncoderOptions {
+                    max_fragment_len: max,
+                    min_fragment_len: min,
+                    first_sequence: case["firstSequence"].as_u64().unwrap_or(0) as u32,
+                };
+                let mut enc = crate::fountain::Encoder::new(message_of(case), options)
+                    .unwrap_or_else(|e| panic!("{name}: {e}"));
+                let want_seqs = u64s(&case["sequences"]);
+                let mut data_hex = Vec::new();
+                for (i, want) in want_seqs.iter().enumerate() {
+                    let part = enc.next().unwrap_or_else(|| panic!("{name}: done early"));
+                    assert_eq!(u64::from(part.sequence()), *want, "{name}");
+                    data_hex.push(hex::encode(part.data()));
+                    if let Some(flags) = case["isCompleteAfter"].as_array() {
+                        assert_eq!(enc.is_complete(), flags[i].as_bool().unwrap(), "{name}");
+                    }
+                    if let Some(rows) = case["lastFragmentIndexes"].as_array() {
+                        let want_idx: Vec<u32> = u64s(&rows[i])
+                            .iter()
+                            .map(|&v| u32::try_from(v).unwrap())
+                            .collect();
+                        assert_eq!(enc.last_fragment_indexes(), want_idx.as_slice(), "{name}");
+                    }
+                }
+                if let Some(want_hex) = case["dataHex"].as_array() {
+                    let got: Vec<String> = data_hex;
+                    let want: Vec<String> = want_hex
+                        .iter()
+                        .map(|v| v.as_str().unwrap().to_owned())
+                        .collect();
+                    assert_eq!(got, want, "{name}");
+                }
+                if case["doneAfter"].as_bool().unwrap_or(false) {
+                    assert!(enc.next().is_none(), "{name}");
+                }
+            }
+            other => panic!("unknown kind {other}"),
+        }
+    }
+}
+
 #[test]
 fn official_decoder() {
     let doc = vdoc!("official/mur/decoder.json");
     for case in doc["cases"].as_array().unwrap() {
         let max = case["maxFragmentLength"].as_u64().unwrap() as usize;
         let message = message_of(case);
-        let mut enc = crate::fountain::Encoder::new(&message, max).unwrap();
-        // `firstSeqNum` is not a supported API yet (F-11); discarding the first N
-        // emitted parts is equivalent wire behavior.
-        for _ in 0..case["firstSeqNum"].as_u64().unwrap_or(0) {
-            let _ = enc.next_part().unwrap();
-        }
+        let options = crate::fountain::EncoderOptions {
+            first_sequence: case["firstSeqNum"].as_u64().unwrap_or(0) as u32,
+            ..crate::fountain::EncoderOptions::new(max)
+        };
+        let mut enc = crate::fountain::Encoder::new(message.clone(), options).unwrap();
         let mut dec = crate::fountain::Decoder::new();
         while !dec.complete() {
-            dec.receive(enc.next_part().unwrap()).unwrap();
+            dec.receive(enc.next().unwrap()).unwrap();
         }
         assert_eq!(dec.message().unwrap().as_deref(), Some(message.as_slice()));
     }
@@ -418,11 +491,16 @@ fn official_ur_multipart() {
         let ur_type = crate::ur::UrType::new(case["urType"].as_str().unwrap()).unwrap();
         let max = case["maxFragmentLength"].as_u64().unwrap() as usize;
         let payload = payload_of(case);
-        let mut enc = crate::ur::Encoder::new(&payload, max, &ur_type).unwrap();
-        // See official_decoder: discarding the first N parts emulates `firstSeqNum`.
-        for _ in 0..case["firstSeqNum"].as_u64().unwrap_or(0) {
-            let _ = enc.next_part().unwrap();
-        }
+        let first_seq = case["firstSeqNum"].as_u64().unwrap_or(0) as u32;
+        let mut enc = crate::ur::Encoder::with_options(
+            payload.clone(),
+            crate::fountain::EncoderOptions {
+                first_sequence: first_seq,
+                ..crate::fountain::EncoderOptions::new(max)
+            },
+            &ur_type,
+        )
+        .unwrap();
         if let Some(parts_file) = case["partsFile"].as_str() {
             assert_eq!(parts_file, "ur-rs/multipart-20.txt");
             let expected: Vec<String> = vector!("ur-rs/multipart-20.txt")

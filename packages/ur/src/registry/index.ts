@@ -11,7 +11,7 @@ export {
   MultipartDecoder,
   UrType,
 } from "../typed/index.ts";
-export { UrError, type UrErrorCode } from "../error.ts";
+export { UrError, type UrErrorCode, type UrErrorInfo, type UrLimit } from "../error.ts";
 
 export { seedCodec, type Seed } from "./seed.ts";
 export { psbtCodec, type Psbt } from "./psbt.ts";

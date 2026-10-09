@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Breaking
+
+- Unified error model in both languages. TS `UrError` carries a discriminated `info` (`{ code, limit }` for `ResourceLimit`, `{ code, expected: UrType[], found: UrType }` for `UnexpectedType`, `{ code }` otherwise) plus `code` and `fatal` getters; `failPoison`, `DecoderPoison`, and the flat `expected`/`found`/`limit` fields are gone. Rust `bcur::Error` is an opaque struct with `kind()`, `is_fatal()`, `limit()`, `expected_types()`, `found_type()`, and `std::error::Error::source()` for wrapped dCBOR errors; `ErrorKind` and `Limit` replace the enum variants, `ResourceKind`, `CborError`, and `CborErrorKind`. Renamed codes: `EmptyPart`/`InvalidSequence` -> `InvalidPart`, `InvalidFragmentLen` -> `InvalidFragmentLength`, `DecoderState` -> `Internal`, `Cbor` -> `CborDecode`/`CborType`; limits are camelCase (`uriLength`, `fragmentCount`, `fragmentLength`, `messageLength`, `receivedParts`, `bufferParts`) and the `sequence` limit is gone.
+- `Part` is plain data. TS exports `type Part`, `encodePart`, and `decodePart`; the `Part` class with `fromFields`/`fromCbor`/`toCbor`/`indexes`/`isSimple`/`sequenceId` is removed. Rust `Part` has private fields with `Part::new` validating constructor, accessors, `to_cbor`, and `from_cbor(bytes, &DecoderLimits)`; `indexes`/`is_simple`/`sequence_id`/`from_cbor_with_max` are removed.
+- Part CBOR decodes leniently (any definite-width integers and headers, values <= u32) and encodes in shortest form; malformed CBOR is `InvalidPartCbor`, invalid fields are `InvalidPart`, and fragment/count limits map to `ResourceLimit(fragmentLength)`/`ResourceLimit(fragmentCount)`.
+- `FountainEncoder` is an iterator: TS `new FountainEncoder(message, { maxFragmentLength, minFragmentLength?, firstSequence? })` implements `IterableIterator<Part>` (replaces `create`/`nextPart`/`nextSequence`/`complete` with `next()`/`isComplete`/`sequence`/`lastFragmentIndexes`); Rust `fountain::Encoder::new(message, EncoderOptions)` implements `Iterator<Item = Part>` + `FusedIterator` (replaces `next_part`). Iteration ends after sequence `0xFFFFFFFF`; `firstSequence` out of range is a `RangeError` (TS).
+- `K == 1` encoders repeat the same single-part output on every call instead of throwing `SinglePartExhausted` (removed in both languages).
+
 ### Added
 
 - Read-only decode of deprecated BCR-2020-006 v1 tokens/tags: `crypto-seed` (300), `crypto-hdkey` (303), `crypto-keypath` (304), `crypto-coin-info` (305), `crypto-sskr` (309), `crypto-psbt` (310). Writes always emit v2. New `tagUrTypes` helper parses every `UrCodec.tags` name.

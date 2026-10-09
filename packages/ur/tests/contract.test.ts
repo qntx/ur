@@ -5,19 +5,20 @@
 
 import { expect, test } from "vite-plus/test";
 
-import { nextSequence } from "../src/fountain/index.ts";
 import {
   DEFAULT_LIMITS,
   Decoder,
   Encoder,
   FountainEncoder,
-  Part,
   UrError,
   UrType,
   bytewords,
   decode,
+  decodePart,
   encode,
+  encodePart,
 } from "../src/index.ts";
+import type { DecoderLimits } from "../src/index.ts";
 import { MultipartDecoder, Ur } from "../src/typed/index.ts";
 import { vectorJson, vectorLines, vectorText } from "./vectors.ts";
 
@@ -46,17 +47,21 @@ function errorOf(fn: () => void): UrError {
   throw new Error("expected UrError");
 }
 
+function limitOf(error: UrError): string | undefined {
+  return error.info.code === "ResourceLimit" ? error.info.limit : undefined;
+}
+
 function assertSessionPoison(decoder: Decoder, part: string, limit: string): void {
   const first = errorOf(() => decoder.receive(part));
   expect(first.code).toBe("ResourceLimit");
-  expect(first.limit).toBe(limit);
+  expect(limitOf(first)).toBe(limit);
   expect(decoder.isPoisoned).toBe(true);
   const later = errorOf(() => decoder.receive(part));
   expect(later.code).toBe("ResourceLimit");
-  expect(later.limit).toBe(limit);
+  expect(limitOf(later)).toBe(limit);
   const msg = errorOf(() => decoder.message());
   expect(msg.code).toBe("ResourceLimit");
-  expect(msg.limit).toBe(limit);
+  expect(limitOf(msg)).toBe(limit);
 }
 
 type BytewordsSpec = {
@@ -106,6 +111,21 @@ type PoisonLimit = {
   sessionPoison: boolean;
 };
 
+type PartCborDecodeCase = {
+  name: string;
+  cborHex: string;
+  limits?: Partial<DecoderLimits>;
+  part?: {
+    sequence: number;
+    sequenceCount: number;
+    messageLength: number;
+    checksum: number;
+    dataHex: string;
+  };
+  reencodedHex?: string;
+  error?: { code: string; limit?: string };
+};
+
 type PoisonSpec = {
   limits: PoisonLimit[];
   receiveAndMessageSameCode: string[];
@@ -125,18 +145,42 @@ test("bytewords contract", () => {
 
 test("part cbor contract", () => {
   const spec = vectorJson<PartCborSpec>("fountain/part-cbor.json");
-  const part = Part.fromCbor(new Uint8Array(Buffer.from(spec.cborHex, "hex")));
+  const part = decodePart(new Uint8Array(Buffer.from(spec.cborHex, "hex")));
   expect(part.sequence).toBe(spec.sequence);
   expect(part.sequenceCount).toBe(spec.sequenceCount);
   expect(part.messageLength).toBe(spec.messageLength);
   expect(part.checksum).toBe(spec.checksum);
   expect(Buffer.from(part.data).toString("hex")).toBe(spec.dataHex);
-  expect(Buffer.from(part.toCbor()).toString("hex")).toBe(spec.cborHex);
-  expect(
-    errorOf(() =>
-      Part.fromCbor(new Uint8Array(Buffer.from(spec.nonShortestSequenceCborHex, "hex"))),
-    ).code,
-  ).toBe("InvalidPartCbor");
+  expect(Buffer.from(encodePart(part)).toString("hex")).toBe(spec.cborHex);
+  // Non-shortest integer widths decode to the same part (UR-ADR-017).
+  const decoded = decodePart(new Uint8Array(Buffer.from(spec.nonShortestSequenceCborHex, "hex")));
+  expect(decoded).toStrictEqual(part);
+  expect(Buffer.from(encodePart(decoded)).toString("hex")).toBe(spec.cborHex);
+});
+
+const partCborDecodeCases = vectorJson<{ cases: PartCborDecodeCase[] }>(
+  "fountain/part-cbor-decode.json",
+).cases.map((c) => ({ ...c, bytes: new Uint8Array(Buffer.from(c.cborHex, "hex")) }));
+const partCborDecodeAccept = partCborDecodeCases.flatMap((c) => (c.error === undefined ? [c] : []));
+const partCborDecodeReject = partCborDecodeCases.flatMap((c) =>
+  c.error === undefined ? [] : [{ ...c, error: must(c.error) }],
+);
+
+test.each(partCborDecodeAccept)("part cbor decode contract: $name", (c) => {
+  const part = decodePart(c.bytes, c.limits);
+  const want = must(c.part);
+  expect(part.sequence).toBe(want.sequence);
+  expect(part.sequenceCount).toBe(want.sequenceCount);
+  expect(part.messageLength).toBe(want.messageLength);
+  expect(part.checksum).toBe(want.checksum);
+  expect(Buffer.from(part.data).toString("hex")).toBe(want.dataHex);
+  expect(Buffer.from(encodePart(part)).toString("hex")).toBe(c.reencodedHex);
+});
+
+test.each(partCborDecodeReject)("part cbor decode contract rejects: $name", (c) => {
+  const err = errorOf(() => decodePart(c.bytes, c.limits));
+  expect(err.code).toBe(c.error.code);
+  expect(limitOf(err)).toBe(c.error.limit);
 });
 
 test("k1 contract", () => {
@@ -150,9 +194,9 @@ test("k1 contract", () => {
   expect(spec.outboundEqualsSinglePartEncode).toBe(true);
   expect(outbound).toBe(encode(payload, urType));
   expect(spec.inboundFountain11Accepted).toBe(true);
-  const fountain = FountainEncoder.create(payload, 64);
-  const part = fountain.nextPart();
-  const body = bytewords.encode(part.toCbor(), "minimal");
+  const fountain = new FountainEncoder(payload, { maxFragmentLength: 64 });
+  const part = must(fountain.next().value);
+  const body = bytewords.encode(encodePart(part), "minimal");
   const uri = `ur:${urType.value}/1-1/${body}`;
   const decoder = new Decoder();
   decoder.receive(uri);
@@ -186,33 +230,27 @@ test("poison maps via limit string", () => {
   expect(raw).not.toContain("DecoderState");
   const spec = vectorJson<PoisonSpec>("limits/poison.json");
   expect(spec.limits).toStrictEqual([
-    { limit: "uri_len", rust: "UriLen", sessionPoison: true },
-    { limit: "fragment_count", rust: "FragmentCount", sessionPoison: true },
-    { limit: "fragment_data", rust: "FragmentData", sessionPoison: true },
-    { limit: "message_length", rust: "MessageLength", sessionPoison: true },
-    { limit: "received_parts", rust: "ReceivedParts", sessionPoison: true },
-    { limit: "buffer_parts", rust: "BufferParts", sessionPoison: true },
-    { limit: "sequence", rust: "Sequence", sessionPoison: false },
+    { limit: "uriLength", rust: "UriLength", sessionPoison: true },
+    { limit: "fragmentCount", rust: "FragmentCount", sessionPoison: true },
+    { limit: "fragmentLength", rust: "FragmentLength", sessionPoison: true },
+    { limit: "messageLength", rust: "MessageLength", sessionPoison: true },
+    { limit: "receivedParts", rust: "ReceivedParts", sessionPoison: true },
+    { limit: "bufferParts", rust: "BufferParts", sessionPoison: true },
   ]);
-  const seq = spec.limits.find((row) => row.limit === "sequence");
-  expect(seq?.sessionPoison).toBe(false);
-  const err = errorOf(() => nextSequence(0xffffffff));
-  expect(err.code).toBe("ResourceLimit");
-  expect(err.limit).toBe("sequence");
 });
 
 test("poison receive and message same code", () => {
   const spec = vectorJson<PoisonSpec>("limits/poison.json");
-  expect(spec.receiveAndMessageSameCode).toStrictEqual(["uri_len", "fragment_count"]);
+  expect(spec.receiveAndMessageSameCode).toStrictEqual(["uriLength", "fragmentCount"]);
 
-  const uriEncoder = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(8)), 5);
+  const uriEncoder = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(8)), 10);
   const uriDecoder = new Decoder({ limits: { maxUriLen: 16 } });
-  assertSessionPoison(uriDecoder, uriEncoder.nextPart(), "uri_len");
+  assertSessionPoison(uriDecoder, uriEncoder.nextPart(), "uriLength");
 
-  const fragmentEncoder = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(16)), 4);
+  const fragmentEncoder = Encoder.bytes(new TextEncoder().encode("Ten chars!".repeat(16)), 10);
   expect(fragmentEncoder.fragmentCount).toBeGreaterThan(1);
   const fragmentDecoder = new Decoder({ limits: { maxFragmentCount: 1 } });
-  assertSessionPoison(fragmentDecoder, fragmentEncoder.nextPart(), "fragment_count");
+  assertSessionPoison(fragmentDecoder, fragmentEncoder.nextPart(), "fragmentCount");
 });
 
 test("poison not-poison errors", () => {
@@ -220,8 +258,8 @@ test("poison not-poison errors", () => {
   expect(spec.notPoison).toStrictEqual(["UnexpectedType", "CborDecode"]);
 
   const data = new TextEncoder().encode("Ten chars!".repeat(6));
-  const a = Encoder.create(data, 5, UrType.parse("alpha"));
-  const b = Encoder.create(data, 5, UrType.parse("beta"));
+  const a = Encoder.create(data, 10, UrType.parse("alpha"));
+  const b = Encoder.create(data, 10, UrType.parse("beta"));
   const decoder = new Decoder();
   decoder.receive(a.nextPart());
   const mismatch = errorOf(() => decoder.receive(b.nextPart()));

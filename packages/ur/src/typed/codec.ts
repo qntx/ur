@@ -42,9 +42,10 @@ export function toUr<T>(value: T, codec: UrCodec<T>): Ur {
 export function fromUr<T>(ur: Ur, codec: UrCodec<T>): T {
   const accepted = tagUrTypes(codec.tags);
   if (!accepted.some((t) => ur.type.equals(t))) {
-    fail("UnexpectedType", {
-      expected: accepted.map((t) => t.value).join("|"),
-      found: ur.type.value,
+    fail({
+      code: "UnexpectedType",
+      expected: accepted,
+      found: ur.type,
     });
   }
   return mapCborType(() => codec.fromUntaggedCbor(ur.cbor));

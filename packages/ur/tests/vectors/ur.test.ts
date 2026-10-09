@@ -122,12 +122,9 @@ test.each(partsFileRows)("ur.encoder $name", (c) => {
 
 test.each(roundTripRows)("ur.encoder $name", (c) => {
   const payload = payloadOf(c);
-  const encoder = Encoder.create(payload, c.maxFragmentLength, UrType.parse(c.urType));
-  // firstSeqNum is not supported (F-11): discarding the first N emitted parts is equivalent
-  // wire behavior to constructing the encoder with firstSeqNum = N.
-  for (let i = 0; i < c.firstSeqNum; i += 1) {
-    encoder.nextPart();
-  }
+  const encoder = Encoder.create(payload, c.maxFragmentLength, UrType.parse(c.urType), {
+    firstSequence: c.firstSeqNum,
+  });
   const decoder = new Decoder();
   while (!decoder.complete) {
     decoder.receive(encoder.nextPart());

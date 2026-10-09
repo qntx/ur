@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "capability": "fountain.part-cbor",
+  "source": {
+    "kind": "generated",
+    "name": "scripts/vectors/generate-part-cbor-decode.ts",
+    "crossCheck": "rust runner decodes accepted cases with minicbor"
+  },
+  "cases": [
+    {
+      "name": "non-shortest-uint8-sequence",
+      "cborHex": "851801091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "part": {
+        "sequence": 1,
+        "sequenceCount": 9,
+        "messageLength": 256,
+        "checksum": 23570951,
+        "dataHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+      },
+      "reencodedHex": "8501091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+    },
+    {
+      "name": "non-shortest-uint16-sequence",
+      "cborHex": "85190001091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "part": {
+        "sequence": 1,
+        "sequenceCount": 9,
+        "messageLength": 256,
+        "checksum": 23570951,
+        "dataHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+      },
+      "reencodedHex": "8501091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+    },
+    {
+      "name": "non-shortest-uint32-sequence-count",
+      "cborHex": "85011a000000091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "part": {
+        "sequence": 1,
+        "sequenceCount": 9,
+        "messageLength": 256,
+        "checksum": 23570951,
+        "dataHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+      },
+      "reencodedHex": "8501091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+    },
+    {
+      "name": "non-shortest-uint64-all-fields",
+      "cborHex": "98051b00000000000000011b00000000000000091b00000000000001001b000000000167aa075b000000000000001d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "part": {
+        "sequence": 1,
+        "sequenceCount": 9,
+        "messageLength": 256,
+        "checksum": 23570951,
+        "dataHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+      },
+      "reencodedHex": "8501091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+    },
+    {
+      "name": "wide-bstr-header-16",
+      "cborHex": "8501091901001a0167aa0759001d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "part": {
+        "sequence": 1,
+        "sequenceCount": 9,
+        "messageLength": 256,
+        "checksum": 23570951,
+        "dataHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+      },
+      "reencodedHex": "8501091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+    },
+    {
+      "name": "wide-bstr-header-32",
+      "cborHex": "8501091901001a0167aa075a0000001d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "part": {
+        "sequence": 1,
+        "sequenceCount": 9,
+        "messageLength": 256,
+        "checksum": 23570951,
+        "dataHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+      },
+      "reencodedHex": "8501091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c"
+    },
+    {
+      "name": "indefinite-array",
+      "cborHex": "9f01091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3cff",
+      "error": {
+        "code": "InvalidPartCbor"
+      }
+    },
+    {
+      "name": "indefinite-bstr",
+      "cborHex": "8501091901001a0167aa075f581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3cff",
+      "error": {
+        "code": "InvalidPartCbor"
+      }
+    },
+    {
+      "name": "tag-wrapped-array",
+      "cborHex": "c18501091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "error": {
+        "code": "InvalidPartCbor"
+      }
+    },
+    {
+      "name": "negative-int-sequence",
+      "cborHex": "8520091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "error": {
+        "code": "InvalidPartCbor"
+      }
+    },
+    {
+      "name": "array-too-short",
+      "cborHex": "8401091901001a0167aa07",
+      "error": {
+        "code": "InvalidPartCbor"
+      }
+    },
+    {
+      "name": "array-too-long",
+      "cborHex": "8601091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c00",
+      "error": {
+        "code": "InvalidPartCbor"
+      }
+    },
+    {
+      "name": "uint-overflow-u64",
+      "cborHex": "851b0000000100000000091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "error": {
+        "code": "InvalidPartCbor"
+      }
+    },
+    {
+      "name": "truncated-input",
+      "cborHex": "850109",
+      "error": {
+        "code": "InvalidPartCbor"
+      }
+    },
+    {
+      "name": "trailing-bytes",
+      "cborHex": "8501091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c00",
+      "error": {
+        "code": "InvalidPartCbor"
+      }
+    },
+    {
+      "name": "bstr-overrun",
+      "cborHex": "8501091901001a0167aa07581e916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "error": {
+        "code": "InvalidPartCbor"
+      }
+    },
+    {
+      "name": "text-instead-of-bstr",
+      "cborHex": "8501091901001a0167aa076161",
+      "error": {
+        "code": "InvalidPartCbor"
+      }
+    },
+    {
+      "name": "zero-sequence",
+      "cborHex": "8500091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "error": {
+        "code": "InvalidPart"
+      }
+    },
+    {
+      "name": "zero-sequence-count",
+      "cborHex": "8501001901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "error": {
+        "code": "InvalidPart"
+      }
+    },
+    {
+      "name": "zero-message-length",
+      "cborHex": "850109001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "error": {
+        "code": "InvalidPart"
+      }
+    },
+    {
+      "name": "empty-data",
+      "cborHex": "850101010040",
+      "error": {
+        "code": "InvalidPart"
+      }
+    },
+    {
+      "name": "padding-wider-than-fragment",
+      "cborHex": "8501020100480000000000000000",
+      "error": {
+        "code": "InvalidPart"
+      }
+    },
+    {
+      "name": "message-exceeds-capacity",
+      "cborHex": "850101186400480000000000000000",
+      "error": {
+        "code": "InvalidPart"
+      }
+    },
+    {
+      "name": "data-over-limit",
+      "cborHex": "8501091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "limits": {
+        "maxFragmentDataLength": 28
+      },
+      "error": {
+        "code": "ResourceLimit",
+        "limit": "fragmentLength"
+      }
+    },
+    {
+      "name": "count-over-limit",
+      "cborHex": "8501091901001a0167aa07581d916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3c",
+      "limits": {
+        "maxFragmentCount": 8
+      },
+      "error": {
+        "code": "ResourceLimit",
+        "limit": "fragmentCount"
+      }
+    }
+  ]
+}

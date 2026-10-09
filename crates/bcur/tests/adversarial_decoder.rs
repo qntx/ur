@@ -9,12 +9,12 @@
 
 //! Adversarial multi-part decoder session behavior (public API).
 
-use bcur::{Decoder, DecoderLimits, Encoder, Error, ResourceKind, UrType};
+use bcur::{Decoder, DecoderLimits, Encoder, ErrorKind, Limit, UrType};
 
 #[test]
 fn uri_len_limit_poisons_session() {
     let data = b"Ten chars!".repeat(8);
-    let mut enc = Encoder::bytes(&data, 5).unwrap();
+    let mut enc = Encoder::bytes(&data, 10).unwrap();
     let part = enc.next_part().unwrap();
 
     let mut decoder = Decoder::with_limits(DecoderLimits {
@@ -23,23 +23,23 @@ fn uri_len_limit_poisons_session() {
     });
     assert!(matches!(
         decoder.receive(&part),
-        Err(Error::ResourceLimit(ResourceKind::UriLen))
+        Err(ref e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(Limit::UriLength)
     ));
     assert!(decoder.is_poisoned());
     assert!(matches!(
         decoder.receive(&part),
-        Err(Error::ResourceLimit(ResourceKind::UriLen))
+        Err(ref e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(Limit::UriLength)
     ));
     assert!(matches!(
         decoder.message(),
-        Err(Error::ResourceLimit(ResourceKind::UriLen))
+        Err(ref e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(Limit::UriLength)
     ));
 }
 
 #[test]
 fn fragment_count_limit_poisons() {
     let data = b"Ten chars!".repeat(16);
-    let mut enc = Encoder::bytes(&data, 4).unwrap();
+    let mut enc = Encoder::bytes(&data, 10).unwrap();
     assert!(enc.fragment_count() > 1);
 
     let mut decoder = Decoder::with_limits(DecoderLimits {
@@ -49,7 +49,7 @@ fn fragment_count_limit_poisons() {
     let part = enc.next_part().unwrap();
     assert!(matches!(
         decoder.receive(&part),
-        Err(Error::ResourceLimit(ResourceKind::FragmentCount))
+        Err(ref e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(Limit::FragmentCount)
     ));
     assert!(decoder.is_poisoned());
 }
@@ -57,14 +57,14 @@ fn fragment_count_limit_poisons() {
 #[test]
 fn message_length_limit_poisons() {
     let data = b"Ten chars!".repeat(16);
-    let mut enc = Encoder::bytes(&data, 8).unwrap();
+    let mut enc = Encoder::bytes(&data, 10).unwrap();
     let mut decoder = Decoder::with_limits(DecoderLimits {
         max_message_length: 8,
         ..DecoderLimits::default()
     });
     assert!(matches!(
         decoder.receive(&enc.next_part().unwrap()),
-        Err(Error::ResourceLimit(ResourceKind::MessageLength))
+        Err(ref e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(Limit::MessageLength)
     ));
     assert!(decoder.is_poisoned());
 }
@@ -72,13 +72,13 @@ fn message_length_limit_poisons() {
 #[test]
 fn type_stickiness_does_not_poison() {
     let data = b"Ten chars!".repeat(6);
-    let mut a = Encoder::new(&data, 5, &UrType::new("alpha").unwrap()).unwrap();
-    let mut b = Encoder::new(&data, 5, &UrType::new("beta").unwrap()).unwrap();
+    let mut a = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
+    let mut b = Encoder::new(&data, 10, &UrType::new("beta").unwrap()).unwrap();
     let mut decoder = Decoder::default();
     decoder.receive(&a.next_part().unwrap()).unwrap();
     assert!(matches!(
         decoder.receive(&b.next_part().unwrap()),
-        Err(Error::UnexpectedType { .. })
+        Err(ref e) if e.kind() == ErrorKind::UnexpectedType
     ));
     assert!(!decoder.is_poisoned());
     // Same type continues to be accepted.
@@ -100,11 +100,11 @@ fn single_part_receive_does_not_poison() {
 #[test]
 fn expected_type_mismatch_does_not_poison() {
     let data = b"Ten chars!".repeat(4);
-    let mut enc = Encoder::new(&data, 5, &UrType::new("alpha").unwrap()).unwrap();
+    let mut enc = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
     let mut decoder = Decoder::default().with_expected_type(UrType::new("beta").unwrap());
     assert!(matches!(
         decoder.receive(&enc.next_part().unwrap()),
-        Err(Error::UnexpectedType { .. })
+        Err(ref e) if e.kind() == ErrorKind::UnexpectedType
     ));
     assert!(!decoder.is_poisoned());
 }
@@ -112,13 +112,13 @@ fn expected_type_mismatch_does_not_poison() {
 #[test]
 fn index_path_mismatch_does_not_poison() {
     let data = b"Ten chars!".repeat(4);
-    let mut enc = Encoder::bytes(&data, 5).unwrap();
+    let mut enc = Encoder::bytes(&data, 10).unwrap();
     let part = enc.next_part().unwrap();
     let corrupted = part.replacen("/1-", "/2-", 1);
     let mut decoder = Decoder::default();
     assert!(matches!(
         decoder.receive(&corrupted),
-        Err(Error::InvalidIndices)
+        Err(ref e) if e.kind() == ErrorKind::InvalidIndices
     ));
     assert!(!decoder.is_poisoned());
 }

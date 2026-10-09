@@ -1,13 +1,12 @@
 {
   "limits": [
-    { "limit": "uri_len", "rust": "UriLen", "sessionPoison": true },
-    { "limit": "fragment_count", "rust": "FragmentCount", "sessionPoison": true },
-    { "limit": "fragment_data", "rust": "FragmentData", "sessionPoison": true },
-    { "limit": "message_length", "rust": "MessageLength", "sessionPoison": true },
-    { "limit": "received_parts", "rust": "ReceivedParts", "sessionPoison": true },
-    { "limit": "buffer_parts", "rust": "BufferParts", "sessionPoison": true },
-    { "limit": "sequence", "rust": "Sequence", "sessionPoison": false }
+    { "limit": "uriLength", "rust": "UriLength", "sessionPoison": true },
+    { "limit": "fragmentCount", "rust": "FragmentCount", "sessionPoison": true },
+    { "limit": "fragmentLength", "rust": "FragmentLength", "sessionPoison": true },
+    { "limit": "messageLength", "rust": "MessageLength", "sessionPoison": true },
+    { "limit": "receivedParts", "rust": "ReceivedParts", "sessionPoison": true },
+    { "limit": "bufferParts", "rust": "BufferParts", "sessionPoison": true }
   ],
-  "receiveAndMessageSameCode": ["uri_len", "fragment_count"],
+  "receiveAndMessageSameCode": ["uriLength", "fragmentCount"],
   "notPoison": ["UnexpectedType", "CborDecode"]
 }
