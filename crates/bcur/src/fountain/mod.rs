@@ -6,74 +6,42 @@
 //! let encoder = bcur::fountain::Encoder::new(data.to_vec(), options).unwrap();
 //! let mut decoder = bcur::fountain::Decoder::default();
 //! for part in encoder {
-//!     decoder.receive(part).unwrap();
-//!     if decoder.complete() {
+//!     decoder.receive(&part).unwrap();
+//!     if matches!(decoder.state(), bcur::fountain::State::Complete(_)) {
 //!         break;
 //!     }
 //! }
-//! assert_eq!(decoder.message().unwrap().as_deref(), Some(data.as_slice()));
+//! assert_eq!(decoder.into_message().unwrap(), data);
 //! ```
 
 mod part_cbor;
 
-use alloc::{
-    collections::{BTreeMap, BTreeSet},
-    vec::Vec,
-};
+use alloc::{boxed::Box, vec::Vec};
 use core::num::NonZeroU32;
 
 use crate::consensus::{FragmentChooser, crc32};
-use crate::error::{Error, ErrorKind, Limit, Poison, Result};
+use crate::error::{Error, ErrorKind, Limit, Result};
 
 /// Hard limits for adversarial multi-part streams.
 ///
 /// [`Default`] is the production budget for hosts that do not call
-/// [`Decoder::with_limits`]. Embedded or tighter envelopes must still set
-/// limits explicitly.
+/// [`Decoder::new`]. Embedded or tighter envelopes must still set limits
+/// explicitly.
 ///
-/// These caps are a desktop fail-closed ceiling, not a QR-version table.
+/// | Field | Default | Check point |
+/// |-------|---------|-------------|
+/// | `max_message_length` | `1_048_576` (1 MiB) | First part's `message_len`; single-part UR payload |
+/// | `max_fragment_count` | `2_000` | First part's `K`; `Part` CBOR decode |
+/// | `max_fragment_length` | `8_192` | Every `part.data.len()`; `Part` CBOR bstr |
+/// | `max_uri_length` | `8_192` | `ur::Decoder::receive` string length |
 ///
-/// | Field | Default | Role |
-/// |-------|---------|------|
-/// | `max_message_length` | `1_048_576` (1 MiB) | Original payload cap |
-/// | `max_fragment_count` | `2_000` | `K` / `sequence_count` |
-/// | `max_fragment_data_length` | `8_192` | `part.data.len()` and `Part` CBOR bstr |
-/// | `max_buffer_parts` | `4_000` | Mixed-part XOR map |
-/// | `max_received_parts` | `8_000` | Unique index-set set |
-/// | `max_uri_len` | `8_192` | `ur::Decoder::receive` ASCII length |
+/// `max_uri_length` = 8192 is a string-API `DoS` bound, above any single QR
+/// (ISO/IEC 18004 alphanumeric L 4296).
 ///
-/// CLI payloads are uppercase UR and fit QR alphanumeric mode. ISO/IEC 18004
-/// Table 7, version 40, alphanumeric Q capacity is 2420 characters.
-/// `max_uri_len` = 8192 is a string-API `DoS` bound, above any single QR
-/// (including alphanumeric L 4296).
-///
-/// At `--max-chars 400`, a part body is ~180 decoded bytes, so `K = 2000`
-/// admits ~360 KiB, below `max_message_length`. Both caps apply; the tighter
-/// one wins. [`Part::from_cbor`] also applies
-/// `max_fragment_count` / `max_fragment_data_length` before the fountain
-/// decoder sees the part.
-///
-/// [`Self::worst_case_heap_bytes`] is a **cap-product ceiling excluding
-/// allocator/BTree overhead**, not a conservative RSS figure. Independent
-/// caps overestimate reachable payload heap (`K=2000` × 8 KiB is
-/// [`ErrorKind::InconsistentPart`] against `max_message_length=1 MiB`).
-/// `BTree`/allocator costs underestimate process RSS for a given cap tuple.
-///
-/// ```text
-/// decoded  = min(max_message_length + max_fragment_data_length,
-///                max_fragment_count * max_fragment_data_length)
-/// buffer   = max_buffer_parts * (max_fragment_data_length
-///            + max_fragment_count * size_of::<usize>())
-/// received = max_received_parts * max_fragment_count * size_of::<usize>()
-/// total    = decoded + buffer + received
-/// ```
-///
-/// All multiplies and adds saturate at [`usize::MAX`].
-///
-/// On 64-bit (`size_of::<usize>() == 8`) [`Default`] is **`225_824_768`
-/// (≈ 215 MiB)**. On 32-bit the same integers yield **`129_824_768`
-/// (≈ 124 MiB)**. An embedded target still must call
-/// [`Decoder::with_limits`] — 124 MiB is not an embedded budget.
+/// Per-session memory bound: `K·fragment_len` bytes of row data plus
+/// `K·ceil(K/8)` bytes of column masks — about 1.5 MiB at the defaults
+/// (UR-ADR-015). A violation is a fatal [`ErrorKind::ResourceLimit`]: the
+/// decoder enters [`State::Failed`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DecoderLimits {
     /// Max original message length in bytes.
@@ -81,13 +49,9 @@ pub struct DecoderLimits {
     /// Max fragment count `K` (`sequence_count`).
     pub max_fragment_count: usize,
     /// Max `part.data.len()` on every part.
-    pub max_fragment_data_length: usize,
-    /// Max entries in the complex-part XOR buffer.
-    pub max_buffer_parts: usize,
-    /// Max unique index-sets recorded in `received`.
-    pub max_received_parts: usize,
-    /// Max UR string length accepted by `ur::Decoder::receive` (ASCII bytes).
-    pub max_uri_len: usize,
+    pub max_fragment_length: usize,
+    /// Max UR string length accepted by `ur::Decoder::receive`.
+    pub max_uri_length: usize,
 }
 
 impl Default for DecoderLimits {
@@ -95,44 +59,9 @@ impl Default for DecoderLimits {
         Self {
             max_message_length: 1_048_576,
             max_fragment_count: 2_000,
-            max_fragment_data_length: 8_192,
-            max_buffer_parts: 4_000,
-            max_received_parts: 8_000,
-            max_uri_len: 8_192,
+            max_fragment_length: 8_192,
+            max_uri_length: 8_192,
         }
-    }
-}
-
-impl DecoderLimits {
-    /// Cap-product ceiling of the public caps, excluding allocator/`BTree`
-    /// overhead. Saturates at [`usize::MAX`].
-    ///
-    /// 64-bit [`Default`] is `225_824_768` (≈ 215 MiB). 32-bit [`Default`] is
-    /// `129_824_768` (≈ 124 MiB). This is not process RSS. `max_uri_len` is a
-    /// receive-length bound and is not included in the product.
-    #[must_use]
-    pub const fn worst_case_heap_bytes(&self) -> usize {
-        let usz = size_of::<usize>();
-        let decoded_a = self
-            .max_message_length
-            .saturating_add(self.max_fragment_data_length);
-        let decoded_b = self
-            .max_fragment_count
-            .saturating_mul(self.max_fragment_data_length);
-        let decoded = if decoded_a < decoded_b {
-            decoded_a
-        } else {
-            decoded_b
-        };
-        let per_buffer = self
-            .max_fragment_data_length
-            .saturating_add(self.max_fragment_count.saturating_mul(usz));
-        let buffer = self.max_buffer_parts.saturating_mul(per_buffer);
-        let received = self
-            .max_received_parts
-            .saturating_mul(self.max_fragment_count)
-            .saturating_mul(usz);
-        decoded.saturating_add(buffer).saturating_add(received)
     }
 }
 
@@ -300,321 +229,416 @@ impl Iterator for Encoder {
 
 impl core::iter::FusedIterator for Encoder {}
 
-/// Fountain decoder with resource limits and fail-closed poison.
+/// Per-frame outcome of [`Decoder::receive`]; `Err(e)` covers the rejected
+/// (`!e.is_fatal()`) and fatal (`e.is_fatal()`) results (UR-ADR-014).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Received {
+    /// The part increased the matrix rank (new information).
+    Accepted,
+    /// The part added nothing (linearly dependent, or the session is
+    /// already in a terminal state).
+    Duplicate,
+}
+
+/// Fountain decode progress snapshot.
+///
+/// [`Progress::ratio`] is `rank / fragment_count`: the exact information
+/// fraction, not an estimate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Progress {
+    fragment_count: u32,
+    rank: u32,
+    recovered: u32,
+    processed: u64,
+}
+
+impl Progress {
+    pub(crate) const fn new(
+        fragment_count: u32,
+        rank: u32,
+        recovered: u32,
+        processed: u64,
+    ) -> Self {
+        Self {
+            fragment_count,
+            rank,
+            recovered,
+            processed,
+        }
+    }
+
+    /// Source fragment count `K` (`0` while [`State::Empty`]).
+    #[must_use]
+    pub const fn fragment_count(&self) -> u32 {
+        self.fragment_count
+    }
+
+    /// Linearly independent parts ingested.
+    #[must_use]
+    pub const fn rank(&self) -> u32 {
+        self.rank
+    }
+
+    /// Source fragments fully recovered (unit rows).
+    #[must_use]
+    pub const fn recovered(&self) -> u32 {
+        self.recovered
+    }
+
+    /// Frames that were `accepted` or `duplicate`.
+    #[must_use]
+    pub const fn processed(&self) -> u64 {
+        self.processed
+    }
+
+    /// `rank / fragment_count` (`0` while empty; `1` once complete).
+    #[must_use]
+    pub fn ratio(&self) -> f64 {
+        if self.fragment_count == 0 {
+            0.0
+        } else {
+            f64::from(self.rank) / f64::from(self.fragment_count)
+        }
+    }
+}
+
+/// Decoder session state.
+///
+/// `T` is the completed payload type: `[u8]` for the fountain [`Decoder`],
+/// [`crate::ur::Decoded`] for the UR decoder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum State<'a, T: ?Sized> {
+    /// No part ingested yet.
+    Empty,
+    /// Collecting parts; carries the current [`Progress`].
+    Collecting(Progress),
+    /// Terminal success; the message is computed once and read, never
+    /// recomputed.
+    Complete(&'a T),
+    /// Terminal failure; carries the fatal error.
+    Failed(&'a Error),
+}
+
+/// Decoder session phase (terminal states own their payload).
+#[derive(Debug)]
+enum Phase {
+    Empty,
+    Collecting,
+    Complete(Vec<u8>),
+    Failed(Error),
+}
+
+/// One retained fountain row: `mask` marks the fragment columns `XOR`ed into
+/// `data`; `rows[p]` has lowest set bit `p` (RREF: no other row contains `p`).
+#[derive(Debug)]
+struct Row {
+    /// K-bit column set.
+    mask: Box<[u64]>,
+    /// Row payload, `fragment_len` bytes.
+    data: Vec<u8>,
+    /// `mask` popcount, maintained with each XOR.
+    ones: u32,
+}
+
+impl Row {
+    fn xor(&mut self, mask: &[u64], data: &[u8]) {
+        for (target, source) in self.mask.iter_mut().zip(mask.iter()) {
+            *target ^= source;
+        }
+        self.ones = self.mask.iter().map(|word| word.count_ones()).sum();
+        xor_in_place(&mut self.data, data);
+    }
+}
+
+fn mask_bit(mask: &[u64], index: usize) -> bool {
+    mask.get(index / 64)
+        .is_some_and(|word| word & (1_u64 << (index % 64)) != 0)
+}
+
+fn lowest_bit(mask: &[u64]) -> Option<usize> {
+    for (i, word) in mask.iter().enumerate() {
+        if *word != 0 {
+            return Some(i * 64 + word.trailing_zeros() as usize);
+        }
+    }
+    None
+}
+
+/// Fountain decoder: incremental Gauss-Jordan elimination over GF(2).
+///
+/// Each retained part is a row `(mask, data)` keyed by its pivot column in
+/// reduced row echelon form; `rank == K` completes the session and the
+/// padding plus CRC-32 of the joined message is verified exactly once
+/// (UR-ADR-013/014/015).
 #[derive(Debug)]
 pub struct Decoder {
-    decoded: BTreeMap<usize, Part>,
-    received: BTreeSet<Vec<usize>>,
-    buffer: BTreeMap<Vec<usize>, Part>,
-    queue: Vec<(usize, Part)>,
+    limits: DecoderLimits,
+    phase: Phase,
+    chooser: Option<FragmentChooser>,
     sequence_count: u32,
     message_length: usize,
     checksum: u32,
-    fragment_length: usize,
-    chooser: Option<FragmentChooser>,
-    limits: DecoderLimits,
-    poisoned: Option<Poison>,
+    fragment_len: usize,
+    /// `rows[p]` is the row whose pivot is column `p`.
+    rows: Vec<Option<Row>>,
+    rank: u32,
+    recovered: u32,
+    processed: u64,
+    last_indexes: Vec<u32>,
 }
 
 impl Default for Decoder {
     fn default() -> Self {
-        Self::new()
+        Self::new(DecoderLimits::default())
     }
 }
 
 impl Decoder {
-    /// Creates a decoder with default limits.
+    /// Creates a decoder with the given limits.
     #[must_use]
-    pub fn new() -> Self {
-        Self::with_limits(DecoderLimits::default())
-    }
-
-    /// Creates a decoder with custom limits.
-    #[must_use]
-    pub const fn with_limits(limits: DecoderLimits) -> Self {
+    pub const fn new(limits: DecoderLimits) -> Self {
         Self {
-            decoded: BTreeMap::new(),
-            received: BTreeSet::new(),
-            buffer: BTreeMap::new(),
-            queue: Vec::new(),
+            limits,
+            phase: Phase::Empty,
+            chooser: None,
             sequence_count: 0,
             message_length: 0,
             checksum: 0,
-            fragment_length: 0,
-            chooser: None,
-            limits,
-            poisoned: None,
+            fragment_len: 0,
+            rows: Vec::new(),
+            rank: 0,
+            recovered: 0,
+            processed: 0,
+            last_indexes: Vec::new(),
         }
     }
 
-    /// Whether a previous fatal error poisoned this decoder.
-    #[must_use]
-    pub const fn is_poisoned(&self) -> bool {
-        self.poisoned.is_some()
-    }
-
-    const fn poison(&mut self, limit: Limit) -> Error {
-        let poison = Poison::Limit(limit);
-        self.poisoned = Some(poison);
-        poison.to_error()
-    }
-
-    const fn escalate(&mut self, err: Error) -> Error {
-        match err.kind() {
-            ErrorKind::ResourceLimit => {
-                if let Some(limit) = err.limit() {
-                    self.poisoned = Some(Poison::Limit(limit));
-                }
-            }
-            ErrorKind::Internal => {
-                self.poisoned = Some(Poison::Internal);
-            }
-            _ => {}
-        }
-        err
-    }
-
-    /// Receives a fountain part.
+    /// Receives one fountain part.
+    ///
+    /// `Ok(Received::Accepted)` when the part raised the rank,
+    /// `Ok(Received::Duplicate)` when it added nothing (including any frame in
+    /// a terminal state). `Err(e)` with `!e.is_fatal()` rejects the frame
+    /// without mutating the session; a fatal error moves the decoder to
+    /// [`State::Failed`]. The frame that triggers a failed completion check
+    /// returns that fatal error itself.
     ///
     /// # Errors
     ///
-    /// Returns an error if the part is invalid, inconsistent, or exceeds limits.
-    pub fn receive(&mut self, part: Part) -> Result<bool> {
-        if let Some(poison) = self.poisoned {
-            return Err(poison.to_error());
+    /// Rejected (state unchanged): [`ErrorKind::InconsistentPart`].
+    /// Fatal ([`State::Failed`]): [`ErrorKind::ResourceLimit`],
+    /// [`ErrorKind::InvalidPadding`], [`ErrorKind::InvalidMessageChecksum`],
+    /// [`ErrorKind::Internal`].
+    pub fn receive(&mut self, part: &Part) -> Result<Received> {
+        if matches!(self.phase, Phase::Complete(_) | Phase::Failed(_)) {
+            self.processed = self.processed.saturating_add(1);
+            return Ok(Received::Duplicate);
         }
-        if self.complete() {
-            return Ok(false);
+        if part.data().len() > self.limits.max_fragment_length {
+            return Err(self.fail(Error::resource_limit(Limit::FragmentLength)));
         }
-
-        if part.data().len() > self.limits.max_fragment_data_length {
-            return Err(self.poison(Limit::FragmentLength));
-        }
-
-        if self.received.is_empty() {
-            let sc = part.sequence_count();
-            let sc_usz = sc as usize;
-            let ml = part.message_len() as usize;
-            if sc_usz > self.limits.max_fragment_count {
-                return Err(self.poison(Limit::FragmentCount));
-            }
-            if ml > self.limits.max_message_length {
-                return Err(self.poison(Limit::MessageLength));
-            }
-            self.sequence_count = sc;
-            self.message_length = ml;
-            self.checksum = part.checksum();
-            self.fragment_length = part.data().len();
-            // `Part` validates nonzero fields at construction.
-            self.chooser = Some(FragmentChooser::new(
-                NonZeroU32::new(sc).ok_or_else(Error::internal)?,
-                part.checksum(),
-            ));
-        } else if !self.validate(&part) {
+        if self.chooser.is_none() {
+            self.lock_metadata(part)?;
+        } else if part.sequence_count() != self.sequence_count
+            || usize::try_from(part.message_len()).map_err(|_| Error::internal())?
+                != self.message_length
+            || part.checksum() != self.checksum
+            || part.data().len() != self.fragment_len
+        {
             return Err(Error::new(ErrorKind::InconsistentPart));
         }
-
-        // Index sets are computed once per part from the per-stream chooser.
-        let indexes: Vec<usize> = self
-            .chooser
-            .as_ref()
-            .ok_or_else(Error::internal)?
-            .choose(NonZeroU32::new(part.sequence()).ok_or_else(Error::internal)?)
-            .into_iter()
-            .map(|i| usize::try_from(i).map_err(|_| Error::internal()))
-            .collect::<Result<_>>()?;
-        if self.received.contains(&indexes) {
-            return Ok(false);
+        let Some(sequence) = NonZeroU32::new(part.sequence()) else {
+            return Err(self.fail(Error::internal()));
+        };
+        let Some(chooser) = self.chooser.as_ref() else {
+            return Err(self.fail(Error::internal()));
+        };
+        let indexes = chooser.choose(sequence);
+        let accepted = self.insert_row(&indexes, part.data());
+        self.last_indexes = indexes;
+        self.processed = self.processed.saturating_add(1);
+        if !accepted {
+            return Ok(Received::Duplicate);
         }
-        if self.received.len() >= self.limits.max_received_parts {
-            return Err(self.poison(Limit::ReceivedParts));
+        if self.rank == self.sequence_count {
+            self.join()?;
         }
-        self.received.insert(indexes.clone());
-        if indexes.len() == 1 {
-            let index = *indexes.first().ok_or_else(Error::internal)?;
-            self.enqueue_simple(index, part);
-        } else {
-            self.process_complex(part, indexes)
-                .map_err(|e| self.escalate(e))?;
-        }
-        // Always drain the reduction queue after ingest so that a complex part
-        // reduced to a simple fragment still cascades into the XOR buffer.
-        self.process_queue().map_err(|e| self.escalate(e))?;
-        Ok(true)
+        Ok(Received::Accepted)
     }
 
-    fn enqueue_simple(&mut self, index: usize, part: Part) {
-        if self.decoded.contains_key(&index) {
-            return;
+    /// First part fixes `K`, `message_length`, `checksum`, and
+    /// `fragment_len`; violations of the configured caps are fatal.
+    fn lock_metadata(&mut self, part: &Part) -> Result<()> {
+        let Ok(count) = usize::try_from(part.sequence_count()) else {
+            return Err(self.fail(Error::internal()));
+        };
+        if count > self.limits.max_fragment_count {
+            return Err(self.fail(Error::resource_limit(Limit::FragmentCount)));
         }
-        self.decoded.insert(index, part.clone());
-        self.queue.push((index, part));
-    }
-
-    fn process_queue(&mut self) -> Result<()> {
-        while let Some((index, simple)) = self.queue.pop() {
-            let to_process: Vec<Vec<usize>> = self
-                .buffer
-                .keys()
-                .filter(|&idxs| idxs.contains(&index))
-                .cloned()
-                .collect();
-            for indexes in to_process {
-                self.reduce_buffered_part(indexes, index, &simple)?;
-            }
+        let Ok(message_length) = usize::try_from(part.message_len()) else {
+            return Err(self.fail(Error::internal()));
+        };
+        if message_length > self.limits.max_message_length {
+            return Err(self.fail(Error::resource_limit(Limit::MessageLength)));
         }
+        // `Part` validates nonzero fields at construction.
+        let Some(count_nz) = NonZeroU32::new(part.sequence_count()) else {
+            return Err(self.fail(Error::internal()));
+        };
+        self.chooser = Some(FragmentChooser::new(count_nz, part.checksum()));
+        self.sequence_count = part.sequence_count();
+        self.message_length = message_length;
+        self.checksum = part.checksum();
+        self.fragment_len = part.data().len();
+        self.rows = (0..count).map(|_| None).collect();
+        self.phase = Phase::Collecting;
         Ok(())
     }
 
-    fn reduce_buffered_part(
-        &mut self,
-        indexes: Vec<usize>,
-        known_index: usize,
-        simple: &Part,
-    ) -> Result<()> {
-        let mut part = self.buffer.remove(&indexes).ok_or_else(Error::internal)?;
-        let mut new_indexes = indexes;
-        let to_remove = new_indexes
-            .iter()
-            .position(|&x| x == known_index)
-            .ok_or_else(Error::internal)?;
-        new_indexes.remove(to_remove);
-        xor(&mut part.data, &simple.data)?;
-        self.insert_reduced(new_indexes, part)
-    }
-
-    fn process_complex(&mut self, mut part: Part, mut indexes: Vec<usize>) -> Result<()> {
-        let known: Vec<usize> = indexes
-            .iter()
-            .copied()
-            .filter(|idx| self.decoded.contains_key(idx))
-            .collect();
-        if indexes.len() == known.len() {
-            return Ok(());
-        }
-        for remove in known {
-            let pos = indexes
-                .iter()
-                .position(|&x| x == remove)
-                .ok_or_else(Error::internal)?;
-            indexes.remove(pos);
-            xor(
-                &mut part.data,
-                &self.decoded.get(&remove).ok_or_else(Error::internal)?.data,
-            )?;
-        }
-        self.insert_reduced(indexes, part)
-    }
-
-    fn insert_reduced(&mut self, indexes: Vec<usize>, part: Part) -> Result<()> {
-        if indexes.len() == 1 {
-            let idx = *indexes.first().ok_or_else(Error::internal)?;
-            if self.decoded.contains_key(&idx) {
-                return Ok(());
+    /// Forward-eliminates the part against existing pivot rows, then
+    /// back-substitutes the new row into every row sharing its pivot.
+    /// Returns whether the rank increased.
+    fn insert_row(&mut self, indexes: &[u32], data: &[u8]) -> bool {
+        let mut mask = alloc::vec![0_u64; self.rows.len().div_ceil(64)].into_boxed_slice();
+        for &index in indexes {
+            if let Some(word) = mask.get_mut(index as usize / 64) {
+                *word |= 1_u64 << (index % 64);
             }
-            self.decoded.insert(idx, part.clone());
-            self.queue.push((idx, part));
-            return Ok(());
         }
-        // Replacing an existing index-set does not grow the map; only count new keys.
-        if !self.buffer.contains_key(&indexes) && self.buffer.len() >= self.limits.max_buffer_parts
-        {
-            return Err(self.poison(Limit::BufferParts));
-        }
-        self.buffer.insert(indexes, part);
-        Ok(())
-    }
-
-    /// Max fragment data length configured for this decoder.
-    #[must_use]
-    pub const fn max_fragment_data_length(&self) -> usize {
-        self.limits.max_fragment_data_length
-    }
-
-    /// Max source fragment count `K` configured for this decoder.
-    #[must_use]
-    pub const fn max_fragment_count(&self) -> usize {
-        self.limits.max_fragment_count
-    }
-
-    /// Max original message length configured for this decoder.
-    #[must_use]
-    pub const fn max_message_length(&self) -> usize {
-        self.limits.max_message_length
-    }
-
-    /// Whether all source fragments have been recovered.
-    #[must_use]
-    pub fn complete(&self) -> bool {
-        self.message_length != 0 && self.decoded.len() == self.sequence_count as usize
-    }
-
-    /// Number of resolved source fragments, or `None` before any part.
-    #[must_use]
-    pub fn resolved_fragment_count(&self) -> Option<u32> {
-        if self.message_length == 0 {
-            None
-        } else {
-            debug_assert!(
-                u32::try_from(self.decoded.len()).is_ok(),
-                "decoded fragment count exceeds u32 (impossible under DecoderLimits)"
-            );
-            u32::try_from(self.decoded.len()).ok()
-        }
-    }
-
-    /// Total fragment count `K`, or `0` before any part.
-    #[must_use]
-    pub const fn fragment_count(&self) -> u32 {
-        self.sequence_count
-    }
-
-    /// Whether `part` is consistent with previously received metadata.
-    #[must_use]
-    pub fn validate(&self, part: &Part) -> bool {
-        if self.received.is_empty() {
+        let mut row_data = data.to_vec();
+        self.forward_eliminate(indexes, &mut mask, &mut row_data);
+        let Some(pivot) = lowest_bit(&mask) else {
             return false;
+        };
+        self.back_substitute(pivot, &mask, &row_data);
+        let ones = mask.iter().map(|word| word.count_ones()).sum();
+        if ones == 1 {
+            self.recovered = self.recovered.saturating_add(1);
         }
-        part.sequence_count() == self.sequence_count
-            && part.message_len() as usize == self.message_length
-            && part.checksum() == self.checksum
-            && part.data().len() == self.fragment_length
+        if let Some(slot) = self.rows.get_mut(pivot) {
+            *slot = Some(Row {
+                mask,
+                data: row_data,
+                ones,
+            });
+        }
+        self.rank = self.rank.saturating_add(1);
+        true
     }
 
-    /// Returns the decoded message if complete.
+    /// RREF: eliminating at an existing pivot can only set non-pivot bits,
+    /// so scanning the part's own index set covers every elimination.
+    fn forward_eliminate(&self, indexes: &[u32], mask: &mut [u64], data: &mut [u8]) {
+        for &index in indexes {
+            let column = index as usize;
+            if !mask_bit(mask, column) {
+                continue;
+            }
+            let Some(Some(row)) = self.rows.get(column) else {
+                continue;
+            };
+            for (target, source) in mask.iter_mut().zip(row.mask.iter()) {
+                *target ^= source;
+            }
+            xor_in_place(data, &row.data);
+        }
+    }
+
+    /// XORs the new pivot row into every stored row that shares its column,
+    /// preserving reduced row echelon form.
+    fn back_substitute(&mut self, pivot: usize, mask: &[u64], data: &[u8]) {
+        for row in self.rows.iter_mut().flatten() {
+            if !mask_bit(&row.mask, pivot) {
+                continue;
+            }
+            let was_unit = row.ones == 1;
+            row.xor(mask, data);
+            if was_unit && row.ones != 1 {
+                self.recovered = self.recovered.saturating_sub(1);
+            } else if !was_unit && row.ones == 1 {
+                self.recovered = self.recovered.saturating_add(1);
+            }
+        }
+    }
+
+    /// Joins the `K` unit rows in fragment order and verifies padding and
+    /// CRC-32 exactly once.
+    fn join(&mut self) -> Result<()> {
+        let mut combined = Vec::with_capacity(self.fragment_len.saturating_mul(self.rows.len()));
+        for slot in &self.rows {
+            let Some(row) = slot else {
+                return Err(self.fail(Error::internal()));
+            };
+            if row.ones != 1 {
+                return Err(self.fail(Error::internal()));
+            }
+            combined.extend_from_slice(&row.data);
+        }
+        let Some(padding) = combined.get(self.message_length..) else {
+            return Err(self.fail(Error::internal()));
+        };
+        if padding.iter().any(|byte| *byte != 0) {
+            return Err(self.fail(Error::new(ErrorKind::InvalidPadding)));
+        }
+        combined.truncate(self.message_length);
+        if crc32::checksum(&combined) != self.checksum {
+            return Err(self.fail(Error::new(ErrorKind::InvalidMessageChecksum)));
+        }
+        self.phase = Phase::Complete(combined);
+        Ok(())
+    }
+
+    /// Moves the session to [`State::Failed`] and returns the fatal error.
+    fn fail(&mut self, error: Error) -> Error {
+        self.phase = Phase::Failed(error.clone());
+        error
+    }
+
+    /// Current session state.
+    #[must_use]
+    pub fn state(&self) -> State<'_, [u8]> {
+        match &self.phase {
+            Phase::Empty => State::Empty,
+            Phase::Collecting => State::Collecting(self.progress()),
+            Phase::Complete(message) => State::Complete(message),
+            Phase::Failed(error) => State::Failed(error),
+        }
+    }
+
+    /// Progress snapshot (`Empty` reports all zeros).
+    #[must_use]
+    pub const fn progress(&self) -> Progress {
+        Progress::new(
+            self.sequence_count,
+            self.rank,
+            self.recovered,
+            self.processed,
+        )
+    }
+
+    /// Fragment indexes of the most recent `accepted`/`duplicate` part
+    /// (ascending).
+    #[must_use]
+    pub fn last_indexes(&self) -> &[u32] {
+        &self.last_indexes
+    }
+
+    /// Consumes the decoder and returns the message.
     ///
     /// # Errors
     ///
-    /// Returns padding or checksum errors if the joined payload is invalid.
-    pub fn message(&self) -> Result<Option<Vec<u8>>> {
-        if let Some(poison) = self.poisoned {
-            return Err(poison.to_error());
+    /// [`ErrorKind::NotComplete`] while still collecting; the stored fatal
+    /// error when the session is [`State::Failed`].
+    pub fn into_message(self) -> Result<Vec<u8>> {
+        match self.phase {
+            Phase::Complete(message) => Ok(message),
+            Phase::Failed(error) => Err(error),
+            Phase::Empty | Phase::Collecting => Err(Error::new(ErrorKind::NotComplete)),
         }
-        if !self.complete() {
-            return Ok(None);
-        }
-        let k = self.sequence_count as usize;
-        let mut combined = Vec::with_capacity(self.fragment_length * k);
-        for idx in 0..k {
-            let part = self.decoded.get(&idx).ok_or_else(Error::internal)?;
-            combined.extend_from_slice(&part.data);
-        }
-        if !combined
-            .get(self.message_length..)
-            .ok_or_else(Error::internal)?
-            .iter()
-            .all(|&x| x == 0)
-        {
-            return Err(Error::new(ErrorKind::InvalidPadding));
-        }
-        let message = combined
-            .get(..self.message_length)
-            .ok_or_else(Error::internal)?
-            .to_vec();
-        if crc32::checksum(&message) != self.checksum {
-            return Err(Error::new(ErrorKind::InvalidMessageChecksum));
-        }
-        Ok(Some(message))
+    }
+
+    /// Returns the session to [`State::Empty`]; limits are kept.
+    pub fn reset(&mut self) {
+        *self = Self::new(self.limits);
     }
 }
 
@@ -752,14 +776,6 @@ fn xor_in_place(v1: &mut [u8], v2: &[u8]) {
     }
 }
 
-fn xor(v1: &mut [u8], v2: &[u8]) -> Result<()> {
-    if v1.len() != v2.len() {
-        return Err(Error::internal());
-    }
-    xor_in_place(v1, v2);
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -773,47 +789,28 @@ mod tests {
             .collect()
     }
 
+    /// Index set of `part` via the cold chooser (mirrors deleted
+    /// `Part::indexes`).
+    fn part_indexes(part: &Part) -> Vec<u32> {
+        let (Some(seq), Some(count)) = (
+            NonZeroU32::new(part.sequence()),
+            NonZeroU32::new(part.sequence_count()),
+        ) else {
+            return Vec::new();
+        };
+        choose_fragments(seq, count, part.checksum())
+            .into_iter()
+            .map(|i| u32::try_from(i).unwrap())
+            .collect()
+    }
+
     #[test]
     fn decoder_limits_default_budget_is_locked() {
         let limits = DecoderLimits::default();
         assert_eq!(limits.max_message_length, 1_048_576);
         assert_eq!(limits.max_fragment_count, 2_000);
-        assert_eq!(limits.max_fragment_data_length, 8_192);
-        assert_eq!(limits.max_buffer_parts, 4_000);
-        assert_eq!(limits.max_received_parts, 8_000);
-        assert_eq!(limits.max_uri_len, 8_192);
-
-        let usz = size_of::<usize>();
-        let decoded_a = limits
-            .max_message_length
-            .saturating_add(limits.max_fragment_data_length);
-        let decoded_b = limits
-            .max_fragment_count
-            .saturating_mul(limits.max_fragment_data_length);
-        let decoded = decoded_a.min(decoded_b);
-        let per_buffer = limits
-            .max_fragment_data_length
-            .saturating_add(limits.max_fragment_count.saturating_mul(usz));
-        let buffer = limits.max_buffer_parts.saturating_mul(per_buffer);
-        let received = limits
-            .max_received_parts
-            .saturating_mul(limits.max_fragment_count)
-            .saturating_mul(usz);
-        let expected = decoded.saturating_add(buffer).saturating_add(received);
-        assert_eq!(limits.worst_case_heap_bytes(), expected);
-
-        #[cfg(target_pointer_width = "64")]
-        assert_eq!(limits.worst_case_heap_bytes(), 225_824_768);
-
-        let overflow = DecoderLimits {
-            max_message_length: usize::MAX,
-            max_fragment_count: usize::MAX,
-            max_fragment_data_length: usize::MAX,
-            max_buffer_parts: usize::MAX,
-            max_received_parts: usize::MAX,
-            max_uri_len: usize::MAX,
-        };
-        assert_eq!(overflow.worst_case_heap_bytes(), usize::MAX);
+        assert_eq!(limits.max_fragment_length, 8_192);
+        assert_eq!(limits.max_uri_length, 8_192);
     }
 
     #[test]
@@ -837,13 +834,19 @@ mod tests {
     #[test]
     fn test_fountain_roundtrip() {
         let message = make_message("Wolf", 256);
-        let mut encoder = Encoder::new(message.clone(), EncoderOptions::new(30)).unwrap();
+        let encoder = Encoder::new(message.clone(), EncoderOptions::new(30)).unwrap();
         let mut decoder = Decoder::default();
-        while !decoder.complete() {
-            let part = encoder.next().unwrap();
-            decoder.receive(part).unwrap();
+        assert!(matches!(decoder.state(), State::Empty));
+        let mut processed = 0_u64;
+        for part in encoder {
+            processed += 1;
+            assert_eq!(decoder.receive(&part).unwrap(), Received::Accepted);
+            assert_eq!(decoder.progress().processed(), processed);
+            if matches!(decoder.state(), State::Complete(_)) {
+                break;
+            }
         }
-        assert_eq!(decoder.message().unwrap(), Some(message));
+        assert_eq!(decoder.into_message().unwrap(), message);
     }
 
     #[test]
@@ -895,14 +898,33 @@ mod tests {
         let mut encoder = Encoder::new(message.clone(), EncoderOptions::new(1000)).unwrap();
         let mut decoder = Decoder::default();
         let mut skip = false;
-        while !decoder.complete() {
+        loop {
             let part = encoder.next().unwrap();
             if !skip {
-                decoder.receive(part).unwrap();
+                let _ = decoder.receive(&part).unwrap();
+            }
+            if matches!(decoder.state(), State::Complete(_)) {
+                break;
             }
             skip = !skip;
         }
-        assert_eq!(decoder.message().unwrap(), Some(message));
+        assert_eq!(decoder.into_message().unwrap(), message);
+    }
+
+    #[test]
+    fn test_out_of_order_completion() {
+        let message = make_message("Wolf", 4096);
+        let mut encoder = Encoder::new(message.clone(), EncoderOptions::new(64)).unwrap();
+        // Buffer enough parts, then feed them reversed: pure mixes first.
+        let parts: Vec<Part> = core::iter::from_fn(|| encoder.next()).take(200).collect();
+        let mut decoder = Decoder::default();
+        for part in parts.iter().rev() {
+            let _ = decoder.receive(part).unwrap();
+            if matches!(decoder.state(), State::Complete(_)) {
+                break;
+            }
+        }
+        assert_eq!(decoder.into_message().unwrap(), message);
     }
 
     #[test]
@@ -957,97 +979,47 @@ mod tests {
         assert_eq!(rejoined, message);
     }
 
-    /// Complex part reduced to a simple fragment must cascade into the buffer.
+    /// A mixed part whose columns were already covered is a `duplicate`,
+    /// and `recovered`/`rank` stay put.
     #[test]
-    fn test_complex_to_simple_cascades_into_buffer() {
-        let (target, known, reducer) =
-            cascade_fixture().expect("need mixed parts that exercise buffer cascade");
-
-        let mut decoder = Decoder::default();
-        decoder.receive(target).unwrap();
-        decoder.receive(known).unwrap();
-        decoder.receive(reducer).unwrap();
-
-        // known simple + reducer-derived simple + cascade of buffered pair
-        assert!(
-            decoder.resolved_fragment_count().unwrap_or(0) >= 3,
-            "cascade failed: resolved={:?} buffer should yield the third fragment",
-            decoder.resolved_fragment_count()
-        );
-    }
-
-    /// Index set of `part` via the cold chooser (mirrors deleted
-    /// `Part::indexes`).
-    fn part_indexes(part: &Part) -> Vec<usize> {
-        let (Some(seq), Some(count)) = (
-            NonZeroU32::new(part.sequence()),
-            NonZeroU32::new(part.sequence_count()),
-        ) else {
-            return Vec::new();
-        };
-        choose_fragments(seq, count, part.checksum())
-    }
-
-    /// Finds `(buffered degree-2, known simple, reducer mixed)` for cascade tests.
-    fn cascade_fixture() -> Option<(Part, Part, Part)> {
-        let message = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ012345".to_vec();
+    fn test_redundant_mixed_part_is_duplicate() {
+        let message = make_message("Wolf", 128);
         let mut encoder = Encoder::new(
             message,
             EncoderOptions {
                 min_fragment_len: 1,
-                ..EncoderOptions::new(8)
+                ..EncoderOptions::new(16)
             },
         )
-        .ok()?;
-        let k = encoder.fragment_count() as usize;
-        let mut parts = Vec::new();
-        for _ in 0..k.saturating_mul(30) {
-            parts.push(encoder.next()?);
-        }
-
-        let mut simple_by_index: BTreeMap<usize, Part> = BTreeMap::new();
+        .unwrap();
+        let k = usize::try_from(encoder.fragment_count()).unwrap();
+        let parts: Vec<Part> = core::iter::from_fn(|| encoder.next())
+            .take(k * 40)
+            .collect();
+        // First: every degree-1 part in order. Two sequences can hash to
+        // the same column, so only the first for each column is accepted.
+        let mut decoder = Decoder::default();
+        let mut fed = Vec::new();
+        let mut covered = alloc::collections::BTreeSet::new();
         for part in &parts {
             let idxs = part_indexes(part);
-            if let Some(&idx) = idxs.first().filter(|_| idxs.len() == 1) {
-                simple_by_index.entry(idx).or_insert_with(|| part.clone());
-            }
+            let Some(&idx) = idxs.first().filter(|_| idxs.len() == 1) else {
+                continue;
+            };
+            let expected = if covered.insert(idx) {
+                fed.push(part.clone());
+                Received::Accepted
+            } else {
+                Received::Duplicate
+            };
+            assert_eq!(decoder.receive(part).unwrap(), expected);
         }
-
-        let target = parts.iter().find(|p| part_indexes(p).len() == 2)?.clone();
-        let mut ends = part_indexes(&target);
-        ends.sort_unstable();
-        let end_lo = *ends.first()?;
-        let end_hi = *ends.get(1)?;
-
-        parts.iter().find_map(|part| {
-            let idxs = part_indexes(part);
-            if idxs.len() != 2 {
-                return None;
-            }
-            let left = *idxs.first()?;
-            let right = *idxs.get(1)?;
-            candidate_reducer(end_lo, end_hi, left, right, part, &target, &simple_by_index).or_else(
-                || candidate_reducer(end_lo, end_hi, right, left, part, &target, &simple_by_index),
-            )
-        })
-    }
-
-    fn candidate_reducer(
-        end_lo: usize,
-        end_hi: usize,
-        recovered: usize,
-        other: usize,
-        reducer: &Part,
-        target: &Part,
-        simple_by_index: &BTreeMap<usize, Part>,
-    ) -> Option<(Part, Part, Part)> {
-        let recovers_endpoint = recovered == end_lo || recovered == end_hi;
-        let other_outside_pair = other != end_lo && other != end_hi;
-        if !(recovers_endpoint && other_outside_pair) {
-            return None;
+        // Re-feeding any of them is a duplicate.
+        for part in &fed {
+            assert_eq!(decoder.receive(part).unwrap(), Received::Duplicate);
         }
-        let known = simple_by_index.get(&other)?.clone();
-        Some((target.clone(), known, reducer.clone()))
+        assert_eq!(decoder.progress().rank(), u32::try_from(fed.len()).unwrap());
+        assert_eq!(decoder.progress().recovered(), decoder.progress().rank());
     }
 
     #[test]
@@ -1057,11 +1029,14 @@ mod tests {
         let mut encoder_b =
             Encoder::new(make_message("Other", 64), EncoderOptions::new(16)).unwrap();
         let mut decoder = Decoder::default();
-        decoder.receive(encoder_a.next().unwrap()).unwrap();
+        decoder.receive(&encoder_a.next().unwrap()).unwrap();
         assert!(matches!(
-            decoder.receive(encoder_b.next().unwrap()),
-            Err(ref e) if e.kind() == ErrorKind::InconsistentPart
+            decoder.receive(&encoder_b.next().unwrap()),
+            Err(ref e) if e.kind() == ErrorKind::InconsistentPart && !e.is_fatal()
         ));
+        // Rejected: the session is still collecting with rank 1.
+        assert!(matches!(decoder.state(), State::Collecting(_)));
+        assert_eq!(decoder.progress().rank(), 1);
     }
 
     #[test]
@@ -1070,17 +1045,18 @@ mod tests {
         let mut encoder = Encoder::new(message, EncoderOptions::new(16)).unwrap();
         let part = encoder.next().unwrap();
         let mut decoder = Decoder::default();
-        assert!(decoder.receive(part.clone()).unwrap());
-        assert!(!decoder.receive(part).unwrap());
+        assert_eq!(decoder.receive(&part).unwrap(), Received::Accepted);
+        assert_eq!(decoder.receive(&part).unwrap(), Received::Duplicate);
+        assert_eq!(decoder.last_indexes(), part_indexes(&part).as_slice());
     }
 
     #[test]
-    fn test_resource_limit_fragment_count_poisons() {
+    fn test_resource_limit_fragment_count_fails() {
         let limits = DecoderLimits {
             max_fragment_count: 1,
             ..DecoderLimits::default()
         };
-        let mut decoder = Decoder::with_limits(limits);
+        let mut decoder = Decoder::new(limits);
         let message = make_message("Wolf", 64);
         let mut encoder = Encoder::new(
             message,
@@ -1092,17 +1068,150 @@ mod tests {
         .unwrap();
         assert!(encoder.fragment_count() > 1);
         assert!(matches!(
-            decoder.receive(encoder.next().unwrap()),
+            decoder.receive(&encoder.next().unwrap()),
             Err(ref e) if e.kind() == ErrorKind::ResourceLimit
                 && e.limit() == Some(Limit::FragmentCount)
+                && e.is_fatal()
         ));
-        assert!(decoder.is_poisoned());
-        // Fail-closed: subsequent receives keep failing.
+        assert!(matches!(decoder.state(), State::Failed(_)));
+        // Terminal: subsequent frames are duplicates, whatever they are.
+        assert_eq!(
+            decoder.receive(&encoder.next().unwrap()).unwrap(),
+            Received::Duplicate
+        );
+    }
+
+    #[test]
+    fn test_resource_limit_message_length_fails() {
+        let limits = DecoderLimits {
+            max_message_length: 16,
+            ..DecoderLimits::default()
+        };
+        let mut decoder = Decoder::new(limits);
+        let message = make_message("Wolf", 64);
+        let mut encoder = Encoder::new(
+            message,
+            EncoderOptions {
+                min_fragment_len: 1,
+                ..EncoderOptions::new(8)
+            },
+        )
+        .unwrap();
         assert!(matches!(
-            decoder.receive(encoder.next().unwrap()),
+            decoder.receive(&encoder.next().unwrap()),
             Err(ref e) if e.kind() == ErrorKind::ResourceLimit
-                && e.limit() == Some(Limit::FragmentCount)
+                && e.limit() == Some(Limit::MessageLength)
         ));
+        assert!(matches!(decoder.state(), State::Failed(_)));
+    }
+
+    #[test]
+    fn test_resource_limit_fragment_length_fails() {
+        let limits = DecoderLimits {
+            max_fragment_length: 16,
+            ..DecoderLimits::default()
+        };
+        let mut decoder = Decoder::new(limits);
+        // K=1 part whose 20-byte payload exceeds the cap.
+        let data = alloc::vec![0_u8; 20];
+        let checksum = crc32::checksum(data.get(..10).unwrap_or(&data));
+        let part = Part::new(1, 1, 10, checksum, data).unwrap();
+        assert!(matches!(
+            decoder.receive(&part),
+            Err(ref e) if e.kind() == ErrorKind::ResourceLimit
+                && e.limit() == Some(Limit::FragmentLength)
+        ));
+        assert!(matches!(decoder.state(), State::Failed(_)));
+    }
+
+    #[test]
+    fn test_invalid_padding_fails() {
+        // K=1: data[message_len..] must be all zero.
+        let message = b"abcde".to_vec();
+        let mut data = message.clone();
+        data.extend_from_slice(&[0_u8; 3]);
+        *data.last_mut().unwrap() = 1;
+        let part = Part::new(1, 1, 5, crc32::checksum(&message), data).unwrap();
+        let mut decoder = Decoder::default();
+        assert!(matches!(
+            decoder.receive(&part),
+            Err(ref e) if e.kind() == ErrorKind::InvalidPadding && e.is_fatal()
+        ));
+        assert!(matches!(
+            decoder.state(),
+            State::Failed(e) if e.kind() == ErrorKind::InvalidPadding
+        ));
+        assert!(matches!(
+            decoder.into_message().unwrap_err().kind(),
+            ErrorKind::InvalidPadding
+        ));
+    }
+
+    #[test]
+    fn test_message_checksum_fails() {
+        let message = b"abcde".to_vec();
+        let mut data = message.clone();
+        *data.first_mut().unwrap() ^= 0xff;
+        let part = Part::new(1, 1, 5, crc32::checksum(&message), data).unwrap();
+        let mut decoder = Decoder::default();
+        assert!(matches!(
+            decoder.receive(&part),
+            Err(ref e) if e.kind() == ErrorKind::InvalidMessageChecksum
+        ));
+        assert!(matches!(decoder.state(), State::Failed(_)));
+    }
+
+    #[test]
+    fn test_decoder_reset() {
+        let message = make_message("Wolf", 64);
+        let mut encoder = Encoder::new(message, EncoderOptions::new(16)).unwrap();
+        let mut decoder = Decoder::default();
+        decoder.receive(&encoder.next().unwrap()).unwrap();
+        assert!(matches!(decoder.state(), State::Collecting(_)));
+        decoder.reset();
+        assert!(matches!(decoder.state(), State::Empty));
+        assert_eq!(decoder.progress(), Progress::new(0, 0, 0, 0));
+        assert_eq!(decoder.last_indexes().len(), 0);
+    }
+
+    #[test]
+    fn test_into_message_not_complete() {
+        let decoder = Decoder::default();
+        assert!(matches!(
+            decoder.into_message().unwrap_err().kind(),
+            ErrorKind::NotComplete
+        ));
+    }
+
+    #[test]
+    fn test_progress_fields() {
+        let message = make_message("Wolf", 100);
+        let mut encoder = Encoder::new(
+            message,
+            EncoderOptions {
+                min_fragment_len: 1,
+                ..EncoderOptions::new(10)
+            },
+        )
+        .unwrap();
+        let k = encoder.fragment_count();
+        let mut decoder = Decoder::default();
+        let mut seen = 0_u32;
+        loop {
+            let part = encoder.next().unwrap();
+            if decoder.receive(&part).unwrap() == Received::Accepted {
+                seen += 1;
+            }
+            let progress = decoder.progress();
+            assert_eq!(progress.fragment_count(), k);
+            assert_eq!(progress.rank(), seen);
+            assert!(progress.recovered() <= progress.rank());
+            if seen == k {
+                break;
+            }
+        }
+        assert_eq!(decoder.progress().ratio(), 1.0);
+        assert!(decoder.last_indexes().iter().all(|i| *i < k));
     }
 
     #[test]
@@ -1161,6 +1270,22 @@ mod tests {
     }
 
     #[test]
+    fn test_k1_decoder_completes() {
+        let mut encoder = Encoder::new(b"hello".to_vec(), EncoderOptions::new(64)).unwrap();
+        let mut decoder = Decoder::default();
+        assert_eq!(
+            decoder.receive(&encoder.next().unwrap()).unwrap(),
+            Received::Accepted
+        );
+        assert!(matches!(decoder.state(), State::Complete(_)));
+        assert_eq!(
+            decoder.receive(&encoder.next().unwrap()).unwrap(),
+            Received::Duplicate
+        );
+        assert_eq!(decoder.into_message().unwrap(), b"hello");
+    }
+
+    #[test]
     fn test_iterator_ends_after_u32_max() {
         let options = EncoderOptions {
             first_sequence: u32::MAX,
@@ -1182,113 +1307,156 @@ mod tests {
         assert!(encoder.next().is_none());
     }
 
-    #[test]
-    fn test_buffer_duplicate_at_capacity_does_not_poison() {
-        let limits = DecoderLimits {
-            max_buffer_parts: 1,
-            ..DecoderLimits::default()
-        };
-        let message = make_message("Wolf", 64);
-        let mut encoder = Encoder::new(
-            message,
-            EncoderOptions {
-                min_fragment_len: 1,
-                ..EncoderOptions::new(8)
-            },
-        )
-        .unwrap();
-        let k = encoder.fragment_count();
-        let first_mixed = (0..k.saturating_mul(20))
-            .map(|_| encoder.next().unwrap())
-            .find(|p| part_indexes(p).len() != 1)
-            .expect("need at least one mixed part");
-
-        let mut decoder = Decoder::with_limits(limits);
-        decoder.receive(first_mixed.clone()).unwrap();
-        // Same index-set: ignored without growing the buffer or poisoning.
-        assert!(!decoder.receive(first_mixed).unwrap());
-        assert!(!decoder.is_poisoned());
+    /// Independent GF(2) rank tracker for the property test: `Vec<bool>` masks
+    /// over an insertion-order row list, no pivot index. Deliberately different
+    /// data structures from `Decoder`.
+    struct NaiveRank {
+        k: u32,
+        rows: Vec<Vec<bool>>,
+        terminal: bool,
     }
 
-    #[test]
-    fn test_resource_limit_message_length_poisons() {
-        let limits = DecoderLimits {
-            max_message_length: 16,
-            ..DecoderLimits::default()
-        };
-        let mut decoder = Decoder::with_limits(limits);
-        let message = make_message("Wolf", 64);
-        let mut encoder = Encoder::new(
-            message,
-            EncoderOptions {
-                min_fragment_len: 1,
-                ..EncoderOptions::new(8)
-            },
-        )
-        .unwrap();
-        assert!(matches!(
-            decoder.receive(encoder.next().unwrap()),
-            Err(ref e) if e.kind() == ErrorKind::ResourceLimit
-                && e.limit() == Some(Limit::MessageLength)
-        ));
-        assert!(decoder.is_poisoned());
-    }
-
-    #[test]
-    fn test_checksum_mismatch_is_inconsistent() {
-        let message = make_message("Wolf", 32);
-        let mut encoder = Encoder::new(
-            message.clone(),
-            EncoderOptions {
-                min_fragment_len: 1,
-                ..EncoderOptions::new(8)
-            },
-        )
-        .unwrap();
-        let part = encoder.next().unwrap();
-        let bad = Part::new(
-            part.sequence(),
-            part.sequence_count(),
-            part.message_len(),
-            part.checksum().wrapping_add(1),
-            part.data().to_vec(),
-        )
-        .unwrap();
-        let mut decoder = Decoder::default();
-        decoder.receive(bad).unwrap();
-        let mut encoder2 = Encoder::new(
-            message,
-            EncoderOptions {
-                min_fragment_len: 1,
-                ..EncoderOptions::new(8)
-            },
-        )
-        .unwrap();
-        let _ = encoder2.next().unwrap();
-        assert!(matches!(
-            decoder.receive(encoder2.next().unwrap()),
-            Err(ref e) if e.kind() == ErrorKind::InconsistentPart
-        ));
-    }
-
-    #[test]
-    fn test_complete_message_crc_ok() {
-        let message = make_message("Wolf", 10);
-        let mut encoder = Encoder::new(
-            message.clone(),
-            EncoderOptions {
-                min_fragment_len: 1,
-                ..EncoderOptions::new(4)
-            },
-        )
-        .unwrap();
-        let mut decoder = Decoder::default();
-        while !decoder.complete() {
-            decoder.receive(encoder.next().unwrap()).unwrap();
+    impl NaiveRank {
+        fn lock(&mut self, k: u32) {
+            self.k = k;
         }
-        assert_eq!(
-            decoder.message().unwrap().as_deref(),
-            Some(message.as_slice())
-        );
+
+        fn ingest(&mut self, indexes: &[usize]) -> bool {
+            if self.terminal {
+                return false;
+            }
+            let mut mask = alloc::vec![false; usize::try_from(self.k).unwrap_or(0)];
+            set_bits(&mut mask, indexes);
+            for row in &self.rows {
+                eliminate_at_pivot(&mut mask, row);
+            }
+            if mask.iter().all(|b| !*b) {
+                return false;
+            }
+            let pivot = mask.iter().position(|b| *b).unwrap_or(0);
+            for row in &mut self.rows {
+                xor_at(row, pivot, &mask);
+            }
+            self.rows.push(mask);
+            self.terminal = self.rows.len() == usize::try_from(self.k).unwrap_or(0);
+            true
+        }
+    }
+
+    fn set_bits(mask: &mut [bool], indexes: &[usize]) {
+        for &i in indexes {
+            if let Some(bit) = mask.get_mut(i) {
+                *bit = true;
+            }
+        }
+    }
+
+    /// Eliminates `row`'s pivot bit from `mask` when it is set.
+    fn eliminate_at_pivot(mask: &mut [bool], row: &[bool]) {
+        let pivot = row.iter().position(|b| *b).unwrap_or(0);
+        if mask.get(pivot).copied().unwrap_or(false) {
+            xor_bits(mask, row);
+        }
+    }
+
+    /// XORs `mask` into `row` when `row` has bit `pivot` set.
+    fn xor_at(row: &mut [bool], pivot: usize, mask: &[bool]) {
+        if row.get(pivot).copied().unwrap_or(false) {
+            xor_bits(row, mask);
+        }
+    }
+
+    fn xor_bits(target: &mut [bool], source: &[bool]) {
+        for (m, r) in target.iter_mut().zip(source.iter()) {
+            *m ^= *r;
+        }
+    }
+
+    fn trial_order(rng: &mut crate::consensus::Xoshiro256, pool: &[Part]) -> Vec<usize> {
+        let mut order: Vec<usize> = Vec::new();
+        for (i, _) in pool.iter().enumerate() {
+            // ~20% loss, ~10% extra duplicates.
+            if rng.next_int(0, 9) >= 2 {
+                order.push(i);
+            }
+            if rng.next_int(0, 9) == 0 {
+                order.push(i);
+            }
+        }
+        // Fisher-Yates shuffle.
+        for i in (1..order.len()).rev() {
+            let j = usize::try_from(rng.next_int(0, i as u64)).unwrap_or(0);
+            order.swap(i, j);
+        }
+        order
+    }
+
+    /// Seeded random streams with loss, reordering, and duplicates: the
+    /// completion frame must equal the naive rank tracker's, the decoded
+    /// message the input, and `rank`/`rows` must never exceed `K`.
+    #[test]
+    fn test_property_matches_naive_rank() {
+        let mut rng = crate::consensus::Xoshiro256::from("fountain-property");
+        for trial in 0..200_u32 {
+            let length = usize::try_from(rng.next_int(1, 400)).unwrap_or(0);
+            let max_len = usize::try_from(rng.next_int(5, 100)).unwrap_or(0);
+            let message = rng.next_bytes(length);
+            let mut encoder = Encoder::new(
+                message.clone(),
+                EncoderOptions {
+                    min_fragment_len: 5,
+                    ..EncoderOptions::new(max_len)
+                },
+            )
+            .unwrap();
+            let k = encoder.fragment_count();
+
+            let pool: Vec<Part> = encoder
+                .by_ref()
+                .take(usize::try_from(k).unwrap_or(0) * 3)
+                .collect();
+            let order = trial_order(&mut rng, &pool);
+            run_trial(trial, &message, k, &pool, &order);
+        }
+    }
+
+    fn run_trial(trial: u32, message: &[u8], k: u32, pool: &[Part], order: &[usize]) {
+        let mut decoder = Decoder::default();
+        let mut naive = NaiveRank {
+            k: 0,
+            rows: Vec::new(),
+            terminal: false,
+        };
+        let mut naive_locked = false;
+        let mut naive_complete_at = None;
+        let mut impl_complete_at = None;
+        for (i, &idx) in order.iter().enumerate() {
+            let part = pool.get(idx).unwrap();
+            let received = decoder.receive(part).unwrap();
+            if !naive_locked {
+                naive.lock(part.sequence_count());
+                naive_locked = true;
+            }
+            let chooser_k = NonZeroU32::new(part.sequence_count()).unwrap();
+            let seq = NonZeroU32::new(part.sequence()).unwrap();
+            let want = naive.ingest(&choose_fragments(seq, chooser_k, part.checksum()));
+            assert_eq!(received == Received::Accepted, want, "{trial} frame {i}");
+            assert!(decoder.progress().rank() <= k, "{trial} frame {i}");
+            assert!(
+                decoder.rows.iter().filter(|r| r.is_some()).count()
+                    <= usize::try_from(k).unwrap_or(0),
+                "{trial} frame {i}"
+            );
+            if naive.terminal {
+                naive_complete_at.get_or_insert(i);
+            }
+            if matches!(decoder.state(), State::Complete(_)) {
+                impl_complete_at.get_or_insert(i);
+            }
+        }
+        assert_eq!(impl_complete_at, naive_complete_at, "{trial}");
+        if impl_complete_at.is_some() {
+            assert_eq!(decoder.into_message().unwrap(), message, "{trial}");
+        }
     }
 }

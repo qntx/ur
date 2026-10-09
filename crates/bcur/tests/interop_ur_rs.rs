@@ -15,7 +15,8 @@
 
 use std::collections::BTreeSet;
 
-use bcur::{Decoder, Encoder, Kind, UrType, decode, encode};
+use bcur::ur::{Decoder, Encoder};
+use bcur::{Kind, State, UrType, decode, encode};
 
 macro_rules! vector {
     ($path:literal) => {
@@ -69,8 +70,8 @@ fn multipart_encoder_matches_ur_rs_first_and_last() {
     for uri in uris.iter().take(9) {
         decoder.receive(uri).unwrap();
     }
-    assert!(decoder.complete());
-    let payload = decoder.message().unwrap().unwrap();
+    assert!(matches!(decoder.state(), State::Complete(_)));
+    let payload = decoder.into_decoded().unwrap().into_parts().1;
 
     let mut encoder = Encoder::bytes(&payload, 30).unwrap();
     assert_eq!(encoder.fragment_count(), 9);
@@ -124,13 +125,13 @@ fn multipart_roundtrip_lossy_channel() {
     let data = b"Ten chars!".repeat(20);
     let mut encoder = Encoder::bytes(&data, 10).unwrap();
     let mut decoder = Decoder::default();
-    while !decoder.complete() {
+    while !matches!(decoder.state(), State::Complete(_)) {
         let part = encoder.next_part().unwrap();
         if encoder.current_index() & 1 != 0 {
             decoder.receive(&part).unwrap();
         }
     }
-    assert_eq!(decoder.message().unwrap().as_deref(), Some(data.as_slice()));
+    assert_eq!(decoder.into_decoded().unwrap().message(), data.as_slice());
 }
 
 /// `published-from-refs.txt` is the pinned extract of quoted `ur:` literals.

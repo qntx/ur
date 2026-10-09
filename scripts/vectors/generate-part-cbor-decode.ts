@@ -386,7 +386,7 @@ const cases: Case[] = [
   {
     name: "data-over-limit",
     cborHex: canonicalHex,
-    limits: { maxFragmentDataLength: DATA.length - 1 },
+    limits: { maxFragmentLength: DATA.length - 1 },
     error: { code: "ResourceLimit", limit: "fragmentLength" },
   },
   {

@@ -1,6 +1,6 @@
 #![no_main]
 
-use bcur::Error;
+use bcur::ErrorKind;
 use bcur::bytewords::{self, Style};
 use libfuzzer_sys::fuzz_target;
 
@@ -32,9 +32,11 @@ fuzz_target!(|data: &[u8]| {
 
     let garbage = String::from_utf8_lossy(data);
     if !garbage.is_ascii() {
-        assert_eq!(
-            bytewords::decode(&garbage, tagged),
-            Err(Error::NonAscii),
+        assert!(
+            matches!(
+                bytewords::decode(&garbage, tagged),
+                Err(ref e) if e.kind() == ErrorKind::NonAscii
+            ),
             "non-ASCII must be NonAscii"
         );
     } else {

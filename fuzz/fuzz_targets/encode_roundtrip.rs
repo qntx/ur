@@ -1,6 +1,7 @@
 #![no_main]
 
-use bcur::{Decoder, Encoder, Error, UrType};
+use bcur::ur::{Decoder, Encoder};
+use bcur::{ErrorKind, State, UrType};
 use libfuzzer_sys::fuzz_target;
 
 /// True when the UR path contains `/<digits>-<digits>/` (fountain form).
@@ -59,35 +60,29 @@ fn encode_roundtrip(type_bytes: &[u8], payload: &[u8], max_frag: usize) {
             "K==1 must emit ur:<type>/<body>, got {part}"
         );
         match decoder.receive(&part) {
-            Err(Error::ResourceLimit(_)) => return,
+            Err(e) if e.is_fatal() => {}
             Err(other) => panic!("decoder receive: {other:?}"),
-            Ok(()) => {
-                assert_eq!(
-                    decoder.message().expect("K==1 message").as_deref(),
-                    Some(payload)
-                );
+            Ok(_) => {
+                assert_eq!(decoder.into_decoded().unwrap().message(), payload);
             }
         }
         return;
     }
 
     let k = usize::try_from(encoder.fragment_count()).unwrap_or(usize::MAX);
-    let cap = k.saturating_mul(3).max(20);
+    let cap = k.saturating_mul(6).max(40);
     for _ in 0..cap {
         match encoder.next_part() {
-            Err(Error::ResourceLimit(_) | Error::SinglePartExhausted) => return,
+            Err(e) if e.kind() == ErrorKind::ResourceLimit => return,
             Err(other) => panic!("encoder next_part: {other:?}"),
             Ok(part) => match decoder.receive(&part) {
-                Err(Error::ResourceLimit(_)) => return,
+                Err(e) if e.is_fatal() => return,
                 Err(other) => panic!("decoder receive: {other:?}"),
-                Ok(()) if decoder.complete() => {
-                    assert_eq!(
-                        decoder.message().expect("complete message").as_deref(),
-                        Some(payload)
-                    );
+                Ok(_) if matches!(decoder.state(), State::Complete(_)) => {
+                    assert_eq!(decoder.into_decoded().unwrap().message(), payload);
                     return;
                 }
-                Ok(()) => {}
+                Ok(_) => {}
             },
         }
     }

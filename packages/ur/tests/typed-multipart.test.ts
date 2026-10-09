@@ -2,9 +2,10 @@ import { cbor, cborEquals } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
 
 import { UrError } from "../src/error.ts";
-import { MultipartDecoder, MultipartEncoder } from "../src/typed/multipart.ts";
+import type { ReceiveResult } from "../src/fountain/index.ts";
 import { Ur } from "../src/typed/ur.ts";
-import { Encoder, UrType } from "../src/ur/index.ts";
+import type { DecodedUr } from "../src/ur/index.ts";
+import { Encoder, UrDecoder, UrType } from "../src/ur/index.ts";
 
 function errorOf(fn: () => void): UrError {
   try {
@@ -18,6 +19,38 @@ function errorOf(fn: () => void): UrError {
   throw new Error("expected UrError");
 }
 
+function frameError(result: ReceiveResult): UrError | undefined {
+  return "error" in result ? result.error : undefined;
+}
+
+function completedUr(decoder: UrDecoder): Ur {
+  return Ur.fromDecoded(completedDecoded(decoder));
+}
+
+function completedDecoded(decoder: UrDecoder): DecodedUr {
+  const { state } = decoder;
+  if (state.phase !== "complete") {
+    throw new Error(`decoder ${state.phase}`);
+  }
+  return state.value;
+}
+
+function failedError(decoder: UrDecoder): UrError {
+  const { state } = decoder;
+  if (state.phase !== "failed") {
+    throw new Error(`decoder ${state.phase}`);
+  }
+  return state.error;
+}
+
+function feedUr(decoder: UrDecoder, text: string): "accepted" | "duplicate" {
+  const result = decoder.receive(text);
+  if (result.status === "rejected" || result.status === "fatal") {
+    throw result.error;
+  }
+  return result.status;
+}
+
 function largeTestUr(): Ur {
   const bytes = new Uint8Array(256);
   for (let i = 0; i < bytes.length; i++) {
@@ -28,7 +61,7 @@ function largeTestUr(): Ur {
 
 test("K==1 emits single-part", () => {
   const ur = Ur.create("test", cbor([1, 2, 3]));
-  const encoder = MultipartEncoder.create(ur, 64);
+  const encoder = ur.encoder({ maxFragmentLength: 64 });
   expect(encoder.isSinglePart).toBe(true);
   expect(encoder.fragmentCount).toBe(1);
   const part = encoder.nextPart();
@@ -38,64 +71,67 @@ test("K==1 emits single-part", () => {
 
 test("drop-odd-parts roundtrip same Cbor", () => {
   const ur = largeTestUr();
-  const encoder = MultipartEncoder.create(ur, 30);
+  const encoder = ur.encoder({ maxFragmentLength: 30 });
   expect(encoder.isSinglePart).toBe(false);
-  const decoder = new MultipartDecoder();
-  while (!decoder.complete) {
-    decoder.receive(encoder.nextPart());
+  const decoder = new UrDecoder();
+  while (decoder.state.phase !== "complete") {
+    feedUr(decoder, encoder.nextPart());
     encoder.nextPart();
   }
-  const recovered = decoder.message();
-  expect(recovered).toBeDefined();
-  expect(cborEquals(recovered!.cbor, ur.cbor)).toBe(true);
-  expect(recovered!.type.equals(ur.type)).toBe(true);
+  const recovered = completedUr(decoder);
+  expect(cborEquals(recovered.cbor, ur.cbor)).toBe(true);
+  expect(recovered.type.equals(ur.type)).toBe(true);
 });
 
-test("expectedType mismatch is UnexpectedType and is not poison", () => {
+test("accept mismatch is UnexpectedType and nonfatal", () => {
   const ur = Ur.create("alpha", cbor([1, 2, 3]));
-  const encoder = MultipartEncoder.create(ur, 64);
-  const decoder = new MultipartDecoder({ expectedType: UrType.parse("beta") });
-  const err = errorOf(() => decoder.receive(encoder.nextPart()));
-  expect(err.code).toBe("UnexpectedType");
-  expect(err.info).toStrictEqual({
+  const encoder = ur.encoder({ maxFragmentLength: 64 });
+  const decoder = new UrDecoder({ accept: [UrType.parse("beta")] });
+  const result = decoder.receive(encoder.nextPart());
+  expect(result.status).toBe("rejected");
+  expect(frameError(result)?.info).toStrictEqual({
     code: "UnexpectedType",
     expected: [UrType.parse("beta")],
     found: UrType.parse("alpha"),
   });
-  expect(decoder.isPoisoned).toBe(false);
+  expect(decoder.state.phase).toBe("empty");
 });
 
-test("maxUriLen poisons on a longer URI", () => {
+test("maxUriLength fails on a longer URI", () => {
   const ur = Ur.create("test", cbor([1, 2, 3]));
-  const part = MultipartEncoder.create(ur, 64).nextPart();
-  const decoder = new MultipartDecoder({ limits: { maxUriLen: 8 } });
+  const part = ur.encoder({ maxFragmentLength: 64 }).nextPart();
+  const decoder = new UrDecoder({ limits: { maxUriLength: 8 } });
   expect(part.length).toBeGreaterThan(8);
-  const err = errorOf(() => decoder.receive(part));
-  expect(err.code).toBe("ResourceLimit");
-  expect(err.info).toStrictEqual({ code: "ResourceLimit", limit: "uriLength" });
-  expect(decoder.isPoisoned).toBe(true);
-  expect(decoder.poisonState).toStrictEqual({ code: "ResourceLimit", limit: "uriLength" });
+  const result = decoder.receive(part);
+  expect(result.status).toBe("fatal");
+  expect(frameError(result)?.info).toStrictEqual({
+    code: "ResourceLimit",
+    limit: "uriLength",
+  });
+  expect(decoder.state.phase).toBe("failed");
+  expect(failedError(decoder).info).toStrictEqual({
+    code: "ResourceLimit",
+    limit: "uriLength",
+  });
 });
 
-test("non-dCBOR complete payload is CborDecode and not poison", () => {
+test("non-dCBOR complete payload is CborDecode", () => {
   const encoder = Encoder.bytes(new TextEncoder().encode("hello"), 64);
-  const decoder = new MultipartDecoder();
-  decoder.receive(encoder.nextPart());
-  expect(decoder.complete).toBe(true);
-  expect(errorOf(() => decoder.message()).code).toBe("CborDecode");
-  expect(decoder.isPoisoned).toBe(false);
+  const decoder = new UrDecoder();
+  feedUr(decoder, encoder.nextPart());
+  const decoded = completedDecoded(decoder);
+  expect(errorOf(() => Ur.fromDecoded(decoded)).code).toBe("CborDecode");
 });
 
 test("uppercase fountain parts roundtrip", () => {
   const ur = largeTestUr();
-  const encoder = MultipartEncoder.create(ur, 30);
+  const encoder = ur.encoder({ maxFragmentLength: 30 });
   expect(encoder.isSinglePart).toBe(false);
-  const decoder = new MultipartDecoder();
-  while (!decoder.complete) {
-    decoder.receive(encoder.nextPart().toUpperCase());
+  const decoder = new UrDecoder();
+  while (decoder.state.phase !== "complete") {
+    feedUr(decoder, encoder.nextPart().toUpperCase());
   }
-  const recovered = decoder.message();
-  expect(recovered).toBeDefined();
-  expect(cborEquals(recovered!.cbor, ur.cbor)).toBe(true);
-  expect(recovered!.type.equals(ur.type)).toBe(true);
+  const recovered = completedUr(decoder);
+  expect(cborEquals(recovered.cbor, ur.cbor)).toBe(true);
+  expect(recovered.type.equals(ur.type)).toBe(true);
 });

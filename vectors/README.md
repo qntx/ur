@@ -17,12 +17,14 @@ for: they pin behavior, not the implementations' bugs.
 | Path                         | Contents                                                        |
 | ---------------------------- | --------------------------------------------------------------- |
 | `bytewords/contract.json`    | ByteWords encode/decode contract (standard, uri, minimal)       |
-| `fountain/part-cbor.json`    | Fountain `Part` CBOR round trip + non-shortest rejection        |
+| `fountain/part-cbor.json`    | Fountain `Part` CBOR round trip                                 |
+| `fountain/part-cbor-decode.json` | Lenient part CBOR decode contract (generated, minicbor-checked) |
+| `fountain/decoder-frames.json` | GF(2) decoder per-frame status streams (generated)            |
 | `ur/k1.json`                 | Single-part encoder/decoder contract                            |
+| `ur/decoder-frames.json`     | L3 `UrDecoder` per-frame status streams (generated)             |
 | `ur/published-singles.txt`   | Three published single-part UR goldens                          |
 | `typed/test-array.json`      | Typed-layer `[1, 2, 3]` UR golden (L4 test array)               |
 | `limits/defaults.json`       | `DecoderLimits` default values                                  |
-| `limits/poison.json`         | Resource-limit → poison-session contract                        |
 | `ur-rs/multipart-20.txt`     | ur-rs `test_ur_encoder` 20-URI table (Wolf/256, max frag 30)    |
 | `ur-rs/choose-fragments.txt` | ur-rs `test_choose_fragments` sorted indexes, seq 1..=30        |
 | `ur-rs/wolf256-fragments.hex` | ur-rs `test_partition_and_join` hex (Wolf/1024, max frag 100)  |
@@ -123,10 +125,9 @@ return.
 
 ### Notes and known gaps
 
-- Officially unsupported encoder knobs are emulated, not implemented:
-  `firstSeqNum` is reproduced by discarding that many emitted parts before
-  decoding (equivalent wire behavior); `minFragmentLength` is asserted only
-  where the bound does not bind. Both are tracked as F-11.
+- `firstSeqNum` maps onto `FountainEncoderOptions.first_sequence`
+  directly; `minFragmentLength` is asserted only where the bound does not
+  bind. Tracked as F-11.
 - Expected failure: the historical BCR-2020-006 seed vector tags the creation
   date as `100(...)` while the current seed codec accepts CBOR date tag `1`
   only — `test.fails("... [F-01]")` in `registry.test.ts`.

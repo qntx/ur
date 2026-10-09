@@ -1,7 +1,12 @@
 import { defineConfig } from "vite-plus";
 import type { UserConfig } from "vite-plus";
 
+const bench = process.env["BENCH"] === "1";
+
 const config: UserConfig = defineConfig({
+  test: {
+    include: bench ? ["bench/**/*.bench.ts"] : ["tests/**/*.test.ts"],
+  },
   pack: {
     dts: {},
     // ESM-only sugar flattens to a string; keep types/import/default for pack entries.

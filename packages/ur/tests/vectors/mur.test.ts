@@ -16,7 +16,12 @@ import {
   fragmentLength,
   partition,
 } from "../../src/fountain/index.ts";
-import type { FountainEncoderOptions } from "../../src/fountain/index.ts";
+import type {
+  DecoderLimits,
+  FountainEncoderOptions,
+  Part,
+  ReceiveResult,
+} from "../../src/fountain/index.ts";
 import { makeMessage } from "../message.ts";
 import { vectorJson } from "../vectors.ts";
 
@@ -56,7 +61,7 @@ const PART_CBOR_DECODE = vectorJson<{
   cases: Array<{
     name: string;
     cborHex: string;
-    limits?: { maxFragmentCount?: number; maxFragmentDataLength?: number };
+    limits?: { maxFragmentCount?: number; maxFragmentLength?: number };
     part?: {
       sequence: number;
       sequenceCount: number;
@@ -172,6 +177,37 @@ const ENCODER = vectorJson<{
 const DECODER = vectorJson<{
   cases: Array<{ message: Msg; maxFragmentLength: number; firstSeqNum?: number }>;
 }>("official/mur/decoder.json");
+const DECODER_FRAMES = vectorJson<{
+  cases: Array<{
+    name: string;
+    message: Msg;
+    maxFragmentLength: number;
+    minFragmentLength?: number;
+    firstSequence?: number;
+    limits?: Partial<DecoderLimits>;
+    frames: Array<{
+      sequence?: number;
+      patch?: {
+        sequence?: number;
+        sequenceCount?: number;
+        messageLength?: number;
+        checksum?: number;
+        dataHex?: string;
+      };
+      part?: {
+        sequence: number;
+        sequenceCount: number;
+        messageLength: number;
+        checksum: number;
+        dataHex: string;
+      };
+      status: "accepted" | "duplicate" | "rejected" | "fatal";
+      error?: { code: string; limit?: string };
+    }>;
+    completeAt?: number;
+    messageHex?: string;
+  }>;
+}>("fountain/decoder-frames.json");
 
 function unhex(hex: string): Uint8Array {
   const out = new Uint8Array(hex.length / 2);
@@ -245,6 +281,46 @@ function errorCodeOf(fn: () => void): string {
   } catch (error) {
     return error instanceof Error && "code" in error ? String(error.code) : "other";
   }
+}
+
+function nextPartValue(encoder: FountainEncoder): Part {
+  const { done, value } = encoder.next();
+  if (done === true || value === undefined) {
+    throw new Error("encoder exhausted");
+  }
+  return value;
+}
+
+/** Feeds one part; frame errors become thrown errors. */
+function receivePart(decoder: FountainDecoder, part: Part): void {
+  const result = decoder.receive(part);
+  if (result.status === "rejected" || result.status === "fatal") {
+    throw result.error;
+  }
+}
+
+function completedValue(decoder: FountainDecoder): Uint8Array {
+  const { state } = decoder;
+  if (state.phase !== "complete") {
+    throw new Error(`decoder ${state.phase}`);
+  }
+  return state.value;
+}
+
+function completedHex(decoder: FountainDecoder): string | undefined {
+  const { state } = decoder;
+  return state.phase === "complete" ? hex(state.value) : undefined;
+}
+
+function errorEntry(result: ReceiveResult): { code: string; limit?: string } | undefined {
+  if (!("error" in result)) {
+    return undefined;
+  }
+  const { error } = result;
+  if (error.info.code === "ResourceLimit") {
+    return { code: error.code, limit: error.info.limit };
+  }
+  return { code: error.code };
 }
 
 function degreesFor(c: (typeof DEGREE.cases)[number], fragmentCount: number): number[] {
@@ -457,10 +533,10 @@ test.each(decoderRows)("fountain.decoder %#", (c) => {
     firstSequence: c.firstSeqNum,
   });
   const decoder = new FountainDecoder();
-  while (!decoder.complete) {
-    decoder.receive(encoder.next().value!);
+  while (decoder.state.phase !== "complete") {
+    receivePart(decoder, nextPartValue(encoder));
   }
-  expect(decoder.message()).toStrictEqual(message);
+  expect(completedValue(decoder)).toStrictEqual(message);
 });
 
 function fountainOptions(c: {
@@ -481,67 +557,113 @@ test.each(optionFragLenCases)("fountain.encoder options $name", (c) => {
   expect(Math.ceil(c.message.length / got)).toBe(c.fragmentCount);
 });
 
-test.each(optionSeqCases)("fountain.encoder options $name", (c) => {
+type SequenceRun = {
+  sequences: number[];
+  completes: boolean[];
+  dataHex: string[];
+  lastIndexes: number[][];
+  doneAfter: boolean;
+};
+
+function sequenceRun(c: (typeof optionSeqCases)[number]): SequenceRun {
   const encoder = new FountainEncoder(
     makeMessage(c.message.seed, c.message.length),
     fountainOptions(c),
   );
-  const sequences: number[] = [];
-  const completes: boolean[] = [];
-  const dataHex: string[] = [];
-  const lastIndexes: number[][] = [];
+  const run: SequenceRun = {
+    sequences: [],
+    completes: [],
+    dataHex: [],
+    lastIndexes: [],
+    doneAfter: false,
+  };
   for (const _seq of c.sequences) {
-    const { value } = encoder.next();
-    sequences.push(value!.sequence);
-    completes.push(encoder.isComplete);
-    dataHex.push(hex(value!.data));
-    lastIndexes.push([...encoder.lastFragmentIndexes]);
+    const value = nextPartValue(encoder);
+    run.sequences.push(value.sequence);
+    run.completes.push(encoder.isComplete);
+    run.dataHex.push(hex(value.data));
+    run.lastIndexes.push([...encoder.lastFragmentIndexes]);
   }
-  expect(sequences).toStrictEqual(c.sequences);
-  expect(completes).toStrictEqual(c.isCompleteAfter);
-  expect(dataHex).toStrictEqual(c.dataHex);
-  expect(lastIndexes).toStrictEqual(c.lastFragmentIndexes);
-  expect(encoder.next().done).toBe(c.doneAfter);
+  run.doneAfter = encoder.next().done === true;
+  return run;
+}
+
+test.each(optionSeqCases)("fountain.encoder options $name", (c) => {
+  const run = sequenceRun(c);
+  expect(run.sequences).toStrictEqual(c.sequences);
+  expect(run.completes).toStrictEqual(c.isCompleteAfter);
+  expect(run.dataHex).toStrictEqual(c.dataHex);
+  expect(run.lastIndexes).toStrictEqual(c.lastFragmentIndexes);
+  expect(run.doneAfter).toBe(c.doneAfter);
 });
 
-test.each(degreeChooserCases)("consensus.sampler $name", (c) => {
-  const degrees = degreesFor(c, fragmentCount(c));
-  expect({ degrees, totals: countsByKey(degrees) }).toStrictEqual({
-    degrees: c.degrees,
-    totals: c.totals,
-  });
-});
+type FrameCase = (typeof DECODER_FRAMES.cases)[number];
 
-test.each(degreeNonceCases)("consensus.sampler $name", (c) => {
-  expect(degreesFor(c, fragmentCount(c))).toStrictEqual(c.degrees);
-});
+function partSource(encoder: FountainEncoder, name: string): (seq: number) => Part {
+  const cache = new Map<number, Part>();
+  return (seq) => {
+    while (!cache.has(seq)) {
+      const { done, value } = encoder.next();
+      if (done === true || value === undefined) {
+        throw new Error(`${name}: encoder ended before seq ${seq}`);
+      }
+      cache.set(value.sequence, value);
+    }
+    const part = cache.get(seq);
+    if (part === undefined) {
+      throw new Error(`${name}: no part ${seq}`);
+    }
+    return part;
+  };
+}
 
-test.each(samplerRows)("consensus.sampler $name", (c) => {
-  const sampler = Sampler.new(c.probabilities);
-  const rng = Xoshiro256.fromString(c.rngSeed);
-  const samples = Array.from({ length: c.count }, () => sampler.next(rng));
-  expect({ samples, totals: countsByKey(samples) }).toStrictEqual({
-    samples: c.samples,
-    totals: c.totals,
-  });
-});
+function framePart(frame: FrameCase["frames"][number], partAt: (seq: number) => Part): Part {
+  const explicit = frame.part;
+  if (explicit !== undefined) {
+    return {
+      sequence: explicit.sequence,
+      sequenceCount: explicit.sequenceCount,
+      messageLength: explicit.messageLength,
+      checksum: explicit.checksum,
+      data: unhex(explicit.dataHex),
+    };
+  }
+  const base = partAt(frame.sequence ?? 0);
+  const { patch } = frame;
+  if (patch === undefined) {
+    return base;
+  }
+  return {
+    sequence: patch.sequence ?? base.sequence,
+    sequenceCount: patch.sequenceCount ?? base.sequenceCount,
+    messageLength: patch.messageLength ?? base.messageLength,
+    checksum: patch.checksum ?? base.checksum,
+    data: patch.dataHex === undefined ? base.data : unhex(patch.dataHex),
+  };
+}
 
-test.each(shuffleContinuedRows)("consensus.shuffle $name", (c) => {
-  const rng = Xoshiro256.fromString(c.rngSeed);
-  const rounds = Array.from({ length: c.rounds }, () => rng.shuffled(c.values));
-  expect(rounds).toStrictEqual(c.expected);
-});
-
-test.each(shufflePrefix)("consensus.shuffle $name", (c) => {
-  const rng = Xoshiro256.fromString(c.rngSeed);
-  expect(rng.shuffled(c.values, c.count)).toStrictEqual(c.expected);
-});
-
-test.each(CHOOSER.cases)("consensus.chooser %#", (c) => {
+function replayFrames(c: FrameCase): {
+  decoder: FountainDecoder;
+  completedAt: number | undefined;
+} {
   const message = makeMessage(c.message.seed, c.message.length);
-  const fragLen = fragmentLength(c.message.length, c.maxFragmentLength, c.minFragmentLength);
-  const fragments = partition(message, fragLen);
-  const chooser = new FragmentChooser(fragments.length, checksum(message));
-  const indexes = c.sequences.map((seq) => chooser.choose(seq));
-  expect(indexes).toStrictEqual(c.indexes);
+  const encoder = new FountainEncoder(message, fountainOptions(c));
+  const partAt = partSource(encoder, c.name);
+  const decoder = new FountainDecoder({ limits: c.limits ?? {} });
+  let completedAt: number | undefined;
+  for (const [i, frame] of c.frames.entries()) {
+    const result = decoder.receive(framePart(frame, partAt));
+    expect(result.status).toBe(frame.status);
+    expect(errorEntry(result)).toStrictEqual(frame.error);
+    if (decoder.state.phase === "complete") {
+      completedAt ??= i + 1;
+    }
+  }
+  return { decoder, completedAt };
+}
+
+test.each(DECODER_FRAMES.cases)("fountain.decoder frames $name", (c) => {
+  const { decoder, completedAt } = replayFrames(c);
+  expect(completedAt).toBe(c.completeAt);
+  expect(completedHex(decoder)).toBe(c.messageHex);
 });

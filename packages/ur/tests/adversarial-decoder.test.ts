@@ -3,9 +3,9 @@ import { expect, test } from "vite-plus/test";
 import { UrError } from "../src/error.ts";
 import type { UrLimit } from "../src/error.ts";
 import { FountainDecoder, FountainEncoder } from "../src/fountain/index.ts";
-import type { Part } from "../src/fountain/index.ts";
+import type { Part, ReceiveResult } from "../src/fountain/index.ts";
 import { decodePart, encodePart } from "../src/fountain/part-cbor.ts";
-import { Decoder, Encoder, UrType, encode } from "../src/ur/index.ts";
+import { Encoder, UrDecoder, UrType, encode } from "../src/ur/index.ts";
 import { makeMessage } from "./message.ts";
 
 function codeOf(fn: () => void): string {
@@ -17,19 +17,41 @@ function codeOf(fn: () => void): string {
   }
 }
 
-function resourceLimitOf(fn: () => void): string | undefined {
+function frameError(result: ReceiveResult): UrError | undefined {
+  return "error" in result ? result.error : undefined;
+}
+
+function errorOf(fn: () => void): UrError {
   try {
     fn();
-    return "none";
   } catch (error) {
-    if (!(error instanceof UrError)) {
-      return "other";
+    if (error instanceof UrError) {
+      return error;
     }
-    if (error.code !== "ResourceLimit" || error.info.code !== "ResourceLimit") {
-      return error.code;
-    }
-    return error.info.limit;
+    throw error;
   }
+  throw new Error("expected UrError");
+}
+
+function completedValue(decoder: FountainDecoder): Uint8Array {
+  const { state } = decoder;
+  if (state.phase !== "complete") {
+    throw new Error(`decoder ${state.phase}`);
+  }
+  return state.value;
+}
+
+function completedDecoded(decoder: UrDecoder) {
+  const { state } = decoder;
+  if (state.phase !== "complete") {
+    throw new Error(`decoder ${state.phase}`);
+  }
+  return state.value;
+}
+
+function limitOf(result: ReceiveResult): UrLimit | undefined {
+  const error = frameError(result);
+  return error?.info.code === "ResourceLimit" ? error.info.limit : undefined;
 }
 
 function nextPart(encoder: FountainEncoder): Part {
@@ -40,30 +62,28 @@ function nextPart(encoder: FountainEncoder): Part {
   return value;
 }
 
-/** Next mixed part (sequence > sequenceCount). */
-function nextMixedPart(encoder: FountainEncoder): Part {
-  for (;;) {
-    const part = nextPart(encoder);
-    if (part.sequence > part.sequenceCount) {
-      return part;
-    }
-  }
-}
-
-test("expectedType rejects mismatch", () => {
+test("accept list rejects mismatch", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(5));
   const enc = Encoder.create(data, 10, UrType.parse("alpha"));
   const part = enc.nextPart();
-  const decoder = new Decoder({ expectedType: UrType.parse("beta") });
-  expect(codeOf(() => decoder.receive(part))).toBe("UnexpectedType");
+  const decoder = new UrDecoder({ accept: [UrType.parse("beta")] });
+  const result = decoder.receive(part);
+  expect(result.status).toBe("rejected");
+  expect(frameError(result)?.code).toBe("UnexpectedType");
+  expect(decoder.state.phase).toBe("empty");
 });
 
-test("maxUriLen poisons uri path", () => {
+test("maxUriLength fails the uri path", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(5));
   const enc = Encoder.bytes(data, 10);
   const part = enc.nextPart();
-  const decoder = new Decoder({ limits: { maxUriLen: 8 } });
-  expect(codeOf(() => decoder.receive(part))).toBe("ResourceLimit");
+  const decoder = new UrDecoder({ limits: { maxUriLength: 8 } });
+  const result = decoder.receive(part);
+  expect(result.status).toBe("fatal");
+  expect(limitOf(result)).toBe("uriLength");
+  expect(decoder.state.phase).toBe("failed");
+  // Terminal: further frames are duplicates without parsing.
+  expect(decoder.receive("garbage").status).toBe("duplicate");
 });
 
 test("multipart path index mismatch", () => {
@@ -71,17 +91,22 @@ test("multipart path index mismatch", () => {
   const enc = Encoder.bytes(data, 10);
   const part = enc.nextPart();
   const corrupted = part.replace("/1-", "/2-");
-  const decoder = new Decoder();
-  expect(codeOf(() => decoder.receive(corrupted))).toBe("InvalidIndices");
+  const decoder = new UrDecoder();
+  const result = decoder.receive(corrupted);
+  expect(result.status).toBe("rejected");
+  expect(frameError(result)?.code).toBe("InvalidIndices");
 });
 
 test("empty and zero-field parts are InvalidPart", () => {
   const decoder = new FountainDecoder();
   const base = { sequence: 1, sequenceCount: 1, messageLength: 1, checksum: 0 };
-  expect(codeOf(() => decoder.receive({ ...base, data: new Uint8Array() }))).toBe("InvalidPart");
-  expect(codeOf(() => decoder.receive({ ...base, sequence: 0, data: new Uint8Array([0]) }))).toBe(
-    "InvalidPart",
-  );
+  const empty = decoder.receive({ ...base, data: new Uint8Array() });
+  expect(empty.status).toBe("rejected");
+  expect(frameError(empty)?.code).toBe("InvalidPart");
+  const zeroSeq = decoder.receive({ ...base, sequence: 0, data: new Uint8Array([0]) });
+  expect(zeroSeq.status).toBe("rejected");
+  expect(frameError(zeroSeq)?.code).toBe("InvalidPart");
+  expect(decoder.state.phase).toBe("empty");
 });
 
 test("part cbor accepts non-shortest integer", () => {
@@ -121,151 +146,121 @@ test("part cbor oversize data is ResourceLimit", () => {
     data: new Uint8Array(32).fill(1),
   };
   const cbor = encodePart(part);
-  expect(resourceLimitOf(() => decodePart(cbor, { maxFragmentDataLength: 16 }))).toBe(
-    "fragmentLength",
-  );
+  const err = errorOf(() => decodePart(cbor, { maxFragmentLength: 16 }));
+  expect(err.info).toStrictEqual({ code: "ResourceLimit", limit: "fragmentLength" });
 });
 
 test("single-part receive completes", () => {
-  const decoder = new Decoder();
-  decoder.receive("ur:bytes/iehsjyhspmwfwfia");
-  expect(decoder.complete).toBe(true);
-  expect(decoder.message()).toStrictEqual(new TextEncoder().encode("data"));
+  const decoder = new UrDecoder();
+  expect(decoder.receive("ur:bytes/iehsjyhspmwfwfia").status).toBe("accepted");
+  expect(decoder.state.phase).toBe("complete");
+  const decoded = completedDecoded(decoder);
+  expect(decoded.message).toStrictEqual(new TextEncoder().encode("data"));
+  expect(decoded.type.equals(UrType.bytes())).toBe(true);
 });
 
-test("single-part maxMessageLength poisons", () => {
+test("single-part maxMessageLength fails", () => {
   const uri = encode(new Uint8Array(8).fill(1), UrType.bytes());
-  const decoder = new Decoder({ limits: { maxMessageLength: 4 } });
-  expect(resourceLimitOf(() => decoder.receive(uri))).toBe("messageLength");
-  expect(decoder.isPoisoned).toBe(true);
-  expect(codeOf(() => decoder.receive(uri))).toBe("ResourceLimit");
-  expect(codeOf(() => decoder.message())).toBe("ResourceLimit");
+  const decoder = new UrDecoder({ limits: { maxMessageLength: 4 } });
+  const result = decoder.receive(uri);
+  expect(result.status).toBe("fatal");
+  expect(limitOf(result)).toBe("messageLength");
+  expect(decoder.state.phase).toBe("failed");
+  expect(decoder.receive(uri).status).toBe("duplicate");
 });
 
-test("fragmentCount limit poisons fail-closed", () => {
-  const decoder = new FountainDecoder({ maxFragmentCount: 1 });
+test("fragmentCount limit fails fail-closed", () => {
+  const decoder = new FountainDecoder({ limits: { maxFragmentCount: 1 } });
   const message = makeMessage("Wolf", 64);
   const encoder = new FountainEncoder(message, { maxFragmentLength: 8, minFragmentLength: 1 });
   expect(encoder.fragmentCount).toBeGreaterThan(1);
-  expect(codeOf(() => decoder.receive(nextPart(encoder)))).toBe("ResourceLimit");
-  expect(decoder.isPoisoned).toBe(true);
-  expect(codeOf(() => decoder.receive(nextPart(encoder)))).toBe("ResourceLimit");
+  const result = decoder.receive(nextPart(encoder));
+  expect(result.status).toBe("fatal");
+  expect(limitOf(result)).toBe("fragmentCount");
+  expect(decoder.state.phase).toBe("failed");
+  expect(decoder.receive(nextPart(encoder)).status).toBe("duplicate");
 });
 
-test("messageLength limit poisons fail-closed", () => {
-  const decoder = new FountainDecoder({ maxMessageLength: 16 });
+test("messageLength limit fails fail-closed", () => {
+  const decoder = new FountainDecoder({ limits: { maxMessageLength: 16 } });
   const encoder = new FountainEncoder(makeMessage("Wolf", 64), {
     maxFragmentLength: 8,
     minFragmentLength: 1,
   });
-  expect(resourceLimitOf(() => decoder.receive(nextPart(encoder)))).toBe("messageLength");
-  expect(decoder.isPoisoned).toBe(true);
-  expect(codeOf(() => decoder.receive(nextPart(encoder)))).toBe("ResourceLimit");
-  expect(codeOf(() => decoder.message())).toBe("ResourceLimit");
+  const result = decoder.receive(nextPart(encoder));
+  expect(result.status).toBe("fatal");
+  expect(limitOf(result)).toBe("messageLength");
+  expect(decoder.state.phase).toBe("failed");
+  expect(decoder.receive(nextPart(encoder)).status).toBe("duplicate");
 });
 
-test("receivedParts limit poisons fail-closed", () => {
-  const decoder = new FountainDecoder({ maxReceivedParts: 2 });
-  const encoder = new FountainEncoder(makeMessage("Wolf", 64), {
-    maxFragmentLength: 8,
-    minFragmentLength: 1,
-  });
-  const first = nextPart(encoder);
-  const second = nextPart(encoder);
-  const third = nextPart(encoder);
-  expect(first.sequence).toBe(1);
-  expect(second.sequence).toBe(2);
-  expect(third.sequence).toBe(3);
-  expect(first.sequence).toBeLessThanOrEqual(first.sequenceCount);
-  expect(decoder.receive(first)).toBe(true);
-  expect(decoder.receive(second)).toBe(true);
-  expect(resourceLimitOf(() => decoder.receive(third))).toBe("receivedParts");
-  expect(decoder.isPoisoned).toBe(true);
-  expect(codeOf(() => decoder.receive(nextPart(encoder)))).toBe("ResourceLimit");
-  expect(codeOf(() => decoder.message())).toBe("ResourceLimit");
-});
-
-test("bufferParts limit poisons fail-closed", () => {
-  const decoder = new FountainDecoder({ maxBufferParts: 1 });
-  const encoder = new FountainEncoder(makeMessage("Wolf", 64), {
-    maxFragmentLength: 8,
-    minFragmentLength: 1,
-  });
-  const first = nextMixedPart(encoder);
-  const second = nextMixedPart(encoder);
-  expect(first.sequence).not.toBe(second.sequence);
-  expect(decoder.receive(first)).toBe(true);
-  expect(resourceLimitOf(() => decoder.receive(second))).toBe("bufferParts");
-  expect(decoder.isPoisoned).toBe(true);
-  expect(codeOf(() => decoder.receive(nextPart(encoder)))).toBe("ResourceLimit");
-  expect(codeOf(() => decoder.message())).toBe("ResourceLimit");
-});
-
-test("bufferParts duplicate at cap does not poison", () => {
-  const decoder = new FountainDecoder({ maxBufferParts: 1 });
-  const encoder = new FountainEncoder(makeMessage("Wolf", 64), {
-    maxFragmentLength: 8,
-    minFragmentLength: 1,
-  });
-  const mixed = nextMixedPart(encoder);
-  expect(decoder.receive(mixed)).toBe(true);
-  expect(decoder.receive(mixed)).toBe(false);
-  expect(decoder.isPoisoned).toBe(false);
-});
-
-test("uriLength resource limit poisons", () => {
+test("uriLength resource limit fails", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(5));
   const enc = Encoder.bytes(data, 10);
   const part = enc.nextPart();
   const short = "ur:bytes/iehsjyhspmwfwfia";
-  const decoder = new Decoder({ limits: { maxUriLen: short.length } });
+  const decoder = new UrDecoder({ limits: { maxUriLength: short.length } });
   expect(part.length).toBeGreaterThan(short.length);
-  expect(resourceLimitOf(() => decoder.receive(part))).toBe("uriLength");
-  expect(decoder.isPoisoned).toBe(true);
-  expect(codeOf(() => decoder.receive(short))).toBe("ResourceLimit");
-  expect(codeOf(() => decoder.message())).toBe("ResourceLimit");
+  const result = decoder.receive(part);
+  expect(result.status).toBe("fatal");
+  expect(limitOf(result)).toBe("uriLength");
+  expect(decoder.state.phase).toBe("failed");
+  expect(decoder.receive(short).status).toBe("duplicate");
 });
 
-test("UR-layer fragmentLength poisons", () => {
+test("UR-layer fragmentLength fails", () => {
   const encoder = Encoder.bytes(makeMessage("Wolf", 64), 32);
   const uri = encoder.nextPart();
-  const decoder = new Decoder({ limits: { maxFragmentDataLength: 16 } });
-  expect(resourceLimitOf(() => decoder.receive(uri))).toBe("fragmentLength");
-  expect(decoder.isPoisoned).toBe(true);
-  expect(codeOf(() => decoder.receive(uri))).toBe("ResourceLimit");
-  expect(codeOf(() => decoder.message())).toBe("ResourceLimit");
+  const decoder = new UrDecoder({ limits: { maxFragmentLength: 16 } });
+  const result = decoder.receive(uri);
+  expect(result.status).toBe("fatal");
+  expect(limitOf(result)).toBe("fragmentLength");
+  expect(decoder.state.phase).toBe("failed");
+  expect(decoder.receive(uri).status).toBe("duplicate");
 });
 
-test("non-fatal part errors do not poison", () => {
+test("non-fatal part errors leave state unchanged", () => {
   const decoder = new FountainDecoder();
   const encoder = new FountainEncoder(makeMessage("Wolf", 64), {
     maxFragmentLength: 8,
     minFragmentLength: 1,
   });
   const first = nextPart(encoder);
-  expect(decoder.receive(first)).toBe(true);
-  // A zero-sequence part is InvalidPart, not a poison trigger.
-  expect(codeOf(() => decoder.receive({ ...first, sequence: 0 }))).toBe("InvalidPart");
-  expect(decoder.isPoisoned).toBe(false);
+  expect(feed(decoder, first)).toBe("accepted");
+  // A zero-sequence part is InvalidPart, not a session failure.
+  const rejected = decoder.receive({ ...first, sequence: 0 });
+  expect(rejected.status).toBe("rejected");
+  expect(frameError(rejected)?.code).toBe("InvalidPart");
+  expect(decoder.state.phase).toBe("collecting");
   // The session still completes from valid parts.
-  while (!decoder.complete) {
-    decoder.receive(nextPart(encoder));
+  while (decoder.state.phase !== "complete") {
+    feed(decoder, nextPart(encoder));
   }
-  expect(decoder.message()).toStrictEqual(makeMessage("Wolf", 64));
+  expect(completedValue(decoder)).toStrictEqual(makeMessage("Wolf", 64));
 });
 
-const LIMIT_POISON: Array<{ limit: UrLimit; limits: Record<string, number> }> = [
-  { limit: "fragmentLength", limits: { maxFragmentDataLength: 4 } },
+function feed(decoder: FountainDecoder, part: Part): "accepted" | "duplicate" {
+  const result = decoder.receive(part);
+  if (result.status === "rejected" || result.status === "fatal") {
+    throw result.error;
+  }
+  return result.status;
+}
+
+const LIMIT_FATAL: Array<{ limit: UrLimit; limits: Record<string, number> }> = [
+  { limit: "fragmentLength", limits: { maxFragmentLength: 4 } },
   { limit: "fragmentCount", limits: { maxFragmentCount: 1 } },
   { limit: "messageLength", limits: { maxMessageLength: 8 } },
 ];
 
-test.each(LIMIT_POISON)("fountain limit $limit poisons", ({ limit, limits }) => {
-  const decoder = new FountainDecoder(limits);
+test.each(LIMIT_FATAL)("fountain limit $limit fails the session", ({ limit, limits }) => {
+  const decoder = new FountainDecoder({ limits });
   const encoder = new FountainEncoder(makeMessage("Wolf", 64), {
     maxFragmentLength: 8,
     minFragmentLength: 1,
   });
-  expect(resourceLimitOf(() => decoder.receive(nextPart(encoder)))).toBe(limit);
-  expect(decoder.isPoisoned).toBe(true);
+  const result = decoder.receive(nextPart(encoder));
+  expect(result.status).toBe("fatal");
+  expect(limitOf(result)).toBe(limit);
+  expect(decoder.state.phase).toBe("failed");
 });

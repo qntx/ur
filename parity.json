@@ -129,7 +129,7 @@
       "id": "ur.decoder",
       "tier": "A",
       "status": "stable",
-      "milestone": "UR3",
+      "milestone": "R1c",
       "ts": {
         "module": "packages/ur/src/ur/index.ts",
         "tests": ["packages/ur/tests/contract.test.ts", "packages/ur/tests/vectors/ur.test.ts"]
@@ -138,7 +138,11 @@
         "module": "crates/bcur/src/ur/mod.rs",
         "tests": ["crates/bcur/tests/contract.rs", "crates/bcur/src/official_vectors.rs"]
       },
-      "vectors": ["vectors/ur/k1.json", "vectors/official/ur/multipart.json"]
+      "vectors": [
+        "vectors/ur/k1.json",
+        "vectors/ur/decoder-frames.json",
+        "vectors/official/ur/multipart.json"
+      ]
     },
     {
       "id": "typed.ur",
@@ -163,7 +167,7 @@
       "id": "limits.defaults",
       "tier": "A",
       "status": "stable",
-      "milestone": "UR3",
+      "milestone": "R1c",
       "ts": {
         "module": "packages/ur/src/fountain/limits.ts",
         "tests": ["packages/ur/tests/contract.test.ts"]
@@ -173,21 +177,6 @@
         "tests": ["crates/bcur/tests/contract.rs"]
       },
       "vectors": ["vectors/limits/defaults.json"]
-    },
-    {
-      "id": "limits.poison",
-      "tier": "A",
-      "status": "stable",
-      "milestone": "UR3",
-      "ts": {
-        "module": "packages/ur/src/ur/index.ts",
-        "tests": ["packages/ur/tests/contract.test.ts"]
-      },
-      "rust": {
-        "module": "crates/bcur/src/ur/mod.rs",
-        "tests": ["crates/bcur/tests/contract.rs"]
-      },
-      "vectors": ["vectors/limits/poison.json"]
     },
     {
       "id": "consensus.crc32",
@@ -283,7 +272,7 @@
       "id": "fountain.decoder",
       "tier": "A",
       "status": "stable",
-      "milestone": "R0",
+      "milestone": "R1c",
       "ts": {
         "module": "packages/ur/src/fountain/decoder.ts",
         "tests": ["packages/ur/tests/vectors/mur.test.ts"]
@@ -292,7 +281,7 @@
         "module": "crates/bcur/src/fountain/mod.rs",
         "tests": ["crates/bcur/src/official_vectors.rs"]
       },
-      "vectors": ["vectors/official/mur/decoder.json"]
+      "vectors": ["vectors/fountain/decoder-frames.json", "vectors/official/mur/decoder.json"]
     },
     {
       "id": "registry.seed",

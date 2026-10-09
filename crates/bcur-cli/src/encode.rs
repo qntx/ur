@@ -2,7 +2,8 @@
 
 use std::path::PathBuf;
 
-use bcur::{Encoder, UrType, encode};
+use bcur::ur::Encoder;
+use bcur::{UrType, encode};
 use clap::Args;
 
 use crate::error::{Error, Result};

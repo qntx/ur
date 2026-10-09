@@ -1,6 +1,6 @@
 import {
-  Decoder,
   Encoder,
+  UrDecoder,
   UrType,
   decodeBytewords,
   decodeMessage,
@@ -8,8 +8,7 @@ import {
   encodeBytewords,
 } from "../../src/index.ts";
 import {
-  MultipartDecoder,
-  MultipartEncoder,
+  Ur,
   fromUr,
   fromUrString,
   psbtCodec,
@@ -82,12 +81,14 @@ export function main(): void {
   const encoder = Encoder.create(message, 30, UrType.bytes());
   assert(!encoder.isSinglePart, "multipart encoder");
   assert(encoder.fragmentCount > 1, "multipart fragment count");
-  const decoder = new Decoder();
-  for (let i = 0; i < 1000 && !decoder.complete; i++) {
-    decoder.receive(encoder.nextPart());
+  const decoder = new UrDecoder();
+  for (let i = 0; i < 1000 && decoder.state.phase !== "complete"; i++) {
+    const result = decoder.receive(encoder.nextPart());
+    assert(result.status === "accepted" || result.status === "duplicate", "multipart frame ok");
   }
-  assert(decoder.complete, "multipart decoder completes");
-  eq(bytesToHex(must(decoder.message())), bytesToHex(message), "multipart round trip");
+  assert(decoder.state.phase === "complete", "multipart decoder completes");
+  const decoded = decoder.state.phase === "complete" ? decoder.state.value : undefined;
+  eq(bytesToHex(must(decoded).message), bytesToHex(message), "multipart round trip");
 
   // Registry path: ur:seed single-part round trip through the typed codec API.
   // The `name` field forces a dCBOR text-string decode through the TextDecoder
@@ -105,13 +106,15 @@ export function main(): void {
   for (let i = 5; i < psbtBytes.length; i++) {
     psbtBytes[i] = (i * 7) & 0xff;
   }
-  const psbtEncoder = MultipartEncoder.create(toUr({ bytes: psbtBytes }, psbtCodec), 30);
+  const psbtEncoder = toUr({ bytes: psbtBytes }, psbtCodec).encoder({ maxFragmentLength: 30 });
   assert(!psbtEncoder.isSinglePart, "psbt multipart encoder");
-  const psbtDecoder = new MultipartDecoder();
-  for (let i = 0; i < 1000 && !psbtDecoder.complete; i++) {
-    psbtDecoder.receive(psbtEncoder.nextPart());
+  const psbtDecoder = new UrDecoder();
+  for (let i = 0; i < 1000 && psbtDecoder.state.phase !== "complete"; i++) {
+    const result = psbtDecoder.receive(psbtEncoder.nextPart());
+    assert(result.status === "accepted" || result.status === "duplicate", "psbt frame ok");
   }
-  assert(psbtDecoder.complete, "psbt decoder completes");
-  const psbt = fromUr(must(psbtDecoder.message()), psbtCodec);
+  assert(psbtDecoder.state.phase === "complete", "psbt decoder completes");
+  const psbtDecoded = psbtDecoder.state.phase === "complete" ? psbtDecoder.state.value : undefined;
+  const psbt = fromUr(Ur.fromDecoded(must(psbtDecoded)), psbtCodec);
   eq(bytesToHex(psbt.bytes), bytesToHex(psbtBytes), "psbt multipart round trip");
 }

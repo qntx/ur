@@ -23,7 +23,7 @@ export function encodePart(part: Part): Uint8Array {
 /**
  * Decode a part from CBOR. Lenient on integer width (UR-ADR-017): any well-formed definite-length
  * encoding is accepted; re-encode with {@link encodePart} for the shortest form. `limits` apply
- * `maxFragmentDataLength` to the bstr and `maxFragmentCount` to `sequenceCount`.
+ * `maxFragmentLength` to the bstr and `maxFragmentCount` to `sequenceCount`.
  */
 export function decodePart(bytes: Uint8Array, limits?: Partial<DecoderLimits>): Part {
   const merged = mergeLimits(limits);
@@ -35,7 +35,7 @@ export function decodePart(bytes: Uint8Array, limits?: Partial<DecoderLimits>): 
   const sequenceCount = decodeU32(bytes, cur);
   const messageLength = decodeU32(bytes, cur);
   const checksum = decodeU32(bytes, cur);
-  const data = decodeBstr(bytes, cur, merged.maxFragmentDataLength);
+  const data = decodeBstr(bytes, cur, merged.maxFragmentLength);
   if (cur.i !== bytes.length) {
     fail("InvalidPartCbor");
   }

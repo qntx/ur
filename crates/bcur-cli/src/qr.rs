@@ -3,7 +3,8 @@
 use std::io::{self, Write as _};
 use std::time::Duration;
 
-use bcur::{Encoder, qr_string};
+use bcur::qr_string;
+use bcur::ur::Encoder;
 use crossterm::cursor::MoveTo;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::execute;

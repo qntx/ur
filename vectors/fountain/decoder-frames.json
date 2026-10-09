@@ -1,0 +1,513 @@
+{
+  "schema": 1,
+  "capability": "fountain.decoder",
+  "source": {
+    "kind": "generated",
+    "name": "scripts/vectors/generate-decoder-frames.ts",
+    "crossCheck": "independent naive GF(2) rank tracker (BigInt masks, row list)"
+  },
+  "cases": [
+    {
+      "name": "in-order",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 3,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "skip-then-redeliver",
+      "message": {
+        "seed": "Wolf",
+        "length": 60
+      },
+      "maxFragmentLength": 10,
+      "minFragmentLength": 5,
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "accepted"
+        },
+        {
+          "sequence": 5,
+          "status": "accepted"
+        },
+        {
+          "sequence": 7,
+          "status": "accepted"
+        },
+        {
+          "sequence": 9,
+          "status": "accepted"
+        },
+        {
+          "sequence": 2,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 4,
+          "status": "accepted"
+        },
+        {
+          "sequence": 6,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 8,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 10,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 11,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 12,
+          "status": "duplicate"
+        }
+      ],
+      "completeAt": 7,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccba44f7f04f2de44f42d84c374a0e149136f25b01852545961d55f7f7a8cde"
+    },
+    {
+      "name": "duplicates-interleaved",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "sequence": 1,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 2,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 3,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "duplicate"
+        }
+      ],
+      "completeAt": 5,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "mixed-parts-first",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "frames": [
+        {
+          "sequence": 4,
+          "status": "accepted"
+        },
+        {
+          "sequence": 5,
+          "status": "accepted"
+        },
+        {
+          "sequence": 6,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 7,
+          "status": "accepted"
+        },
+        {
+          "sequence": 1,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 2,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 3,
+          "status": "duplicate"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "post-completion-duplicate",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "accepted"
+        },
+        {
+          "sequence": 4,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 1,
+          "status": "duplicate"
+        }
+      ],
+      "completeAt": 3,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "inconsistent-checksum",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "sequence": 2,
+          "patch": {
+            "checksum": 3735928559
+          },
+          "status": "rejected",
+          "error": {
+            "code": "InconsistentPart"
+          }
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "inconsistent-message-length",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "sequence": 2,
+          "patch": {
+            "messageLength": 29
+          },
+          "status": "rejected",
+          "error": {
+            "code": "InconsistentPart"
+          }
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "invalid-part-sequence-zero",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "sequence": 2,
+          "patch": {
+            "sequence": 0
+          },
+          "status": "rejected",
+          "error": {
+            "code": "InvalidPart"
+          }
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "invalid-part-padding-mismatch",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "sequence": 2,
+          "patch": {
+            "messageLength": 40
+          },
+          "status": "rejected",
+          "error": {
+            "code": "InvalidPart"
+          }
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "limit-fragment-count",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "limits": {
+        "maxFragmentCount": 2
+      },
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "fatal",
+          "error": {
+            "code": "ResourceLimit",
+            "limit": "fragmentCount"
+          }
+        },
+        {
+          "sequence": 2,
+          "status": "duplicate"
+        }
+      ]
+    },
+    {
+      "name": "limit-fragment-length",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "limits": {
+        "maxFragmentLength": 9
+      },
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "fatal",
+          "error": {
+            "code": "ResourceLimit",
+            "limit": "fragmentLength"
+          }
+        },
+        {
+          "sequence": 2,
+          "status": "duplicate"
+        }
+      ]
+    },
+    {
+      "name": "limit-message-length",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "limits": {
+        "maxMessageLength": 29
+      },
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "fatal",
+          "error": {
+            "code": "ResourceLimit",
+            "limit": "messageLength"
+          }
+        },
+        {
+          "sequence": 2,
+          "status": "duplicate"
+        }
+      ]
+    },
+    {
+      "name": "invalid-padding",
+      "message": {
+        "seed": "Wolf",
+        "length": 25
+      },
+      "maxFragmentLength": 10,
+      "minFragmentLength": 5,
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "patch": {
+            "dataHex": "d42e905b77adc3ffff"
+          },
+          "status": "fatal",
+          "error": {
+            "code": "InvalidPadding"
+          }
+        },
+        {
+          "sequence": 3,
+          "status": "duplicate"
+        }
+      ]
+    },
+    {
+      "name": "invalid-message-checksum",
+      "message": {
+        "seed": "Wolf",
+        "length": 25
+      },
+      "maxFragmentLength": 10,
+      "minFragmentLength": 5,
+      "frames": [
+        {
+          "sequence": 1,
+          "patch": {
+            "dataHex": "6e6ec65cf77cadf55c"
+          },
+          "status": "accepted"
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "fatal",
+          "error": {
+            "code": "InvalidMessageChecksum"
+          }
+        },
+        {
+          "sequence": 3,
+          "status": "duplicate"
+        }
+      ]
+    },
+    {
+      "name": "redundant-mixed-part",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "frames": [
+        {
+          "sequence": 4,
+          "status": "accepted"
+        },
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "duplicate"
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "duplicate"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    }
+  ]
+}

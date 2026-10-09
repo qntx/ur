@@ -46,6 +46,10 @@ name    = "chooser"
 harness = false
 
 [[bench]]
+name    = "decoder"
+harness = false
+
+[[bench]]
 name    = "fountain"
 harness = false
 

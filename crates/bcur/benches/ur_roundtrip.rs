@@ -11,7 +11,8 @@
 
 //! Multi-part UR encode/decode throughput.
 
-use bcur::{Decoder, Encoder};
+use bcur::State;
+use bcur::ur::{Decoder, Encoder};
 use criterion::{Criterion, criterion_group, criterion_main};
 
 fn bench_ur(c: &mut Criterion) {
@@ -21,10 +22,10 @@ fn bench_ur(c: &mut Criterion) {
         b.iter(|| {
             let mut enc = Encoder::bytes(&data, 12).unwrap();
             let mut dec = Decoder::default();
-            while !dec.complete() {
+            while !matches!(dec.state(), State::Complete(_)) {
                 dec.receive(&enc.next_part().unwrap()).unwrap();
             }
-            let _ = dec.message().unwrap();
+            let _ = dec.into_decoded().unwrap();
         });
     });
 
@@ -32,13 +33,13 @@ fn bench_ur(c: &mut Criterion) {
         b.iter(|| {
             let mut enc = Encoder::bytes(&data, 12).unwrap();
             let mut dec = Decoder::default();
-            while !dec.complete() {
+            while !matches!(dec.state(), State::Complete(_)) {
                 let part = enc.next_part().unwrap();
                 if enc.current_index() & 1 != 0 {
                     dec.receive(&part).unwrap();
                 }
             }
-            let _ = dec.message().unwrap();
+            let _ = dec.into_decoded().unwrap();
         });
     });
 }

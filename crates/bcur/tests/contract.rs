@@ -14,7 +14,8 @@ use serde_json::Value;
 
 use bcur::bytewords::{self, Style};
 use bcur::fountain::{self, Part};
-use bcur::{Decoder, DecoderLimits, Encoder, ErrorKind, Kind, Limit, UrType, decode, encode};
+use bcur::ur::{Decoder, Encoder};
+use bcur::{DecoderLimits, ErrorKind, Kind, Limit, Received, State, UrType, decode, encode};
 
 macro_rules! vector {
     ($path:literal) => {
@@ -58,21 +59,25 @@ fn assert_line_file(raw: &str) {
     );
 }
 
-fn assert_session_poison(limit: Limit, decoder: &mut Decoder, part: &str) {
-    let is_limit = |r: &bcur::Result<()>| matches!(r, Err(e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(limit));
+fn assert_session_fails(limit: Limit, mut decoder: Decoder, part: &str) {
+    let is_limit = |r: &bcur::Result<Received>| matches!(r, Err(e) if e.kind() == ErrorKind::ResourceLimit && e.limit() == Some(limit) && e.is_fatal());
     assert!(
         is_limit(&decoder.receive(part)),
         "first receive must be {limit:?}"
     );
-    assert!(decoder.is_poisoned(), "resource limit poisons the session");
     assert!(
-        is_limit(&decoder.receive(part)),
-        "later receive must repeat {limit:?}"
+        matches!(decoder.state(), State::Failed(_)),
+        "resource limit fails the session"
+    );
+    assert_eq!(
+        decoder.receive(part).unwrap(),
+        Received::Duplicate,
+        "later frames are duplicates in a terminal state"
     );
     assert!(
-        matches!(decoder.message(), Err(e) if e.kind() == ErrorKind::ResourceLimit
+        matches!(decoder.into_decoded().unwrap_err(), e if e.kind() == ErrorKind::ResourceLimit
             && e.limit() == Some(limit)),
-        "message must repeat {limit:?}"
+        "into_decoded must repeat {limit:?}"
     );
 }
 
@@ -158,10 +163,7 @@ fn part_cbor_decode_contract() {
                 DecoderLimits {
                     max_message_length: get("maxMessageLength", d.max_message_length),
                     max_fragment_count: get("maxFragmentCount", d.max_fragment_count),
-                    max_fragment_data_length: get(
-                        "maxFragmentDataLength",
-                        d.max_fragment_data_length,
-                    ),
+                    max_fragment_length: get("maxFragmentLength", d.max_fragment_length),
                     ..d
                 }
             })
@@ -252,9 +254,9 @@ fn k1_contract() {
     let body = bytewords::encode(&part.to_cbor(), Style::Minimal);
     let uri = format!("ur:{}/1-1/{body}", ur_type.as_str());
     let mut decoder = Decoder::default();
-    decoder.receive(&uri).unwrap();
-    assert!(decoder.complete());
-    assert_eq!(decoder.message().unwrap().as_deref(), Some(payload));
+    assert_eq!(decoder.receive(&uri).unwrap(), Received::Accepted);
+    assert!(matches!(decoder.state(), State::Complete(_)));
+    assert_eq!(decoder.into_decoded().unwrap().message(), payload);
 }
 
 #[test]
@@ -289,85 +291,42 @@ fn decoder_limits_contract() {
         json_usize(&spec, "maxFragmentCount")
     );
     assert_eq!(
-        limits.max_fragment_data_length,
-        json_usize(&spec, "maxFragmentDataLength")
+        limits.max_fragment_length,
+        json_usize(&spec, "maxFragmentLength")
     );
-    assert_eq!(limits.max_buffer_parts, json_usize(&spec, "maxBufferParts"));
-    assert_eq!(
-        limits.max_received_parts,
-        json_usize(&spec, "maxReceivedParts")
-    );
-    assert_eq!(limits.max_uri_len, json_usize(&spec, "maxUriLen"));
+    assert_eq!(limits.max_uri_length, json_usize(&spec, "maxUriLength"));
 }
 
 #[test]
-fn poison_maps_via_rust_ident() {
-    let spec = json(vector!("limits/poison.json"));
-    let raw = vector!("limits/poison.json");
-    assert!(!raw.contains("DecoderState"));
-    let rows = spec.get("limits").and_then(Value::as_array).unwrap();
-    let kinds = [
-        Limit::UriLength,
-        Limit::FragmentCount,
-        Limit::FragmentLength,
-        Limit::MessageLength,
-        Limit::ReceivedParts,
-        Limit::BufferParts,
-    ];
-    assert_eq!(rows.len(), kinds.len());
-    for (row, kind) in rows.iter().zip(kinds) {
-        assert_eq!(json_str(row, "rust"), format!("{kind:?}"));
-        assert_eq!(json_str(row, "limit"), kind.as_str());
-        let session = row.get("sessionPoison").and_then(Value::as_bool).unwrap();
-        assert!(session);
-    }
-}
-
-#[test]
-fn poison_receive_and_message_same_code() {
-    let spec = json(vector!("limits/poison.json"));
-    let names: Vec<&str> = spec
-        .get("receiveAndMessageSameCode")
-        .and_then(Value::as_array)
-        .unwrap()
-        .iter()
-        .map(|v| v.as_str().unwrap())
-        .collect();
-    assert_eq!(names, ["uriLength", "fragmentCount"]);
-
+fn resource_limits_fail_session() {
     let uri_payload = b"Ten chars!".repeat(8);
     let mut uri_enc = Encoder::bytes(&uri_payload, 10).unwrap();
     let uri_part = uri_enc.next_part().unwrap();
-    let mut uri_decoder = Decoder::with_limits(DecoderLimits {
-        max_uri_len: 16,
-        ..DecoderLimits::default()
-    });
-    assert_session_poison(Limit::UriLength, &mut uri_decoder, &uri_part);
+    assert_session_fails(
+        Limit::UriLength,
+        Decoder::new(DecoderLimits {
+            max_uri_length: 16,
+            ..DecoderLimits::default()
+        }),
+        &uri_part,
+    );
 
     let fragment_payload = b"Ten chars!".repeat(16);
     let mut fragment_enc = Encoder::bytes(&fragment_payload, 10).unwrap();
     assert!(fragment_enc.fragment_count() > 1);
-    let mut fragment_decoder = Decoder::with_limits(DecoderLimits {
-        max_fragment_count: 1,
-        ..DecoderLimits::default()
-    });
     let fragment_part = fragment_enc.next_part().unwrap();
-    assert_session_poison(Limit::FragmentCount, &mut fragment_decoder, &fragment_part);
+    assert_session_fails(
+        Limit::FragmentCount,
+        Decoder::new(DecoderLimits {
+            max_fragment_count: 1,
+            ..DecoderLimits::default()
+        }),
+        &fragment_part,
+    );
 }
 
 #[test]
-fn poison_not_poison_errors() {
-    let spec = json(vector!("limits/poison.json"));
-    let names = spec
-        .get("notPoison")
-        .and_then(Value::as_array)
-        .unwrap()
-        .iter()
-        .map(|v| v.as_str().unwrap())
-        .collect::<Vec<_>>();
-    assert!(names.contains(&"UnexpectedType"));
-    assert!(names.contains(&"CborDecode"));
-
+fn nonfatal_errors_leave_state() {
     let data = b"Ten chars!".repeat(6);
     let mut a = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
     let mut b = Encoder::new(&data, 10, &UrType::new("beta").unwrap()).unwrap();
@@ -375,23 +334,23 @@ fn poison_not_poison_errors() {
     decoder.receive(&a.next_part().unwrap()).unwrap();
     assert!(matches!(
         decoder.receive(&b.next_part().unwrap()),
-        Err(ref e) if e.kind() == ErrorKind::UnexpectedType
+        Err(ref e) if e.kind() == ErrorKind::UnexpectedType && !e.is_fatal()
     ));
-    assert!(!decoder.is_poisoned());
-    decoder.receive(&a.next_part().unwrap()).unwrap();
+    assert!(matches!(decoder.state(), State::Collecting(_)));
+    assert!(decoder.receive(&a.next_part().unwrap()).is_ok());
 
+    // A completed session whose bytes are not well-formed dCBOR fails the
+    // typed conversion, not the decode itself.
     #[cfg(feature = "dcbor")]
     {
-        use bcur::MultipartDecoder;
-
-        let mut typed = MultipartDecoder::new();
-        typed.receive("ur:bytes/iehsjyhspmwfwfia").unwrap();
-        assert!(typed.complete());
+        let uri = encode(b"\xff", &UrType::bytes());
+        let mut d = Decoder::default();
+        d.receive(&uri).unwrap();
+        let decoded = d.into_decoded().unwrap();
         assert!(matches!(
-            typed.message(),
+            bcur::Ur::try_from(decoded),
             Err(ref e) if e.kind() == ErrorKind::CborDecode
         ));
-        assert!(!typed.is_poisoned());
     }
 }
 
@@ -406,8 +365,8 @@ fn multipart_20_contract() {
     for uri in &uris {
         decoder.receive(uri).unwrap();
     }
-    assert!(decoder.complete());
-    let payload = decoder.message().unwrap().unwrap();
+    assert!(matches!(decoder.state(), State::Complete(_)));
+    let payload = decoder.into_decoded().unwrap().into_parts().1;
     let mut encoder = Encoder::bytes(&payload, 30).unwrap();
     assert_eq!(encoder.fragment_count(), 9);
     assert_eq!(

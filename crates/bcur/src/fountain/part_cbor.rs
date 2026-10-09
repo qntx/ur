@@ -94,7 +94,7 @@ fn decode_bstr(bytes: &[u8], i: &mut usize, limits: &DecoderLimits) -> Result<Ve
     }
     let len = usize::try_from(decode_argument(head, i, bytes)?)
         .map_err(|_| Error::new(ErrorKind::InvalidPartCbor))?;
-    if len > limits.max_fragment_data_length {
+    if len > limits.max_fragment_length {
         return Err(Error::resource_limit(Limit::FragmentLength));
     }
     let end = i
@@ -298,7 +298,7 @@ mod tests {
         let part = Part::new(1, 1, 32, 0, alloc::vec![0; 32]).unwrap();
         let cbor = encode_part(&part);
         let limits = DecoderLimits {
-            max_fragment_data_length: 16,
+            max_fragment_length: 16,
             ..DecoderLimits::default()
         };
         let err = decode_part(&cbor, &limits).unwrap_err();

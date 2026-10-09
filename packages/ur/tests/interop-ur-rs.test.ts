@@ -9,10 +9,35 @@
 import { expect, test } from "vite-plus/test";
 
 import * as bytewords from "../src/bytewords/index.ts";
+import type { Part } from "../src/fountain/index.ts";
 import { FountainEncoder, encodePart } from "../src/fountain/index.ts";
-import { Decoder, Encoder, UrType, decode, encode, parse, toQrString } from "../src/ur/index.ts";
+import { Encoder, UrDecoder, UrType, decode, encode, parse, toQrString } from "../src/ur/index.ts";
 import { makeMessage } from "./message.ts";
 import { vectorJson, vectorLines } from "./vectors.ts";
+
+/** Feeds one UR; frame errors become thrown errors. */
+function feedUr(decoder: UrDecoder, text: string): void {
+  const result = decoder.receive(text);
+  if (result.status === "rejected" || result.status === "fatal") {
+    throw result.error;
+  }
+}
+
+function decodedMessage(decoder: UrDecoder): Uint8Array {
+  const { state } = decoder;
+  if (state.phase !== "complete") {
+    throw new Error(`decoder ${state.phase}`);
+  }
+  return state.value.message;
+}
+
+function nextPart(fountain: FountainEncoder): Part {
+  const { done, value } = fountain.next();
+  if (done === true || value === undefined) {
+    throw new Error("encoder exhausted");
+  }
+  return value;
+}
 
 /** CBOR bstr header + payload (ur-rs ByteVec). */
 function cborBstr(message: Uint8Array): Uint8Array {
@@ -70,24 +95,22 @@ test("ur-rs test_single_part_ur", () => {
 test("decode full-uppercase multipart URIs", () => {
   const data = new TextEncoder().encode("Ten chars!".repeat(8));
   const encoder = Encoder.bytes(data, 10);
-  const decoder = new Decoder();
-  while (!decoder.complete) {
-    decoder.receive(toQrString(encoder.nextPart()));
+  const decoder = new UrDecoder();
+  while (decoder.state.phase !== "complete") {
+    feedUr(decoder, toQrString(encoder.nextPart()));
   }
-  expect(decoder.message()).toStrictEqual(data);
+  expect(decodedMessage(decoder)).toStrictEqual(data);
 });
 
 test("test_foreign_1_1_fountain_uri_decodes", () => {
   const message = new TextEncoder().encode("hello");
   const fountain = new FountainEncoder(message, { maxFragmentLength: 64 });
   expect(fountain.fragmentCount).toBe(1);
-  const part = fountain.next().value;
-  const body = bytewords.encode(encodePart(part!), "minimal");
+  const body = bytewords.encode(encodePart(nextPart(fountain)), "minimal");
   const uri = `ur:bytes/1-1/${body}`;
-  const decoder = new Decoder();
-  decoder.receive(uri);
-  expect(decoder.complete).toBe(true);
-  expect(decoder.message()).toStrictEqual(message);
+  const decoder = new UrDecoder();
+  expect(decoder.receive(uri).status).toBe("accepted");
+  expect(decodedMessage(decoder)).toStrictEqual(message);
 });
 
 test("bc-ur golden: ur:test array", () => {

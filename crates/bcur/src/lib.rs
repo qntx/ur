@@ -19,14 +19,14 @@
 //! **L0–L3 (always built).** A UR type token is a validated label
 //! (`[a-z0-9-]+` after ASCII lowercasing). The body is raw bytes plus
 //! bytewords CRC. [`ur::encode`] / [`ur::Encoder`] do **not** parse or
-//! require CBOR. [`UrType::bytes`] and [`Encoder::bytes`] exist so tests
+//! require CBOR. [`UrType::bytes`] and [`ur::Encoder::bytes`] exist so tests
 //! and generic hosts can move untyped payloads. This is an intentional
 //! split, not an accident, and it matches ur-rs.
 //!
 //! **BCR-2020-005** says a UR *message* MUST be dCBOR and that type
 //! `bytes` MUST NOT be used except for testing. That MUST is enforced on
 //! **L4** (`feature = "dcbor"`): [`typed::Ur::from_ur_string`] and
-//! [`typed::MultipartDecoder::message`] reject non-dCBOR
+//! `TryFrom<ur::Decoded> for typed::Ur` reject non-dCBOR
 //! ([`ErrorKind::CborDecode`]).
 //! L4 also uses the first registered `dcbor` tag **name** as the type
 //! token and strips the tag from the UR body (005 "top-level UR is
@@ -38,19 +38,20 @@
 //!
 //! # Example
 //!
-//! L3 transport (opaque bytes + type token). [`Encoder::bytes`] remains for
+//! L3 transport (opaque bytes + type token). [`ur::Encoder::bytes`] remains for
 //! ur-rs-shaped tests; it is not the crate hero.
 //!
 //! ```
-//! use bcur::{Decoder, Encoder, UrType};
+//! use bcur::ur::{Decoder, Encoder};
+//! use bcur::{State, UrType};
 //!
 //! let data = b"Ten chars!".repeat(10);
 //! let mut encoder = Encoder::new(&data, 10, &UrType::new("alpha").unwrap()).unwrap();
 //! let mut decoder = Decoder::default();
-//! while !decoder.complete() {
+//! while !matches!(decoder.state(), State::Complete(_)) {
 //!     decoder.receive(&encoder.next_part().unwrap()).unwrap();
 //! }
-//! assert_eq!(decoder.message().unwrap().as_deref(), Some(data.as_slice()));
+//! assert_eq!(decoder.into_decoded().unwrap().message(), data.as_slice());
 //! ```
 //!
 //! Typed dCBOR (`feature = "dcbor"`):
@@ -78,10 +79,11 @@ mod consensus;
 mod constants;
 mod error;
 
+pub use bytewords::Style;
 pub use error::{Error, ErrorKind, Limit, Result};
-pub use fountain::DecoderLimits;
+pub use fountain::{DecoderLimits, Part, Progress, Received, State};
 pub use ur::{
-    Decoder, Encoder, Kind, ParsedUr, UrType, decode, decode_message, decode_with_type, encode,
+    Decoded, Kind, ParsedUr, UrType, decode, decode_message, decode_with_type, encode,
     normalize_ur, parse, qr_string,
 };
 
@@ -95,4 +97,4 @@ mod official_vectors;
 #[cfg(test)]
 use serde_json as _;
 #[cfg(feature = "dcbor")]
-pub use typed::{MultipartDecoder, MultipartEncoder, Ur, UrCodable, UrDecodable, UrEncodable};
+pub use typed::{Ur, UrCodable, UrDecodable, UrEncodable};

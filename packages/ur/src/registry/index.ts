@@ -7,8 +7,6 @@ export {
   Ur,
   firstTagUrType,
   tagUrTypes,
-  MultipartEncoder,
-  MultipartDecoder,
   UrType,
 } from "../typed/index.ts";
 export { UrError, type UrErrorCode, type UrErrorInfo, type UrLimit } from "../error.ts";

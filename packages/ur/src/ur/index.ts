@@ -1,6 +1,6 @@
 import * as bytewords from "../bytewords/index.ts";
 import { UrError, fail } from "../error.ts";
-import type { UrErrorInfo, UrLimit } from "../error.ts";
+import type { UrErrorInfo } from "../error.ts";
 import {
   FountainDecoder,
   FountainEncoder,
@@ -8,7 +8,7 @@ import {
   encodePart,
   mergeLimits,
 } from "../fountain/index.ts";
-import type { DecoderLimits } from "../fountain/index.ts";
+import type { DecoderLimits, DecoderState, Progress, ReceiveResult } from "../fountain/index.ts";
 import { parse } from "./parse.ts";
 import type { Kind, ParsedUr } from "./parse.ts";
 import { UrType } from "./type.ts";
@@ -124,151 +124,183 @@ export class Encoder {
   }
 }
 
-/** UR decoder with type stickiness and URI limits. */
-export class Decoder {
-  private readonly fountain: FountainDecoder;
-  private readonly limits: DecoderLimits;
-  private readonly expectedType: UrType | undefined;
-  private seenType: UrType | undefined;
-  private single: Uint8Array | undefined;
-  private poisoned: UrErrorInfo | undefined;
+/** Reconstructed UR payload and type: the terminal value of {@link UrDecoder}. */
+export type DecodedUr = Readonly<{ type: UrType; message: Uint8Array }>;
 
-  constructor(options?: { limits?: Partial<DecoderLimits>; expectedType?: UrType }) {
-    const limits = mergeLimits(options?.limits);
-    this.fountain = new FountainDecoder(limits);
-    this.limits = limits;
-    this.expectedType = options?.expectedType;
+/** {@link UrDecoder} options; `accept` empty accepts any type. */
+export type UrDecoderOptions = Readonly<{
+  limits?: Partial<DecoderLimits>;
+  accept?: ReadonlyArray<UrType>;
+}>;
+
+type Terminal =
+  | Readonly<{ phase: "complete"; value: DecodedUr }>
+  | Readonly<{ phase: "failed"; error: UrError }>;
+
+function toUrError(error: unknown): UrError {
+  return error instanceof UrError ? error : new UrError({ code: "Internal" });
+}
+
+/**
+ * UR decoder (single-part or fountain).
+ *
+ * `receive` never throws for frame problems: parse, type, index, bytewords, and consistency
+ * failures come back `rejected` with the session unchanged; limit violations and completion-check
+ * failures are `fatal` and move the session to `failed`. Terminal sessions return `duplicate` for
+ * every further frame without parsing it (UR-ADR-014). The first successfully ingested frame locks
+ * the UR type.
+ */
+export class UrDecoder {
+  readonly #limits: DecoderLimits;
+  readonly #accept: ReadonlyArray<UrType>;
+  #fountain: FountainDecoder;
+  #lockedType: UrType | undefined;
+  #terminal: Terminal | undefined;
+  #processed = 0;
+
+  constructor(options?: UrDecoderOptions) {
+    this.#limits = mergeLimits(options?.limits);
+    this.#fountain = new FountainDecoder({ limits: this.#limits });
+    this.#accept = options?.accept ?? [];
   }
 
-  private poisonLimit(limit: UrLimit): never {
-    const info: UrErrorInfo = { code: "ResourceLimit", limit };
-    this.poisoned = info;
-    fail(info);
-  }
-
-  private escalate(e: unknown): never {
-    if (e instanceof UrError && (e.info.code === "ResourceLimit" || e.info.code === "Internal")) {
-      this.poisoned ??= e.info;
+  /** Receive one UR string (single-part or fountain part). */
+  receive(text: string): ReceiveResult {
+    if (this.#terminal !== undefined) {
+      this.#processed += 1;
+      return { status: "duplicate" };
     }
-    throw e;
-  }
-
-  get poisonState(): UrErrorInfo | undefined {
-    return this.poisoned ?? this.fountain.poisonState;
-  }
-
-  receive(uri: string): void {
-    if (this.poisoned) {
-      throw new UrError(this.poisoned);
+    if (text.length > this.#limits.maxUriLength) {
+      return this.#fail({ code: "ResourceLimit", limit: "uriLength" });
     }
-    if (this.fountain.isPoisoned) {
-      const poison = this.fountain.poisonState;
-      if (poison === undefined) {
-        fail("Internal");
-      }
-      this.poisoned ??= poison;
-      throw new UrError(poison);
-    }
-    if (uri.length > this.limits.maxUriLen) {
-      this.poisonLimit("uriLength");
-    }
-
-    const parsed = parse(uri);
-    if (this.expectedType && !parsed.type.equals(this.expectedType)) {
-      fail({
-        code: "UnexpectedType",
-        expected: [this.expectedType],
-        found: parsed.type,
-      });
-    }
-    if (this.seenType && !this.seenType.equals(parsed.type)) {
-      fail({
-        code: "UnexpectedType",
-        expected: [this.seenType],
-        found: parsed.type,
-      });
-    }
-
     try {
-      if (parsed.kind === "single") {
-        this.receiveSingle(parsed);
-      } else {
-        this.receiveFountain(parsed);
-      }
+      return this.#receiveParsed(text);
     } catch (error) {
-      this.escalate(error);
+      const urError = toUrError(error);
+      if (urError.fatal) {
+        return this.#fatal(urError);
+      }
+      return { status: "rejected", error: urError };
     }
   }
 
-  private receiveSingle(parsed: ParsedUr): void {
-    if (this.fountain.resolvedFragmentCount() !== undefined) {
-      fail("InconsistentPart");
+  #receiveParsed(text: string): ReceiveResult {
+    const parsed = parse(text);
+    this.#checkType(parsed.type);
+    return parsed.kind === "single" ? this.#receiveSingle(parsed) : this.#receiveFountain(parsed);
+  }
+
+  /** Type admission: `accept` list (when non-empty), then the locked type. */
+  #checkType(type: UrType): void {
+    if (this.#accept.length > 0 && !this.#accept.some((t) => t.equals(type))) {
+      fail({ code: "UnexpectedType", expected: this.#accept, found: type });
     }
-    if (this.single !== undefined) {
-      return;
+    const locked = this.#lockedType;
+    if (locked !== undefined && !locked.equals(type)) {
+      fail({ code: "UnexpectedType", expected: [locked], found: type });
+    }
+  }
+
+  #receiveSingle(parsed: ParsedUr): ReceiveResult {
+    // A single-part URI inside a collecting fountain session is inconsistent;
+    // the reverse order is unreachable (a completed session is terminal).
+    if (this.#fountain.state.phase !== "empty") {
+      fail("InconsistentPart");
     }
     const data = bytewords.decode(parsed.body, "minimal");
-    if (data.length > this.limits.maxMessageLength) {
-      this.poisonLimit("messageLength");
+    if (data.length > this.#limits.maxMessageLength) {
+      return this.#fail({ code: "ResourceLimit", limit: "messageLength" });
     }
-    this.seenType = parsed.type;
-    this.single = data;
+    this.#lockedType ??= parsed.type;
+    this.#terminal = { phase: "complete", value: { type: parsed.type, message: data } };
+    this.#processed += 1;
+    return { status: "accepted" };
   }
 
-  private receiveFountain(parsed: ParsedUr): void {
-    if (this.single !== undefined) {
-      fail("InconsistentPart");
-    }
+  #receiveFountain(parsed: ParsedUr): ReceiveResult {
     const decoded = bytewords.decode(parsed.body, "minimal");
-    const part = decodePart(decoded, this.limits);
+    const part = decodePart(decoded, this.#limits);
     const { indices } = parsed;
-    if (!indices) {
+    if (
+      indices === undefined ||
+      part.sequence !== indices.seq ||
+      part.sequenceCount !== indices.count
+    ) {
       fail("InvalidIndices");
     }
-    if (part.sequence !== indices.seq || part.sequenceCount !== indices.count) {
-      fail("InvalidIndices");
+    const result = this.#fountain.receive(part);
+    if (result.status === "rejected") {
+      return result;
     }
-    this.fountain.receive(part);
-    this.seenType ??= parsed.type;
-  }
-
-  get complete(): boolean {
-    return this.single !== undefined || this.fountain.complete;
-  }
-
-  message(): Uint8Array | undefined {
-    if (this.poisoned) {
-      throw new UrError(this.poisoned);
+    if (result.status === "fatal") {
+      this.#terminal = { phase: "failed", error: result.error };
+      return result;
     }
-    if (this.fountain.isPoisoned) {
-      const poison = this.fountain.poisonState;
-      if (poison === undefined) {
-        fail("Internal");
-      }
-      throw new UrError(poison);
+    this.#lockedType ??= parsed.type;
+    this.#processed += 1;
+    const fountainState = this.#fountain.state;
+    if (fountainState.phase === "complete") {
+      this.#terminal = {
+        phase: "complete",
+        value: { type: parsed.type, message: fountainState.value },
+      };
     }
-    if (this.single) {
-      return new Uint8Array(this.single);
+    return result;
+  }
+
+  /** Moves the session to `failed` with a built error and returns `fatal`. */
+  #fail(info: UrErrorInfo): ReceiveResult {
+    return this.#fatal(new UrError(info));
+  }
+
+  /** Moves the session to `failed` with an existing error and returns `fatal`. */
+  #fatal(error: UrError): ReceiveResult {
+    this.#terminal = { phase: "failed", error };
+    return { status: "fatal", error };
+  }
+
+  /** Current session state. */
+  get state(): DecoderState<DecodedUr> {
+    const terminal = this.#terminal;
+    if (terminal !== undefined) {
+      return terminal.phase === "complete"
+        ? { phase: "complete", value: terminal.value }
+        : { phase: "failed", error: terminal.error };
     }
-    return this.fountain.message();
+    const fountain = this.#fountain.state;
+    return fountain.phase === "collecting"
+      ? { phase: "collecting", progress: fountain.progress }
+      : { phase: "empty" };
   }
 
-  resolvedFragmentCount(): number | undefined {
-    if (this.single) {
-      return 1;
+  /**
+   * Progress snapshot (`empty` reports all zeros; a session completed via a single-part URI reports
+   * `K = 1`).
+   */
+  get progress(): Progress {
+    const base = this.#fountain.progress;
+    if (base.fragmentCount === 0 && this.#terminal?.phase === "complete") {
+      return { fragmentCount: 1, rank: 1, recovered: 1, processed: this.#processed, ratio: 1 };
     }
-    return this.fountain.resolvedFragmentCount();
+    return {
+      fragmentCount: base.fragmentCount,
+      rank: base.rank,
+      recovered: base.recovered,
+      processed: this.#processed,
+      ratio: base.ratio,
+    };
   }
 
-  get fragmentCount(): number {
-    return this.single ? 1 : this.fountain.fragmentCount;
+  /** Fragment indexes of the most recent `accepted`/`duplicate` part. */
+  get lastIndexes(): ReadonlyArray<number> {
+    return this.#fountain.lastIndexes;
   }
 
-  get type(): UrType | undefined {
-    return this.seenType;
-  }
-
-  get isPoisoned(): boolean {
-    return this.poisoned !== undefined || this.fountain.isPoisoned;
+  /** Returns the session to `empty`; limits and the `accept` list are kept. */
+  reset(): void {
+    this.#fountain = new FountainDecoder({ limits: this.#limits });
+    this.#lockedType = undefined;
+    this.#terminal = undefined;
+    this.#processed = 0;
   }
 }

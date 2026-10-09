@@ -11,7 +11,7 @@ import {
   fragmentLength,
   partition,
 } from "../src/fountain/index.ts";
-import type { Part } from "../src/fountain/index.ts";
+import type { Part, ReceiveResult } from "../src/fountain/index.ts";
 import { makeMessage } from "./message.ts";
 import { vectorJson, vectorLines } from "./vectors.ts";
 
@@ -40,6 +40,27 @@ function errorOf(fn: () => void): UrError {
   throw new Error("expected UrError");
 }
 
+function frameError(result: ReceiveResult): UrError | undefined {
+  return "error" in result ? result.error : undefined;
+}
+
+/** Feeds one part; frame errors become thrown errors. */
+function feed(decoder: FountainDecoder, part: Part): "accepted" | "duplicate" {
+  const result = decoder.receive(part);
+  if (result.status === "rejected" || result.status === "fatal") {
+    throw result.error;
+  }
+  return result.status;
+}
+
+function completedMessage(decoder: FountainDecoder): Uint8Array {
+  const { state } = decoder;
+  if (state.phase !== "complete") {
+    throw new Error(`decoder ${state.phase}`);
+  }
+  return state.value;
+}
+
 function nextPart(encoder: FountainEncoder): Part {
   const { done, value } = encoder.next();
   if (done !== false || value === undefined) {
@@ -61,10 +82,10 @@ test("fountain roundtrip", () => {
   const message = makeMessage("Wolf", 256);
   const encoder = new FountainEncoder(message, { maxFragmentLength: 30 });
   const decoder = new FountainDecoder();
-  while (!decoder.complete) {
-    decoder.receive(nextPart(encoder));
+  while (decoder.state.phase !== "complete") {
+    feed(decoder, nextPart(encoder));
   }
-  expect(decoder.message()).toStrictEqual(message);
+  expect(completedMessage(decoder)).toStrictEqual(message);
 });
 
 test("fountain encoder first part", () => {
@@ -134,21 +155,21 @@ test("decoder from rateless parts only (BCR-2024-001 §6 testDecoder)", () => {
     encoder.next();
   }
   const decoder = new FountainDecoder();
-  while (!decoder.complete) {
-    decoder.receive(nextPart(encoder));
+  while (decoder.state.phase !== "complete") {
+    feed(decoder, nextPart(encoder));
   }
-  expect(decoder.message()).toStrictEqual(message);
+  expect(completedMessage(decoder)).toStrictEqual(message);
 });
 
 test("skip fragments", () => {
   const message = makeMessage("Wolf", 32767);
   const encoder = new FountainEncoder(message, { maxFragmentLength: 1000 });
   const decoder = new FountainDecoder();
-  while (!decoder.complete) {
-    decoder.receive(nextPart(encoder));
+  while (decoder.state.phase !== "complete") {
+    feed(decoder, nextPart(encoder));
     encoder.next();
   }
-  expect(decoder.message()).toStrictEqual(message);
+  expect(completedMessage(decoder)).toStrictEqual(message);
 });
 
 test("choose_fragments", () => {
@@ -194,8 +215,13 @@ test("inconsistent part rejected", () => {
   const encoderA = new FountainEncoder(message, { maxFragmentLength: 16 });
   const encoderB = new FountainEncoder(makeMessage("Other", 64), { maxFragmentLength: 16 });
   const decoder = new FountainDecoder();
-  decoder.receive(nextPart(encoderA));
-  expect(errorOf(() => decoder.receive(nextPart(encoderB))).code).toBe("InconsistentPart");
+  feed(decoder, nextPart(encoderA));
+  const result = decoder.receive(nextPart(encoderB));
+  expect(result.status).toBe("rejected");
+  expect(frameError(result)?.code).toBe("InconsistentPart");
+  // Nonfatal: the session is still collecting with rank 1.
+  expect(decoder.state.phase).toBe("collecting");
+  expect(decoder.progress.rank).toBe(1);
 });
 
 test("duplicate part ignored", () => {
@@ -203,18 +229,25 @@ test("duplicate part ignored", () => {
   const encoder = new FountainEncoder(message, { maxFragmentLength: 16 });
   const part = nextPart(encoder);
   const decoder = new FountainDecoder();
-  expect(decoder.receive(part)).toBe(true);
-  expect(decoder.receive(part)).toBe(false);
+  expect(feed(decoder, part)).toBe("accepted");
+  expect(feed(decoder, part)).toBe("duplicate");
+  expect(decoder.lastIndexes).toStrictEqual([0]);
 });
 
-test("resource limit fragmentCount poisons", () => {
-  const decoder = new FountainDecoder({ maxFragmentCount: 1 });
+test("resource limit fragmentCount fails the session", () => {
+  const decoder = new FountainDecoder({ limits: { maxFragmentCount: 1 } });
   const message = makeMessage("Wolf", 64);
   const encoder = new FountainEncoder(message, { maxFragmentLength: 8, minFragmentLength: 1 });
   expect(encoder.fragmentCount).toBeGreaterThan(1);
-  expect(() => decoder.receive(nextPart(encoder))).toThrow(UrError);
-  expect(decoder.isPoisoned).toBe(true);
-  expect(() => decoder.receive(nextPart(encoder))).toThrow(UrError);
+  const result = decoder.receive(nextPart(encoder));
+  expect(result.status).toBe("fatal");
+  expect(frameError(result)?.info).toStrictEqual({
+    code: "ResourceLimit",
+    limit: "fragmentCount",
+  });
+  expect(decoder.state.phase).toBe("failed");
+  // Terminal: every further frame is a duplicate.
+  expect(feed(decoder, nextPart(encoder))).toBe("duplicate");
 });
 
 test("padding wider than one fragment is InvalidPart", () => {
@@ -226,10 +259,10 @@ test("padding wider than one fragment is InvalidPart", () => {
     checksum: 0,
     data: new Uint8Array(8),
   };
-  const err = errorOf(() => decoder.receive(part));
-  expect(err.code).toBe("InvalidPart");
-  expect(decoder.isPoisoned).toBe(false);
-  expect(decoder.poisonState).toBeUndefined();
+  const result = decoder.receive(part);
+  expect(result.status).toBe("rejected");
+  expect(frameError(result)?.code).toBe("InvalidPart");
+  expect(decoder.state.phase).toBe("empty");
 });
 
 test("decodePart maxFragmentCount", () => {

@@ -1,58 +1,39 @@
 #![no_main]
 
-use bcur::{Decoder, DecoderLimits, Error};
+use bcur::ur::Decoder;
+use bcur::{Received, State};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
     let s = String::from_utf8_lossy(data);
-    let mut decoder = Decoder::with_limits(DecoderLimits::default());
+    let mut decoder = Decoder::default();
     match decoder.receive(&s) {
-        Err(Error::ResourceLimit(kind)) => {
+        Err(e) if e.is_fatal() => {
             assert!(
-                decoder.is_poisoned(),
-                "ResourceLimit({kind:?}) must poison the session"
+                matches!(decoder.state(), State::Failed(_)),
+                "fatal receive must fail the session"
             );
-            match decoder.receive(&s) {
-                Err(Error::ResourceLimit(again)) if again == kind => {}
-                other => panic!("poisoned receive must replay {kind:?}, got {other:?}"),
-            }
-            match decoder.message() {
-                Err(Error::ResourceLimit(again)) if again == kind => {}
-                other => panic!("poisoned message must replay {kind:?}, got {other:?}"),
-            }
+            assert_eq!(
+                decoder.receive(&s).unwrap(),
+                Received::Duplicate,
+                "a failed session duplicates every later frame"
+            );
+            assert!(decoder.into_decoded().is_err());
         }
-        Ok(()) => {
-            if decoder.complete() {
-                match decoder.message() {
-                    Ok(Some(_)) => {}
-                    Err(
-                        Error::InvalidPadding | Error::InvalidMessageChecksum | Error::DecoderState,
-                    ) => {}
-                    other => {
-                        panic!("complete() message must be Some or a join error, got {other:?}")
-                    }
-                }
-            }
-            if let Some(ty) = decoder.ur_type() {
-                let other = if ty.as_str() == "zzzz" {
-                    "yyyy"
-                } else {
-                    "zzzz"
-                };
-                let probe = format!("ur:{other}/iehsjyhspmwfwfia");
-                let poisoned = decoder.is_poisoned();
-                match decoder.receive(&probe) {
-                    Err(Error::UnexpectedType { .. }) => {
-                        assert_eq!(
-                            decoder.is_poisoned(),
-                            poisoned,
-                            "type pin is UnexpectedType, not poison"
-                        );
-                    }
-                    other => panic!("pinned type must reject {other:?}"),
-                }
-            }
+        Err(e) => {
+            assert!(
+                matches!(decoder.state(), State::Empty | State::Collecting(_)),
+                "nonfatal receive must not fail the session: {e:?}"
+            );
         }
-        Err(_) => {}
+        Ok(_) => match decoder.state() {
+            State::Complete(_) => {
+                assert!(decoder.into_decoded().is_ok());
+            }
+            State::Collecting(progress) => {
+                assert!(progress.rank() < progress.fragment_count());
+            }
+            State::Empty | State::Failed(_) => {}
+        },
     }
 });

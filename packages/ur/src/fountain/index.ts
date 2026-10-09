@@ -1,4 +1,9 @@
-export { FountainDecoder } from "./decoder.ts";
+export {
+  FountainDecoder,
+  type DecoderState,
+  type Progress,
+  type ReceiveResult,
+} from "./decoder.ts";
 export {
   FountainEncoder,
   fragmentLength,

@@ -11,11 +11,9 @@
 //! assert_eq!(ur.string(), "ur:test/lsadaoaxjygonesw");
 //! ```
 
-mod multipart;
 mod traits;
 mod ur_value;
 
-pub use multipart::{MultipartDecoder, MultipartEncoder};
 pub use traits::{UrCodable, UrDecodable, UrEncodable};
 pub use ur_value::Ur;
 
@@ -34,7 +32,5 @@ mod tests {
     #[test]
     fn typed_types_are_send_sync() {
         assert_send_sync::<super::Ur>();
-        assert_send_sync::<super::MultipartEncoder>();
-        assert_send_sync::<super::MultipartDecoder>();
     }
 }

@@ -1,8 +1,10 @@
 import { expect, test } from "vite-plus/test";
 
+import type { DecoderLimits, ReceiveResult } from "../../src/fountain/index.ts";
+import type { DecodedUr } from "../../src/ur/index.ts";
 import {
-  Decoder,
   Encoder,
+  UrDecoder,
   UrType,
   decode,
   decodeMessage,
@@ -120,15 +122,93 @@ test.each(partsFileRows)("ur.encoder $name", (c) => {
   expect(parts).toStrictEqual(expected);
 });
 
+function feedUr(decoder: UrDecoder, text: string): void {
+  const result = decoder.receive(text);
+  if (result.status === "rejected" || result.status === "fatal") {
+    throw result.error;
+  }
+}
+
+function completedDecoded(decoder: UrDecoder): DecodedUr {
+  const { state } = decoder;
+  if (state.phase !== "complete") {
+    throw new Error(`decoder ${state.phase}`);
+  }
+  return state.value;
+}
+
 test.each(roundTripRows)("ur.encoder $name", (c) => {
   const payload = payloadOf(c);
   const encoder = Encoder.create(payload, c.maxFragmentLength, UrType.parse(c.urType), {
     firstSequence: c.firstSeqNum,
   });
-  const decoder = new Decoder();
-  while (!decoder.complete) {
-    decoder.receive(encoder.nextPart());
+  const decoder = new UrDecoder();
+  while (decoder.state.phase !== "complete") {
+    feedUr(decoder, encoder.nextPart());
   }
-  expect(decoder.message()).toStrictEqual(payload);
-  expect(decoder.type?.value).toBe(c.urType);
+  const value = completedDecoded(decoder);
+  expect(value.message).toStrictEqual(payload);
+  expect(value.type.value).toBe(c.urType);
+});
+
+const UR_FRAMES = vectorJson<{
+  cases: Array<{
+    name: string;
+    accept?: string[];
+    limits?: Partial<DecoderLimits>;
+    frames: Array<{
+      text: string;
+      status: "accepted" | "duplicate" | "rejected" | "fatal";
+      error?: { code: string; limit?: string };
+    }>;
+    completeAt?: number;
+    messageHex?: string;
+  }>;
+}>("ur/decoder-frames.json");
+
+function errorEntry(result: ReceiveResult): { code: string; limit?: string } | undefined {
+  if (!("error" in result)) {
+    return undefined;
+  }
+  const { error } = result;
+  if (error.info.code === "ResourceLimit") {
+    return { code: error.code, limit: error.info.limit };
+  }
+  return { code: error.code };
+}
+
+function completedMessageHex(decoder: UrDecoder): string | undefined {
+  const { state } = decoder;
+  if (state.phase !== "complete") {
+    return undefined;
+  }
+  return Array.from(state.value.message, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+type UrFrameCase = (typeof UR_FRAMES.cases)[number];
+
+function replayFrames(c: UrFrameCase): {
+  decoder: UrDecoder;
+  completedAt: number | undefined;
+} {
+  const decoder = new UrDecoder({
+    ...(c.limits === undefined ? {} : { limits: c.limits }),
+    ...(c.accept === undefined ? {} : { accept: c.accept.map((t) => UrType.parse(t)) }),
+  });
+  let completedAt: number | undefined;
+  for (const [i, frame] of c.frames.entries()) {
+    const result = decoder.receive(frame.text);
+    expect(result.status).toBe(frame.status);
+    expect(errorEntry(result)).toStrictEqual(frame.error);
+    if (decoder.state.phase === "complete") {
+      completedAt ??= i + 1;
+    }
+  }
+  return { decoder, completedAt };
+}
+
+test.each(UR_FRAMES.cases)("ur.decoder frames $name", (c) => {
+  const { decoder, completedAt } = replayFrames(c);
+  expect(completedAt).toBe(c.completeAt);
+  expect(completedMessageHex(decoder)).toBe(c.messageHex);
 });
