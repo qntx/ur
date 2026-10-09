@@ -27,7 +27,7 @@ use crate::fountain::{self, DecoderLimits, EncoderOptions, Part, Progress, Recei
 /// Validated UR type token: canonical lowercase ASCII `[a-z0-9-]+`.
 ///
 /// [`UrType::new`] lowercases then validates; [`UrType::new_static`] validates
-/// a `&'static str` at compile time (see [`ur_type!`]).
+/// a `&'static str` at compile time (see [`ur_type!`](crate::ur_type!)).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UrType(Cow<'static, str>);
 
@@ -48,7 +48,7 @@ impl UrType {
 
     /// Validates a `&'static str` that is already canonical lowercase.
     ///
-    /// Usable in `const` context — see [`ur_type!`].
+    /// Usable in `const` context — see [`ur_type!`](crate::ur_type!).
     #[must_use]
     pub const fn new_static(s: &'static str) -> Option<Self> {
         if !is_valid_type_const(s) {

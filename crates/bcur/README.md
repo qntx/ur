@@ -4,18 +4,13 @@ A Rust implementation of [Uniform Resources](https://github.com/BlockchainCommon
 
 URs encode binary payloads as URI-friendly strings for QR codes and unreliable channels, using [bytewords](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-012-bytewords.md) and fountain codes for multi-part transfer.
 
-## Status (1.0)
-
-Transport: bytewords + fountain + multi-part UR + frozen `DecoderLimits` Default.  
-Typed dCBOR: `feature = "dcbor"` (`Ur`, traits; implies `std`).
-
 ## Layering
 
-**L0–L3 (always built).** A UR type token is a validated label (`[a-z0-9-]+` after ASCII lowercasing). The body is raw bytes plus bytewords CRC. `ur::encode` / `ur::Encoder` do **not** parse or require CBOR. `UrType::bytes()` and `Encoder::bytes` exist so tests and generic hosts can move untyped payloads. This is an intentional split, not an accident, and it matches ur-rs.
+**L0–L3 (always built).** A UR type token is a validated label (`[a-z0-9-]+` after ASCII lowercasing). The body is raw bytes plus the bytewords CRC. `ur::encode` / `ur::Encoder` do **not** parse or require CBOR, so generic hosts and tests can move opaque payloads; this split matches ur-rs.
 
-**BCR-2020-005** says a UR _message_ MUST be dCBOR and that type `bytes` MUST NOT be used except for testing. That MUST is enforced on **L4** (`feature = "dcbor"`): `typed::Ur::from_ur_string` and `TryFrom<ur::Decoded>` reject non-dCBOR (`Error::Cbor`). L4 also uses the first registered `dcbor` tag **name** as the type token and strips the tag from the UR body (005 "top-level UR is untagged").
+**BCR-2020-005** says a UR _message_ MUST be dCBOR and that type `bytes` MUST NOT be used except for testing. That MUST is enforced on **L4** (`feature = "dcbor"`): `FromStr for typed::Ur` and `TryFrom<ur::Decoded> for typed::Ur` reject non-dCBOR (`ErrorKind::CborDecode`). L4 uses the first registered `dcbor` tag **name** as the type token and strips the tag from the UR body (005 "top-level UR is untagged").
 
-**This crate will not** grow a Blockchain Commons type registry, Envelope, or PSBT module to "satisfy 005." Application types belong in a consumer crate that implements `UrEncodable` / `UrDecodable`.
+Registry types (seed, hdkey, PSBT, …) are not part of this crate; application types implement `UrEncodable` / `UrDecodable`.
 
 ## Features
 
@@ -28,30 +23,32 @@ Typed dCBOR: `feature = "dcbor"` (`Ur`, traits; implies `std`).
 
 ## Quick start
 
-L3 transport — opaque bytes plus a type token. `Encoder::bytes` / `UrType::bytes`
-remain for tests and generic hosts; they are not the product default.
+L3 transport — opaque bytes plus a type token. The encoder is an iterator; the decoder reports one outcome per frame.
 
 ```rust
-use bcur::{Decoder, Encoder, State, UrType};
+use bcur::fountain::EncoderOptions;
+use bcur::ur::{Decoder, Encoder};
+use bcur::{State, ur_type};
 
 let data = b"Ten chars!".repeat(10);
-let mut encoder = Encoder::new(&data, 5, &UrType::new("alpha").unwrap()).unwrap();
+let mut encoder = Encoder::new(ur_type!("alpha"), data.clone(), EncoderOptions::new(10)).unwrap();
 let mut decoder = Decoder::default();
-while !matches!(decoder.state(), State::Complete(_)) {
-    decoder.receive(&encoder.next_part().unwrap()).unwrap();
+for frame in encoder.by_ref() {
+    decoder.receive(&frame).unwrap();
+    if matches!(decoder.state(), State::Complete(_)) {
+        break;
+    }
 }
-let decoded = decoder.into_decoded().unwrap();
-assert_eq!(decoded.message(), data.as_slice());
+assert_eq!(decoder.into_decoded().unwrap().message(), data.as_slice());
 ```
 
-L4 typed dCBOR (`feature = "dcbor"`). First registered tag **name** is the UR
-type; the body is untagged.
+L4 typed dCBOR (`feature = "dcbor"`). The first registered tag **name** is the UR type; the body is untagged.
 
 ```rust
-use bcur::Ur;
+use bcur::{Ur, ur_type};
 
-let ur = Ur::new("test", vec![1, 2, 3]).unwrap();
-assert_eq!(ur.string(), "ur:test/lsadaoaxjygonesw");
+let ur = Ur::new(ur_type!("test"), vec![1, 2, 3]);
+assert_eq!(ur.to_string(), "ur:test/lsadaoaxjygonesw");
 ```
 
 ## License
