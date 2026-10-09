@@ -19,4 +19,4 @@ bun add @qntx/ur @blockchaincommons/dcbor@1.0.0-beta.3
 
 Package name is `@qntx/ur`. The GitHub repository is `qntx/ur`.
 
-Supported runtimes: Node `>=22.12` and Bun, matching `@blockchaincommons/dcbor`. React Native (Hermes V1) is covered by a CI smoke test: the root transport needs only `TextEncoder`, which Hermes ships; `@qntx/ur/typed` and `@qntx/ur/registry` additionally need a WHATWG `TextDecoder` supporting `{ fatal: true }` (Expo provides one; bare React Native needs a polyfill). The published `dist` is ESM and does not import Node builtins; browser is not a support claim.
+Supported runtimes: Node `>=20.19.0` and Bun for the root transport; `@qntx/ur/typed` and `@qntx/ur/registry` follow `@blockchaincommons/dcbor`, which requires Node `>=22.12`. React Native (Hermes V1) is covered by a CI smoke test: the root transport needs only `TextEncoder`, which Hermes ships; `@qntx/ur/typed` and `@qntx/ur/registry` additionally need a WHATWG `TextDecoder` supporting `{ fatal: true }` (Expo provides one; bare React Native needs a polyfill). The published `dist` is ESM and does not import Node builtins; browser is not a support claim.

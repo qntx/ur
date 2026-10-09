@@ -48,3 +48,11 @@ export function expectInt32(cbor: Cbor): number {
 export function expectBool(cbor: Cbor): boolean {
   return expectBoolean(cbor);
 }
+
+/** Encode-side mirror of `expectText`: validates a caller-built field. */
+export function assertText(value: string): string {
+  if (typeof value !== "string") {
+    throw CborError.wrongType();
+  }
+  return value;
+}

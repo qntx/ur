@@ -12,11 +12,6 @@ import { expect, test } from "vite-plus/test";
 
 import {
   ENVELOPE_MAX_DEPTH,
-  TAG_COMPRESSED,
-  TAG_ENCRYPTED,
-  TAG_ENVELOPE,
-  TAG_ENVELOPE_LEAF,
-  TAG_KNOWN_VALUE,
   TAGS,
   Ur,
   UrError,
@@ -25,6 +20,13 @@ import {
   fromUr,
   toUr,
 } from "../../src/registry/index.ts";
+import {
+  TAG_COMPRESSED,
+  TAG_ENCRYPTED,
+  TAG_ENVELOPE,
+  TAG_ENVELOPE_LEAF,
+  TAG_KNOWN_VALUE,
+} from "../../src/registry/tags.ts";
 import { envelopeAlice, envelopeNode } from "./goldens.ts";
 
 function urErrorOf(fn: () => void): UrError {

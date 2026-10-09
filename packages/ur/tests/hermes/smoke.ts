@@ -7,7 +7,14 @@ import {
   parseUr,
   parseUrType,
 } from "../../src/index.ts";
-import { Ur, fromUr, psbtCodec, seedCodec, toUr } from "../../src/registry/index.ts";
+import {
+  Ur,
+  fromUr,
+  outputDescriptorCodec,
+  psbtCodec,
+  seedCodec,
+  toUr,
+} from "../../src/registry/index.ts";
 
 /**
  * Hermes smoke test: bundled to a single classic script and run on the Hermes V1 CLI that React
@@ -123,4 +130,21 @@ export function main(): void {
   const psbtDecoded = psbtDecoder.state.phase === "complete" ? psbtDecoder.state.value : undefined;
   const psbt = fromUr(Ur.fromDecoded(must(psbtDecoded)), psbtCodec);
   eq(bytesToHex(psbt.bytes), bytesToHex(psbtBytes), "psbt multipart round trip");
+
+  // Registry path: output-descriptor round trip (tagged embedded eckey + text
+  // fields through the TextDecoder shim).
+  const pubKey = hexToBytes(`02${"ab".repeat(32)}`);
+  const odUri = toUr(
+    {
+      source: "pkh(@0)",
+      keys: [{ kind: "eckey", key: { data: pubKey } }],
+      name: "hermes od",
+    },
+    outputDescriptorCodec,
+  ).toString();
+  assert(odUri.startsWith("ur:output-descriptor/"), "output-descriptor ur type");
+  const od = fromUr(Ur.parse(odUri), outputDescriptorCodec);
+  eq(od.source, "pkh(@0)", "output-descriptor source");
+  eq(od.keys.length, 1, "output-descriptor key count");
+  eq(od.name, "hermes od", "output-descriptor name text decode");
 }

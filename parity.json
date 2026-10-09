@@ -399,16 +399,89 @@
       "vectors": []
     },
     {
-      "id": "registry.codec-map",
+      "id": "typed.codec-map",
+      "tier": "C",
+      "status": "n/a",
+      "milestone": "UR3",
+      "ts": {
+        "module": "packages/ur/src/typed/codec.ts",
+        "tests": ["packages/ur/tests/typed-codec.test.ts"]
+      },
+      "rust": null,
+      "vectors": [],
+      "note": "Rust dispatches codecs by matching ur_type(); there is no Rust counterpart by design."
+    },
+    {
+      "id": "registry.eckey",
       "tier": "A",
       "status": "ts-only",
       "milestone": "R4",
       "ts": {
-        "module": "packages/ur/src/typed/codec.ts",
-        "tests": ["packages/ur/tests/registry/codecs.test.ts"]
+        "module": "packages/ur/src/registry/eckey.ts",
+        "tests": [
+          "packages/ur/tests/registry/descriptors.test.ts",
+          "packages/ur/tests/vectors/registry.test.ts"
+        ]
       },
       "rust": null,
-      "vectors": []
+      "vectors": ["vectors/official/registry/eckey.json", "vectors/registry/invalid.json"]
+    },
+    {
+      "id": "registry.address",
+      "tier": "A",
+      "status": "ts-only",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/address.ts",
+        "tests": [
+          "packages/ur/tests/registry/descriptors.test.ts",
+          "packages/ur/tests/vectors/registry.test.ts"
+        ]
+      },
+      "rust": null,
+      "vectors": ["vectors/official/registry/address.json", "vectors/registry/invalid.json"]
+    },
+    {
+      "id": "registry.output-descriptor",
+      "tier": "A",
+      "status": "ts-only",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/output-descriptor.ts",
+        "tests": [
+          "packages/ur/tests/registry/descriptors.test.ts",
+          "packages/ur/tests/vectors/registry.test.ts"
+        ]
+      },
+      "rust": null,
+      "vectors": [
+        "vectors/official/registry/output-descriptor.json",
+        "vectors/official/registry/crypto-output.json",
+        "vectors/keystone/crypto-output.json",
+        "vectors/registry/crypto-output-conversion.json",
+        "vectors/registry/invalid.json"
+      ]
+    },
+    {
+      "id": "registry.account-descriptor",
+      "tier": "A",
+      "status": "ts-only",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/account-descriptor.ts",
+        "tests": [
+          "packages/ur/tests/registry/descriptors.test.ts",
+          "packages/ur/tests/vectors/registry.test.ts"
+        ]
+      },
+      "rust": null,
+      "vectors": [
+        "vectors/official/registry/account-descriptor.json",
+        "vectors/official/registry/crypto-account.json",
+        "vectors/keystone/crypto-account.json",
+        "vectors/registry/crypto-output-conversion.json",
+        "vectors/registry/invalid.json"
+      ]
     },
     {
       "id": "bytewords.identifier",

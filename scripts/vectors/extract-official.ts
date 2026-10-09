@@ -24,6 +24,7 @@ import {
   balanced,
   codeBlockAfter,
   codeBlockContaining,
+  codeBlocks,
   concatString,
   docFuncBody,
   expect,
@@ -48,6 +49,7 @@ const RESEARCH_SHA = "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850";
 const URKIT_SHA = "ebba59b2e1538cb368d98147dd58c452e6d1dc47";
 const BCUR_SHA = "4479fb81b2350ae8bafa042a5572b9c64c2c32ca";
 const BCUR_RS_SHA = "2f8b4e728945f9dc248eba71911b89371f076924";
+const KEYSTONE_SHA = "bd8f408127c420f723222c1934c5666873a94c3e";
 
 const URKIT_FOUNTAIN = `URKit ${URKIT_SHA} Tests/URKitTests/FountainCodesTests.swift`;
 const URKIT_BYTEWORDS = `URKit ${URKIT_SHA} Tests/URKitTests/BytewordsTests.swift`;
@@ -154,7 +156,7 @@ function partFields(body: string): { fields: number[]; data: number[] } {
   return { fields: ns.slice(0, 4), data: ns.slice(4) };
 }
 
-/* ------------------------------------------------------------------ mur */
+// MUR
 
 function mur(bcr: string, kit: string, cpp: string): void {
   const b = (name: string) => docFuncBody(bcr, name);
@@ -592,7 +594,7 @@ function assertListLiteral(body: string, name: string): number[] {
   return numbers(balanced(body, pos));
 }
 
-/* ------------------------------------------------------------- bytewords */
+// Bytewords
 
 const hex = (bytes: number[]) => bytes.map((x) => x.toString(16).padStart(2, "0")).join("");
 
@@ -718,7 +720,7 @@ function bytewords(bwDoc: string, kitBw: string, cpp: string): void {
   );
 }
 
-/* --------------------------------------------------------------------- ur */
+// UR
 
 function ur(kitUr: string, cpp: string, urDoc: string, multipartTable: string[]): void {
   const [kitSingle] = urLiterals(funcBody(kitUr, "func testSinglePartUR"));
@@ -835,7 +837,7 @@ function ur(kitUr: string, cpp: string, urDoc: string, multipartTable: string[])
   );
 }
 
-/* -------------------------------------------------------------- registry */
+// Registry
 
 function registry(urtDoc: string, hdkeyDoc: string, sskrDoc: string, urDoc: string): void {
   const seedHex = hexLiteral(codeBlockContaining(urtDoc, "A20150C7098580"));
@@ -965,7 +967,227 @@ function registry(urtDoc: string, hdkeyDoc: string, sskrDoc: string, urDoc: stri
   );
 }
 
-/* ------------------------------------------------- identifier/bytemoji */
+// Descriptors & accounts
+
+/** `### Example/Test Vector` sections of a BCR doc. */
+function vectorSections(doc: string): string[] {
+  const parts = doc.split(/### Example\/Test Vector/).slice(1);
+  expect(parts.length > 0, "doc has no example sections");
+  return parts;
+}
+
+/** The ` ``` ` block after `marker` inside `section`. */
+function sectionHex(section: string, marker: string): string {
+  return hexLiteral(codeBlockAfter(section, marker));
+}
+
+/**
+ * `cborHex` holds the untagged body (registry convention); BCR-2023-010 prints the
+ * `40308(…)`-wrapped form, so strip the outer tag.
+ */
+function untag40308(hex: string): string {
+  expect(hex.startsWith("d99d74"), `expected 40308-tagged hex, got ${hex.slice(0, 12)}…`);
+  return hex.slice(6);
+}
+
+function descriptorRegistries(
+  eckeyDoc: string,
+  addressDoc: string,
+  cryptoOutputDoc: string,
+  cryptoAccountDoc: string,
+  outputDescDoc: string,
+  accountDescDoc: string,
+): void {
+  const eckeySections = vectorSections(eckeyDoc);
+  expect(
+    eckeySections.length === 2,
+    `BCR-2020-008: expected 2 vectors, got ${eckeySections.length}`,
+  );
+  writeVector(
+    "official/registry/eckey.json",
+    "registry.eckey",
+    researchSource("BCR-2020-008", "papers/bcr-2020-008-eckey.md"),
+    eckeySections.map((sec, i) => ({
+      name: `eckey vector ${i + 1}`,
+      urType: "eckey",
+      tag: 40306,
+      cborHex: sectionHex(sec, "As a hex string"),
+      ur: req(
+        urLiterals(sec).find((u) => u.startsWith("ur:eckey/")),
+        `eckey ${i} ur`,
+      ),
+    })),
+  );
+
+  const addressSections = vectorSections(addressDoc);
+  expect(
+    addressSections.length === 2,
+    `BCR-2020-009: expected 2 vectors, got ${addressSections.length}`,
+  );
+  writeVector(
+    "official/registry/address.json",
+    "registry.address",
+    researchSource("BCR-2020-009", "papers/bcr-2020-009-address.md"),
+    addressSections.map((sec, i) => ({
+      name: `address vector ${i + 1}`,
+      urType: "address",
+      tag: 40307,
+      cborHex: sectionHex(sec, "As a hex string"),
+      ur: req(
+        urLiterals(sec).find((u) => u.startsWith("ur:address/")),
+        `address ${i} ur`,
+      ),
+    })),
+  );
+
+  const odSections = vectorSections(outputDescDoc);
+  expect(odSections.length === 4, `BCR-2023-010: expected 4 vectors, got ${odSections.length}`);
+  const odNames = [
+    "pk(@0) eckey",
+    "addr(@0) address",
+    "pkh(@0) private eckey",
+    "wsh sortedmulti 3 hdkeys",
+  ];
+  writeVector(
+    "official/registry/output-descriptor.json",
+    "registry.output-descriptor",
+    researchSource("BCR-2023-010", "papers/bcr-2023-010-output-descriptor.md"),
+    odSections.map((sec, i) => {
+      const [firstBlock] = codeBlocks(sec, "");
+      const [textDescriptor] = req(firstBlock?.trim(), `output-descriptor ${i} text`).split("\n");
+      const c: Json = {
+        name: `vector ${i + 1}: ${req(odNames[i], `output-descriptor ${i} name`)}`,
+        urType: "output-descriptor",
+        tag: 40308,
+        cborHex: untag40308(sectionHex(sec, "Hex-encoded CBOR")),
+        textDescriptor,
+      };
+      const ur = urLiterals(sec).find((u) => u.startsWith("ur:output-descriptor/"));
+      if (ur !== undefined) {
+        c["ur"] = ur;
+      }
+      if (sec.includes("placeholder")) {
+        c["source"] = req(
+          codeBlockAfter(sec, "placeholder").trim(),
+          `output-descriptor ${i} placeholder`,
+        );
+      }
+      return c;
+    }),
+  );
+
+  const adSection = req(vectorSections(accountDescDoc)[0], "BCR-2023-019 vector");
+  writeVector(
+    "official/registry/account-descriptor.json",
+    "registry.account-descriptor",
+    researchSource("BCR-2023-019", "papers/bcr-2023-019-account-descriptor.md"),
+    [
+      {
+        name: "BIP39 'shield group…' account, 7 descriptors",
+        urType: "account-descriptor",
+        tag: 40311,
+        cborHex: sectionHex(adSection, "As a hex string"),
+        ur: req(
+          urLiterals(adSection).find((u) => u.startsWith("ur:account-descriptor/")),
+          "account-descriptor ur",
+        ),
+        textDescriptors: codeBlocks(adSection, "")[1]?.trim().split("\n"),
+      },
+    ],
+  );
+
+  const coSections = vectorSections(cryptoOutputDoc);
+  expect(coSections.length === 5, `BCR-2020-010: expected 5 vectors, got ${coSections.length}`);
+  const coNames = [
+    "pkh eckey",
+    "sh(wpkh) eckey",
+    "sh multi 2-of-2 eckey",
+    "pkh hdkey",
+    "wsh multi 1-of-2 hdkey",
+  ];
+  writeVector(
+    "official/registry/crypto-output.json",
+    "registry.output-descriptor",
+    researchSource("BCR-2020-010", "papers/bcr-2020-010-output-desc.md"),
+    coSections.map((sec, i) => ({
+      name: `crypto-output vector ${i + 1}: ${req(coNames[i], `crypto-output ${i} name`)}`,
+      urType: "crypto-output",
+      tag: 308,
+      cborHex: sectionHex(sec, "As a hex string"),
+      ur: req(
+        urLiterals(sec).find((u) => u.startsWith("ur:crypto-output/")),
+        `crypto-output ${i} ur`,
+      ),
+      textDescriptor: req(codeBlocks(sec, "")[0]?.trim().split("\n")[0], `crypto-output ${i} text`),
+    })),
+  );
+
+  const caSection = req(vectorSections(cryptoAccountDoc)[0], "BCR-2020-015 vector");
+  writeVector(
+    "official/registry/crypto-account.json",
+    "registry.account-descriptor",
+    researchSource("BCR-2020-015", "papers/bcr-2020-015-account.md"),
+    [
+      {
+        name: "BIP39 'shield group…' account, 7 v1 descriptors",
+        urType: "crypto-account",
+        tag: 311,
+        cborHex: sectionHex(caSection, "As a hex string"),
+        ur: req(
+          urLiterals(caSection).find((u) => u.startsWith("ur:crypto-account/")),
+          "crypto-account ur",
+        ),
+        textDescriptors: codeBlocks(caSection, "")[1]?.trim().split("\n"),
+      },
+    ],
+  );
+}
+
+/**
+ * KeystoneHQ ur-registry jest tests: each `it(…)` asserts a `const hex` CBOR and a `ur:crypto-*`
+ * literal, a second independent source for the v1 types.
+ */
+function keystoneCases(testFile: string, urType: string): Json[] {
+  const seen = new Map<string, Json>();
+  for (const sec of testFile.split(/ {2}it\(/).slice(1)) {
+    const hex = /const hex =\s*'([0-9a-fA-F]+)'/.exec(sec)?.[1]?.toLowerCase();
+    const ur = urLiterals(sec).find((u) => u.startsWith(`ur:${urType}/`));
+    if (ur === undefined || seen.has(ur)) {
+      continue;
+    }
+    const text = /\.toString\(\)\)\.toBe\('([^']+)'\)/.exec(sec)?.[1];
+    seen.set(ur, {
+      name: `keystone ${seen.size}: ${ur.slice(3 + urType.length + 1, 3 + urType.length + 25)}…`,
+      urType,
+      ...(hex === undefined ? {} : { cborHex: hex }),
+      ur,
+      ...(text === undefined ? {} : { textDescriptor: text }),
+    });
+  }
+  return [...seen.values()];
+}
+
+function keystone(outTest: string, accountTest: string): void {
+  const source: Json = {
+    name: "KeystoneHQ/ur-registry",
+    commit: KEYSTONE_SHA,
+    license: "MIT",
+  };
+  writeVector(
+    "keystone/crypto-output.json",
+    "registry.output-descriptor",
+    { ...source, path: "__tests__/CryptoOutput.test.ts" },
+    keystoneCases(outTest, "crypto-output"),
+  );
+  writeVector(
+    "keystone/crypto-account.json",
+    "registry.account-descriptor",
+    { ...source, path: "__tests__/CryptoAccount.test.ts" },
+    keystoneCases(accountTest, "crypto-account"),
+  );
+}
+
+// Identifier/bytemoji
 
 /** The 256-word table from the BCR-2020-012 `0xNN:` word list. */
 function docWordTable(bwDoc: string): string[] {
@@ -1095,8 +1317,6 @@ function refBlockJoin(emojis: string[]): string {
   return emojis.join("");
 }
 
-/* -------------------------------------------------------------------- */
-
 const [
   murDoc,
   bwDoc,
@@ -1125,6 +1345,26 @@ const [
   fetchRaw("BlockchainCommons/bc-ur-rust", BCUR_RS_SHA, "src/bytewords.rs"),
 ]);
 
+const [
+  eckeyDoc,
+  addressDoc,
+  cryptoOutputDoc,
+  cryptoAccountDoc,
+  outputDescDoc,
+  accountDescDoc,
+  ksOutTest,
+  ksAccountTest,
+] = await Promise.all([
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-008-eckey.md"),
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-009-address.md"),
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-010-output-desc.md"),
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2020-015-account.md"),
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2023-010-output-descriptor.md"),
+  fetchRaw("BlockchainCommons/Research", RESEARCH_SHA, "papers/bcr-2023-019-account-descriptor.md"),
+  fetchRaw("KeystoneHQ/ur-registry", KEYSTONE_SHA, "__tests__/CryptoOutput.test.ts"),
+  fetchRaw("KeystoneHQ/ur-registry", KEYSTONE_SHA, "__tests__/CryptoAccount.test.ts"),
+]);
+
 const multipartTable = readFileSync(join(VECTORS, "ur-rs/multipart-20.txt"), "utf8")
   .split("\n")
   .map((l) => l.trim())
@@ -1134,6 +1374,15 @@ mur(murDoc, kitFountain, cpp);
 bytewords(bwDoc, kitBw, cpp);
 ur(kitUr, cpp, urDoc, multipartTable);
 registry(urtDoc, hdkeyDoc, sskrDoc, urDoc);
+descriptorRegistries(
+  eckeyDoc,
+  addressDoc,
+  cryptoOutputDoc,
+  cryptoAccountDoc,
+  outputDescDoc,
+  accountDescDoc,
+);
+keystone(ksOutTest, ksAccountTest);
 identifiers(bwDoc, bytemojiDoc, bcRs);
 
 console.log(`wrote ${written.length} vector files:`);

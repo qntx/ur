@@ -1,0 +1,27 @@
+{
+  "capability": "registry.address",
+  "cases": [
+    {
+      "cborHex": "a1035477bff20c60e522dfaa3350c39b030a5d004e839a",
+      "name": "address vector 1",
+      "tag": 40307,
+      "ur": "ur:address/oyaxghktrswzbnhnvwcpurpkeogdsrndaxbkhlaegllsnyolrsemgu",
+      "urType": "address"
+    },
+    {
+      "cborHex": "a201d99d71a201183c0201035481b7e08f65bdf5648606c89998a9cc8164397647",
+      "name": "address vector 2",
+      "tag": 40307,
+      "ur": "ur:address/oeadtantjsoeadcsfnaoadaxghlyrlvtmyihryykielnamspnlmkptsflyieeskoflkovdfdlb",
+      "urType": "address"
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "crossChecked": [],
+    "kind": "official",
+    "name": "BCR-2020-009",
+    "path": "papers/bcr-2020-009-address.md",
+    "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+  }
+}

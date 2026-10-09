@@ -1,0 +1,27 @@
+{
+  "capability": "registry.eckey",
+  "cases": [
+    {
+      "cborHex": "a202f50358208c05c4b4f3e88840a4f4b5f155cfd69473ea169f3d0431b7a6787a23777f08aa",
+      "name": "eckey vector 1",
+      "tag": 40306,
+      "ur": "ur:eckey/oeaoykaxhdcxlkahssqzwfvslofzoxwkrewngotktbmwjkwdcmnefsaaehrlolkskncnktlbaypkrphsmyid",
+      "urType": "eckey"
+    },
+    {
+      "cborHex": "a103582103bec5163df25d8703150c3a1804eac7d615bb212b7cc9d7ff937aa8bd1c494b7f",
+      "name": "eckey vector 2",
+      "tag": 40306,
+      "ur": "ur:eckey/oyaxhdclaxrnskcmfswzhlltaxbzbnftcsaawdsttbbzrkcldnkesotszmmuknpdrycegagrlbemdevtlp",
+      "urType": "eckey"
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "crossChecked": [],
+    "kind": "official",
+    "name": "BCR-2020-008",
+    "path": "papers/bcr-2020-008-eckey.md",
+    "revision": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850"
+  }
+}
