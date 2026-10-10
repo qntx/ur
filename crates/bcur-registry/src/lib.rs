@@ -3,11 +3,11 @@
 //! BCR-2020-006 registry types (`seed`, `hdkey`, `keypath`, `coin-info`,
 //! `eckey`, `address`, `output-descriptor`, `sskr`, `psbt`,
 //! `account-descriptor`) on `dcbor`'s tagged traits. v1 `crypto-output`
-//! script expressions (BCR-2020-010) convert to `OutputDescriptor` on read.
-//! Every type shares wire bytes and accept/reject behavior with the
-//! `@qntx/ur/registry` TypeScript registry and round-trips through `ur:<type>` multi-part UR
-//! transport via `bcur`'s `typed::{UrEncodable, UrDecodable}` blanket impls
-//! (a dev-dependency of this crate, not a runtime one).
+//! script expressions (BCR-2020-010) convert to [`OutputDescriptor`] on read.
+//! Every value writes the v2 tag and reads both v1 and v2; types re-encode
+//! to the recorded canonical bytes and round-trip through `ur:<type>`
+//! multi-part UR transport via `bcur`'s `typed::{UrEncodable, UrDecodable}`
+//! blanket impls (a dev-dependency of this crate, not a runtime one).
 //!
 //! ```rust
 //! use bcur::typed::{UrDecodable, UrEncodable};
@@ -31,12 +31,13 @@ mod coin_info;
 mod descriptor_key;
 mod eckey;
 mod error;
-mod expect;
+mod fingerprint;
 mod hdkey;
 mod keypath;
 mod output_descriptor;
 mod psbt;
-mod script_expression;
+mod read;
+mod script;
 mod seed;
 mod sskr;
 
@@ -44,12 +45,13 @@ pub mod tags;
 
 pub use account_descriptor::AccountDescriptor;
 pub use address::{Address, AddressType};
-pub use coin_info::{CoinInfo, coin_type, network};
+pub use coin_info::{CoinInfo, CoinType, Network};
 pub use descriptor_key::DescriptorKey;
-pub use eckey::{EcKey, curve};
-pub use error::{Error, ErrorKind, Result};
+pub use eckey::{Curve, EcKey};
+pub use error::{Error, Result};
+pub use fingerprint::Fingerprint;
 pub use hdkey::{DerivedKey, HdKey, MasterKey};
-pub use keypath::{ChildIndex, Keypath, PathComponent};
+pub use keypath::{ChildNumber, ChildRange, Index, Keypath, PathComponent};
 pub use output_descriptor::OutputDescriptor;
 pub use psbt::Psbt;
 pub use seed::Seed;

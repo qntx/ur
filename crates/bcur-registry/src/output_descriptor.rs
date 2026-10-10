@@ -5,9 +5,10 @@ use std::collections::BTreeSet;
 use dcbor::{CBOR, CBORTagged, CBORTaggedDecodable, CBORTaggedEncodable, Map, Tag};
 
 use crate::descriptor_key::DescriptorKey;
-use crate::expect::{closed_int_map, expect_array, expect_text, extract, get};
-use crate::script_expression;
-use crate::{Error, ErrorKind, Result, tags};
+use crate::read::{MapReader, array, text, untag};
+use crate::script::Script;
+use crate::seed::nonempty;
+use crate::{Error, Result, tags};
 
 const KEYS: &[u64] = &[1, 2, 3, 4];
 
@@ -21,13 +22,13 @@ const KEYS: &[u64] = &[1, 2, 3, 4];
 pub struct OutputDescriptor {
     source: String,
     keys: Vec<DescriptorKey>,
-    name: String,
-    note: String,
+    name: Option<String>,
+    note: Option<String>,
 }
 
-/// TS `assertPlaceholders`: the `@n` placeholders in `source` must be exactly
-/// the set `0..key_count`. A `@` followed by a maximal run of ASCII digits is
-/// a placeholder; anything else is ignored.
+/// The `@n` placeholders in `source` must form exactly the set
+/// `0..key_count`. A `@` followed by a maximal run of ASCII digits is a
+/// placeholder; anything else is ignored.
 fn assert_placeholders(source: &str, key_count: usize) -> Result<()> {
     let bytes = source.as_bytes();
     let mut found = BTreeSet::new();
@@ -49,17 +50,15 @@ fn assert_placeholders(source: &str, key_count: usize) -> Result<()> {
         let Some(digits) = source.get(pos..pos + run) else {
             continue;
         };
-        let n: u64 = digits
-            .parse()
-            .map_err(|_| Error::new(ErrorKind::InvalidPlaceholder, "source"))?;
+        let n: u64 = digits.parse().map_err(|_| Error::Placeholders)?;
         if n >= key_count as u64 {
-            return Err(Error::new(ErrorKind::InvalidPlaceholder, "source"));
+            return Err(Error::Placeholders);
         }
         found.insert(n);
         pos += run;
     }
     if found.len() != key_count {
-        return Err(Error::new(ErrorKind::InvalidPlaceholder, "source"));
+        return Err(Error::Placeholders);
     }
     Ok(())
 }
@@ -69,30 +68,30 @@ impl OutputDescriptor {
     ///
     /// # Errors
     ///
-    /// [`ErrorKind::InvalidPlaceholder`] when the `@n` placeholders in
-    /// `source` are not exactly the set `0..keys.len()`.
+    /// [`Error::Placeholders`] when the `@n` placeholders in `source` are not
+    /// exactly the set `0..keys.len()`.
     pub fn new(source: impl Into<String>, keys: Vec<DescriptorKey>) -> Result<Self> {
         let source = source.into();
         assert_placeholders(&source, keys.len())?;
         Ok(Self {
             source,
             keys,
-            name: String::new(),
-            note: String::new(),
+            name: None,
+            note: None,
         })
     }
 
-    /// Sets the display name (empty names are omitted on write).
+    /// Sets the display name; `""` clears it.
     #[must_use]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = name.into();
+        self.name = nonempty(name.into());
         self
     }
 
-    /// Sets the note (empty notes are omitted on write).
+    /// Sets the note; `""` clears it.
     #[must_use]
     pub fn with_note(mut self, note: impl Into<String>) -> Self {
-        self.note = note.into();
+        self.note = nonempty(note.into());
         self
     }
 
@@ -108,16 +107,58 @@ impl OutputDescriptor {
         &self.keys
     }
 
-    /// The display name.
+    /// The display name, when present.
     #[must_use]
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
     }
 
-    /// The note.
+    /// The note, when present.
     #[must_use]
-    pub fn note(&self) -> &str {
-        &self.note
+    pub fn note(&self) -> Option<&str> {
+        self.note.as_deref()
+    }
+}
+
+impl OutputDescriptor {
+    fn from_body(cbor: &CBOR) -> Result<Self> {
+        if !cbor.is_map() {
+            // v1 crypto-output: a tagged script-expression tree.
+            let (source, keys) = Script::to_descriptor_parts(cbor)?;
+            return Ok(Self {
+                source,
+                keys,
+                name: None,
+                note: None,
+            });
+        }
+        let map = MapReader::closed(cbor, KEYS)?;
+        let source = text(&map.required(1)?)?;
+        let keys = match map.optional(2) {
+            Some(value) => array(&value)?
+                .iter()
+                .map(|item| DescriptorKey::try_from(item.clone()))
+                .collect::<Result<Vec<DescriptorKey>>>()?,
+            None => Vec::new(),
+        };
+        assert_placeholders(&source, keys.len())?;
+        // An empty name/note on the wire means absent.
+        let name = map
+            .optional(3)
+            .map(|v| text(&v))
+            .transpose()?
+            .and_then(nonempty);
+        let note = map
+            .optional(4)
+            .map(|v| text(&v))
+            .transpose()?
+            .and_then(nonempty);
+        Ok(Self {
+            source,
+            keys,
+            name,
+            note,
+        })
     }
 }
 
@@ -140,11 +181,11 @@ impl CBORTaggedEncodable for OutputDescriptor {
                     .collect::<Vec<CBOR>>(),
             );
         }
-        if !self.name.is_empty() {
-            map.insert(3, self.name.clone());
+        if let Some(name) = &self.name {
+            map.insert(3, name.clone());
         }
-        if !self.note.is_empty() {
-            map.insert(4, self.note.clone());
+        if let Some(note) = &self.note {
+            map.insert(4, note.clone());
         }
         map.into()
     }
@@ -152,40 +193,7 @@ impl CBORTaggedEncodable for OutputDescriptor {
 
 impl CBORTaggedDecodable for OutputDescriptor {
     fn from_untagged_cbor(cbor: CBOR) -> dcbor::Result<Self> {
-        if !cbor.is_map() {
-            // v1 crypto-output: a tagged script-expression tree -> v2 value.
-            let (source, keys) = script_expression::to_descriptor(&cbor)?;
-            return Ok(Self {
-                source,
-                keys,
-                name: String::new(),
-                note: String::new(),
-            });
-        }
-        let map = closed_int_map(&cbor, KEYS)?;
-        let source = expect_text(&extract(&map, 1)?)?;
-        let keys = match get(&map, 2) {
-            Some(value) => expect_array(&value)?
-                .into_iter()
-                .map(DescriptorKey::try_from)
-                .collect::<dcbor::Result<Vec<DescriptorKey>>>()?,
-            None => Vec::new(),
-        };
-        assert_placeholders(&source, keys.len())?;
-        let name = get(&map, 3)
-            .map(|value| expect_text(&value))
-            .transpose()?
-            .unwrap_or_default();
-        let note = get(&map, 4)
-            .map(|value| expect_text(&value))
-            .transpose()?
-            .unwrap_or_default();
-        Ok(Self {
-            source,
-            keys,
-            name,
-            note,
-        })
+        Self::from_body(&cbor).map_err(dcbor::Error::from)
     }
 }
 
@@ -196,9 +204,9 @@ impl From<OutputDescriptor> for CBOR {
 }
 
 impl TryFrom<CBOR> for OutputDescriptor {
-    type Error = dcbor::Error;
+    type Error = Error;
 
-    fn try_from(cbor: CBOR) -> dcbor::Result<Self> {
-        Self::from_tagged_cbor(cbor)
+    fn try_from(cbor: CBOR) -> Result<Self> {
+        Self::from_body(&untag(cbor, &Self::cbor_tags())?)
     }
 }

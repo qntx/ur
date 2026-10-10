@@ -1,6 +1,6 @@
 # bcur-registry
 
-BCR-2020-006 registry types (seed, hdkey, keypath, coin-info, eckey, address, output-descriptor, sskr, psbt, account-descriptor) on the `bcur` typed dCBOR layer — byte- and error-compatible with `@qntx/ur/registry`.
+BCR-2020-006 registry types — `Seed`, `HdKey` (`MasterKey`/`DerivedKey`), `Keypath`, `CoinInfo`, `EcKey`, `Address`, `OutputDescriptor`, `SskrShare`, `Psbt`, `AccountDescriptor` — on the `bcur` typed dCBOR layer, with domain types (`Fingerprint`, `Index`, `ChildNumber`, `ChildRange`, `PathComponent`, `CoinType`, `Network`, `Curve`, `AddressType`) that carry invariants, checked `new` constructors, consuming `with_*` builders, zeroized secrets, and v1 `crypto-output`/`crypto-account` conversion to descriptor parts.
 
 Docs: <https://github.com/qntx/ur/tree/main/docs/rust/registry.mdx>
 

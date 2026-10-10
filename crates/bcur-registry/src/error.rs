@@ -1,77 +1,103 @@
-//! Registry validation error type.
+//! Registry error type.
 
 use core::fmt;
 
-/// Why a registry value failed validation.
+/// Registry validation and decode error.
 ///
-/// In the dcbor decode path the kinds map through
-/// `From<Error> for dcbor::Error`: [`ErrorKind::InvalidValue`] becomes
-/// `dcbor::Error::WrongType` and every other kind becomes
-/// `dcbor::Error::OutOfRange`, matching the TypeScript `CborError` classes
-/// (`wrongType` / `outOfRange`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// Carries enough context to stand alone: the failing CBOR map key or tag,
+/// the field name, or the offending value's length. `Cbor` wraps a
+/// structural [`dcbor::Error`] (wrong major type, malformed input) and is the
+/// only variant with a `source()`.
+#[derive(Debug)]
 #[non_exhaustive]
-pub enum ErrorKind {
-    /// A length fell outside the allowed range.
-    InvalidLength,
+pub enum Error {
+    /// A structural dCBOR failure (wrong major type, malformed input).
+    Cbor(dcbor::Error),
+    /// A map key outside the type's closed key set.
+    UnknownKey {
+        /// The unexpected key.
+        key: u64,
+    },
+    /// A required map key was absent.
+    MissingKey {
+        /// The missing key.
+        key: u64,
+    },
+    /// A CBOR tag the type does not accept.
+    UnexpectedTag {
+        /// The unexpected tag value.
+        tag: u64,
+    },
+    /// A byte or item count fell outside the allowed range.
+    InvalidLength {
+        /// The field that failed.
+        field: &'static str,
+        /// The offending length.
+        len: usize,
+    },
     /// A numeric value fell outside the allowed range.
-    OutOfRange,
+    OutOfRange {
+        /// The field that failed.
+        field: &'static str,
+    },
     /// A value had the right shape but was semantically invalid.
-    InvalidValue,
-    /// A descriptor placeholder was invalid (reserved for descriptor types).
-    InvalidPlaceholder,
-}
-
-/// Validation error raised by registry constructors.
-///
-/// Carries the failure [`ErrorKind`] plus the name of the offending field.
-/// dcbor structural failures (unknown map key, wrong CBOR type, missing key)
-/// use `dcbor::Error` directly and never surface as this type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Error {
-    kind: ErrorKind,
-    field: &'static str,
-}
-
-impl Error {
-    /// Creates an error for `field` with `kind`.
-    #[must_use]
-    pub const fn new(kind: ErrorKind, field: &'static str) -> Self {
-        Self { kind, field }
-    }
-
-    /// The failure category.
-    #[must_use]
-    pub const fn kind(&self) -> ErrorKind {
-        self.kind
-    }
-
-    /// The name of the field that failed validation.
-    #[must_use]
-    pub const fn field(&self) -> &'static str {
-        self.field
-    }
+    Invalid {
+        /// The field that failed.
+        field: &'static str,
+        /// Why the value is invalid.
+        reason: &'static str,
+    },
+    /// The `@n` placeholders were not exactly the set `0..keys.len()`.
+    Placeholders,
+    /// A script expression that cannot be represented (unknown tag or
+    /// disallowed nesting).
+    UnsupportedScript {
+        /// The offending script-expression tag.
+        tag: u64,
+    },
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let reason = match self.kind {
-            ErrorKind::InvalidLength => "invalid length",
-            ErrorKind::OutOfRange => "out of range",
-            ErrorKind::InvalidValue => "invalid value",
-            ErrorKind::InvalidPlaceholder => "invalid placeholder",
-        };
-        write!(f, "{}: {reason}", self.field)
+        match self {
+            // The dcbor error is exposed through `source()`, not repeated here.
+            Self::Cbor(_) => f.write_str("malformed dCBOR"),
+            Self::UnknownKey { key } => write!(f, "unknown map key {key}"),
+            Self::MissingKey { key } => write!(f, "missing map key {key}"),
+            Self::UnexpectedTag { tag } => write!(f, "unexpected tag {tag}"),
+            Self::InvalidLength { field, len } => {
+                write!(f, "{field} length {len} is outside the allowed range")
+            }
+            Self::OutOfRange { field } => write!(f, "{field} is out of range"),
+            Self::Invalid { field, reason } => write!(f, "{field} is invalid: {reason}"),
+            Self::Placeholders => f.write_str("placeholders are not exactly the set 0..keys.len()"),
+            Self::UnsupportedScript { tag } => {
+                write!(f, "script expression tag {tag} is not supported here")
+            }
+        }
     }
 }
 
-impl core::error::Error for Error {}
+impl core::error::Error for Error {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            Self::Cbor(source) => Some(source),
+            _ => None,
+        }
+    }
+}
+
+impl From<dcbor::Error> for Error {
+    fn from(source: dcbor::Error) -> Self {
+        Self::Cbor(source)
+    }
+}
 
 impl From<Error> for dcbor::Error {
     fn from(error: Error) -> Self {
-        match error.kind {
-            ErrorKind::InvalidValue => Self::WrongType,
-            _ => Self::OutOfRange,
+        match error {
+            Error::Cbor(source) => source,
+            other => Self::Custom(other.to_string()),
         }
     }
 }

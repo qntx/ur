@@ -1,18 +1,17 @@
 //! `hdkey` (tag 40303; reads v1 `crypto-hdkey` 303).
 
 use core::fmt;
-use core::num::NonZeroU32;
 
 use dcbor::{ByteString, CBOR, CBORTagged, CBORTaggedDecodable, CBORTaggedEncodable, Map, Tag};
 use sha2::{Digest, Sha256};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::coin_info::CoinInfo;
-use crate::expect::{
-    closed_int_map, expect_bool, expect_bytes_len, expect_text, expect_uint32_ne0, extract, get,
-};
+use crate::fingerprint::Fingerprint;
 use crate::keypath::Keypath;
-use crate::{Error, ErrorKind, Result, tags};
+use crate::read::{MapReader, boolean, bytes_fixed, text, uint32_ne0, untag};
+use crate::seed::nonempty;
+use crate::{Error, Result, tags};
 
 const MASTER_KEYS: &[u64] = &[1, 3, 4];
 const DERIVED_KEYS: &[u64] = &[2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -41,8 +40,8 @@ pub struct MasterKey {
     chain_code: [u8; CHAIN_CODE_LEN],
 }
 
-/// A derived HD key: public (`is_private` absent) or private (`0x00`-prefixed
-/// key data), with optional derivation metadata.
+/// A derived HD key: public (33-byte compressed key data) or private
+/// (`0x00`-prefixed key data), with optional derivation metadata.
 #[derive(Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct DerivedKey {
     #[zeroize(skip)]
@@ -56,11 +55,11 @@ pub struct DerivedKey {
     #[zeroize(skip)]
     children: Option<Keypath>,
     #[zeroize(skip)]
-    parent_fingerprint: Option<NonZeroU32>,
+    parent_fingerprint: Option<Fingerprint>,
     #[zeroize(skip)]
-    name: String,
+    name: Option<String>,
     #[zeroize(skip)]
-    note: String,
+    note: Option<String>,
 }
 
 impl fmt::Debug for MasterKey {
@@ -108,18 +107,18 @@ impl fmt::Debug for HdKey {
 }
 
 impl MasterKey {
-    /// Creates a master key; `key_data` is the 33-byte `0x00`-prefixed secret.
+    /// Creates a master key; `key_data` is the 33-byte `0x00`-prefixed secret
+    /// (BCR-2020-007: a master key is always private).
     ///
     /// # Errors
     ///
-    /// [`ErrorKind::OutOfRange`] when `key_data` does not carry the `0x00`
-    /// private prefix.
+    /// [`Error::OutOfRange`] when `key_data` does not carry the `0x00` prefix.
     pub const fn new(
         key_data: [u8; KEY_DATA_LEN],
         chain_code: [u8; CHAIN_CODE_LEN],
     ) -> Result<Self> {
         if key_data[0] != 0 {
-            return Err(Error::new(ErrorKind::OutOfRange, "key_data"));
+            return Err(Error::OutOfRange { field: "key_data" });
         }
         Ok(Self {
             key_data,
@@ -143,7 +142,7 @@ impl MasterKey {
 impl DerivedKey {
     /// Creates a public derived key (33-byte compressed key data).
     #[must_use]
-    pub const fn new_public(key_data: [u8; KEY_DATA_LEN]) -> Self {
+    pub const fn public(key_data: [u8; KEY_DATA_LEN]) -> Self {
         Self {
             is_private: false,
             key_data,
@@ -152,8 +151,8 @@ impl DerivedKey {
             origin: None,
             children: None,
             parent_fingerprint: None,
-            name: String::new(),
-            note: String::new(),
+            name: None,
+            note: None,
         }
     }
 
@@ -161,10 +160,10 @@ impl DerivedKey {
     ///
     /// # Errors
     ///
-    /// [`ErrorKind::OutOfRange`] when `key_data[0]` is not `0x00`.
-    pub fn new_private(key_data: [u8; KEY_DATA_LEN]) -> Result<Self> {
-        if key_data.first() != Some(&0) {
-            return Err(Error::new(ErrorKind::OutOfRange, "key_data"));
+    /// [`Error::OutOfRange`] when `key_data[0]` is not `0x00`.
+    pub const fn private(key_data: [u8; KEY_DATA_LEN]) -> Result<Self> {
+        if key_data[0] != 0 {
+            return Err(Error::OutOfRange { field: "key_data" });
         }
         Ok(Self {
             is_private: true,
@@ -174,8 +173,8 @@ impl DerivedKey {
             origin: None,
             children: None,
             parent_fingerprint: None,
-            name: String::new(),
-            note: String::new(),
+            name: None,
+            note: None,
         })
     }
 
@@ -207,24 +206,32 @@ impl DerivedKey {
         self
     }
 
-    /// Sets the parent fingerprint (`uint32`, nonzero).
-    #[must_use]
-    pub const fn with_parent_fingerprint(mut self, parent_fingerprint: NonZeroU32) -> Self {
-        self.parent_fingerprint = Some(parent_fingerprint);
-        self
+    /// Sets the parent fingerprint (`uint32`, nonzero per BCR-2020-007).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::OutOfRange`] when `fingerprint` is zero.
+    pub fn with_parent_fingerprint(mut self, fingerprint: Fingerprint) -> Result<Self> {
+        if fingerprint.to_bytes() == [0; 4] {
+            return Err(Error::OutOfRange {
+                field: "parent_fingerprint",
+            });
+        }
+        self.parent_fingerprint = Some(fingerprint);
+        Ok(self)
     }
 
-    /// Sets the display name (empty names are omitted on write).
+    /// Sets the display name; `""` clears it.
     #[must_use]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = name.into();
+        self.name = nonempty(name.into());
         self
     }
 
-    /// Sets the note (empty notes are omitted on write).
+    /// Sets the note; `""` clears it.
     #[must_use]
     pub fn with_note(mut self, note: impl Into<String>) -> Self {
-        self.note = note.into();
+        self.note = nonempty(note.into());
         self
     }
 
@@ -248,8 +255,8 @@ impl DerivedKey {
 
     /// The coin/network use info, when present.
     #[must_use]
-    pub const fn use_info(&self) -> Option<&CoinInfo> {
-        self.use_info.as_ref()
+    pub const fn use_info(&self) -> Option<CoinInfo> {
+        self.use_info
     }
 
     /// The origin keypath, when present.
@@ -266,20 +273,20 @@ impl DerivedKey {
 
     /// The parent fingerprint, when present.
     #[must_use]
-    pub const fn parent_fingerprint(&self) -> Option<NonZeroU32> {
+    pub const fn parent_fingerprint(&self) -> Option<Fingerprint> {
         self.parent_fingerprint
     }
 
-    /// The display name.
+    /// The display name, when present.
     #[must_use]
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
     }
 
-    /// The note.
+    /// The note, when present.
     #[must_use]
-    pub fn note(&self) -> &str {
-        &self.note
+    pub fn note(&self) -> Option<&str> {
+        self.note.as_deref()
     }
 }
 
@@ -319,7 +326,7 @@ impl HdKey {
 
     /// The coin/network use info (derived keys only).
     #[must_use]
-    pub const fn use_info(&self) -> Option<&CoinInfo> {
+    pub const fn use_info(&self) -> Option<CoinInfo> {
         match self {
             Self::Master(_) => None,
             Self::Derived(key) => key.use_info(),
@@ -346,27 +353,27 @@ impl HdKey {
 
     /// The parent fingerprint (derived keys only).
     #[must_use]
-    pub const fn parent_fingerprint(&self) -> Option<NonZeroU32> {
+    pub const fn parent_fingerprint(&self) -> Option<Fingerprint> {
         match self {
             Self::Master(_) => None,
             Self::Derived(key) => key.parent_fingerprint(),
         }
     }
 
-    /// The display name.
+    /// The display name, when present (derived keys only).
     #[must_use]
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> Option<&str> {
         match self {
-            Self::Master(_) => "",
+            Self::Master(_) => None,
             Self::Derived(key) => key.name(),
         }
     }
 
-    /// The note.
+    /// The note, when present (derived keys only).
     #[must_use]
-    pub fn note(&self) -> &str {
+    pub fn note(&self) -> Option<&str> {
         match self {
-            Self::Master(_) => "",
+            Self::Master(_) => None,
             Self::Derived(key) => key.note(),
         }
     }
@@ -385,8 +392,8 @@ impl HdKey {
             Self::Derived(key) => (
                 key.key_data().as_slice(),
                 key.chain_code().map(<[u8; CHAIN_CODE_LEN]>::as_slice),
-                key.use_info().copied().map_or(0, CoinInfo::coin_type),
-                key.use_info().copied().map_or(0, CoinInfo::network),
+                key.use_info().map_or(0, |i| i.coin_type().get()),
+                key.use_info().map_or(0, |i| i.network().get()),
             ),
         };
         let chain_item =
@@ -426,15 +433,75 @@ fn encode_derived(key: &DerivedKey) -> CBOR {
         map.insert(7, children.tagged_cbor());
     }
     if let Some(fingerprint) = key.parent_fingerprint {
-        map.insert(8, fingerprint.get());
+        map.insert(8, u32::from_be_bytes(fingerprint.to_bytes()));
     }
-    if !key.name.is_empty() {
-        map.insert(9, key.name.clone());
+    if let Some(name) = &key.name {
+        map.insert(9, name.clone());
     }
-    if !key.note.is_empty() {
-        map.insert(10, key.note.clone());
+    if let Some(note) = &key.note {
+        map.insert(10, note.clone());
     }
     map.into()
+}
+
+impl HdKey {
+    fn from_body(cbor: &CBOR) -> Result<Self> {
+        let peek = cbor.clone().try_into_map()?;
+        if let Some(flag) = peek.get::<i32, CBOR>(1) {
+            // CDDL allows `is-master` only as true; a false flag is not a
+            // derived encoding.
+            if !boolean(&flag)? {
+                return Err(Error::Cbor(dcbor::Error::WrongType));
+            }
+            let map = MapReader::closed(cbor, MASTER_KEYS)?;
+            let key_data = bytes_fixed::<KEY_DATA_LEN>(&map.required(3)?, "key_data")?;
+            let chain_code = bytes_fixed::<CHAIN_CODE_LEN>(&map.required(4)?, "chain_code")?;
+            return Ok(Self::Master(MasterKey::new(key_data, chain_code)?));
+        }
+        let map = MapReader::closed(cbor, DERIVED_KEYS)?;
+        let is_private = match map.optional(2) {
+            Some(value) => boolean(&value)?,
+            None => false,
+        };
+        let key_data = bytes_fixed::<KEY_DATA_LEN>(&map.required(3)?, "key_data")?;
+        if is_private && key_data[0] != 0 {
+            return Err(Error::OutOfRange { field: "key_data" });
+        }
+        let chain_code = map
+            .optional(4)
+            .map(|value| bytes_fixed::<CHAIN_CODE_LEN>(&value, "chain_code"))
+            .transpose()?;
+        let use_info = map.optional(5).map(CoinInfo::try_from).transpose()?;
+        let origin = map.optional(6).map(Keypath::try_from).transpose()?;
+        let children = map.optional(7).map(Keypath::try_from).transpose()?;
+        let parent_fingerprint = map
+            .optional(8)
+            .map(|value| uint32_ne0(&value, "parent_fingerprint"))
+            .transpose()?
+            .map(|v| Fingerprint::from(v.to_be_bytes()));
+        // An empty name/note on the wire means absent.
+        let name = map
+            .optional(9)
+            .map(|v| text(&v))
+            .transpose()?
+            .and_then(nonempty);
+        let note = map
+            .optional(10)
+            .map(|v| text(&v))
+            .transpose()?
+            .and_then(nonempty);
+        Ok(Self::Derived(DerivedKey {
+            is_private,
+            key_data,
+            chain_code,
+            use_info,
+            origin,
+            children,
+            parent_fingerprint,
+            name,
+            note,
+        }))
+    }
 }
 
 impl CBORTagged for HdKey {
@@ -460,56 +527,7 @@ impl CBORTaggedEncodable for HdKey {
 
 impl CBORTaggedDecodable for HdKey {
     fn from_untagged_cbor(cbor: CBOR) -> dcbor::Result<Self> {
-        let peek = cbor.clone().try_into_map()?;
-        if let Some(master_flag) = get(&peek, 1) {
-            // CDDL allows is-master only as true; false is not a derived encoding.
-            if !expect_bool(&master_flag)? {
-                return Err(dcbor::Error::WrongType);
-            }
-            let map = closed_int_map(&cbor, MASTER_KEYS)?;
-            let key_data = expect_bytes_len::<KEY_DATA_LEN>(&extract(&map, 3)?, "key_data")?;
-            let chain_code = expect_bytes_len::<CHAIN_CODE_LEN>(&extract(&map, 4)?, "chain_code")?;
-            return Ok(Self::Master(
-                MasterKey::new(key_data, chain_code).map_err(dcbor::Error::from)?,
-            ));
-        }
-        let map = closed_int_map(&cbor, DERIVED_KEYS)?;
-        let is_private = match get(&map, 2) {
-            Some(value) => expect_bool(&value)?,
-            None => false,
-        };
-        let key_data = expect_bytes_len::<KEY_DATA_LEN>(&extract(&map, 3)?, "key_data")?;
-        if is_private && key_data.first() != Some(&0) {
-            return Err(Error::new(ErrorKind::OutOfRange, "key_data").into());
-        }
-        let chain_code = get(&map, 4)
-            .map(|value| expect_bytes_len::<CHAIN_CODE_LEN>(&value, "chain_code"))
-            .transpose()?;
-        let use_info = get(&map, 5).map(CoinInfo::try_from).transpose()?;
-        let origin = get(&map, 6).map(Keypath::try_from).transpose()?;
-        let children = get(&map, 7).map(Keypath::try_from).transpose()?;
-        let parent_fingerprint = get(&map, 8)
-            .map(|value| expect_uint32_ne0(&value))
-            .transpose()?;
-        let name = get(&map, 9)
-            .map(|value| expect_text(&value))
-            .transpose()?
-            .unwrap_or_default();
-        let note = get(&map, 10)
-            .map(|value| expect_text(&value))
-            .transpose()?
-            .unwrap_or_default();
-        Ok(Self::Derived(DerivedKey {
-            is_private,
-            key_data,
-            chain_code,
-            use_info,
-            origin,
-            children,
-            parent_fingerprint,
-            name,
-            note,
-        }))
+        Self::from_body(&cbor).map_err(dcbor::Error::from)
     }
 }
 
@@ -532,9 +550,9 @@ impl From<DerivedKey> for HdKey {
 }
 
 impl TryFrom<CBOR> for HdKey {
-    type Error = dcbor::Error;
+    type Error = Error;
 
-    fn try_from(cbor: CBOR) -> dcbor::Result<Self> {
-        Self::from_tagged_cbor(cbor)
+    fn try_from(cbor: CBOR) -> Result<Self> {
+        Self::from_body(&untag(cbor, &Self::cbor_tags())?)
     }
 }
