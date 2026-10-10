@@ -388,15 +388,16 @@
     },
     {
       "id": "registry.envelope",
-      "tier": "A",
-      "status": "ts-only",
-      "milestone": "R4",
+      "tier": "C",
+      "status": "n/a",
+      "milestone": "UR3",
       "ts": {
         "module": "packages/ur/src/registry/envelope.ts",
         "tests": ["packages/ur/tests/registry/envelope.test.ts"]
       },
       "rust": null,
-      "vectors": []
+      "vectors": [],
+      "note": "Structural validation only; Rust users use Blockchain Commons bc-envelope, so there is no Rust counterpart by design."
     },
     {
       "id": "typed.codec-map",
