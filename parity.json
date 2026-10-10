@@ -439,7 +439,7 @@
     {
       "id": "registry.eckey",
       "tier": "A",
-      "status": "ts-only",
+      "status": "stable",
       "milestone": "R4",
       "ts": {
         "module": "packages/ur/src/registry/eckey.ts",
@@ -448,13 +448,16 @@
           "packages/ur/tests/vectors/registry.test.ts"
         ]
       },
-      "rust": null,
+      "rust": {
+        "module": "crates/bcur-registry/src/eckey.rs",
+        "tests": ["crates/bcur-registry/tests/registry.rs", "crates/bcur-registry/tests/unit.rs"]
+      },
       "vectors": ["vectors/official/registry/eckey.json", "vectors/registry/invalid.json"]
     },
     {
       "id": "registry.address",
       "tier": "A",
-      "status": "ts-only",
+      "status": "stable",
       "milestone": "R4",
       "ts": {
         "module": "packages/ur/src/registry/address.ts",
@@ -463,13 +466,16 @@
           "packages/ur/tests/vectors/registry.test.ts"
         ]
       },
-      "rust": null,
+      "rust": {
+        "module": "crates/bcur-registry/src/address.rs",
+        "tests": ["crates/bcur-registry/tests/registry.rs", "crates/bcur-registry/tests/unit.rs"]
+      },
       "vectors": ["vectors/official/registry/address.json", "vectors/registry/invalid.json"]
     },
     {
       "id": "registry.output-descriptor",
       "tier": "A",
-      "status": "ts-only",
+      "status": "stable",
       "milestone": "R4",
       "ts": {
         "module": "packages/ur/src/registry/output-descriptor.ts",
@@ -478,7 +484,10 @@
           "packages/ur/tests/vectors/registry.test.ts"
         ]
       },
-      "rust": null,
+      "rust": {
+        "module": "crates/bcur-registry/src/output_descriptor.rs",
+        "tests": ["crates/bcur-registry/tests/registry.rs", "crates/bcur-registry/tests/unit.rs"]
+      },
       "vectors": [
         "vectors/official/registry/output-descriptor.json",
         "vectors/official/registry/crypto-output.json",
@@ -490,7 +499,7 @@
     {
       "id": "registry.account-descriptor",
       "tier": "A",
-      "status": "ts-only",
+      "status": "stable",
       "milestone": "R4",
       "ts": {
         "module": "packages/ur/src/registry/account-descriptor.ts",
@@ -499,7 +508,10 @@
           "packages/ur/tests/vectors/registry.test.ts"
         ]
       },
-      "rust": null,
+      "rust": {
+        "module": "crates/bcur-registry/src/account_descriptor.rs",
+        "tests": ["crates/bcur-registry/tests/registry.rs", "crates/bcur-registry/tests/unit.rs"]
+      },
       "vectors": [
         "vectors/official/registry/account-descriptor.json",
         "vectors/official/registry/crypto-account.json",

@@ -23,12 +23,12 @@ all-features = true
 # otherwise bcur's `UrEncodable`/`UrDecodable` blanket impls do not apply to
 # these `CBORTagged*` impls.
 dcbor   = { version = "0.25", default-features = false, features = ["std", "multithreaded"] }
+hex     = { workspace = true }
 sha2    = { version = "0.10", default-features = false }
 zeroize = { version = "1.8", features = ["derive"] }
 
 [dev-dependencies]
 bcur       = { workspace = true, features = ["dcbor"] }
-hex        = { workspace = true }
 serde_json = "1"
 
 [lints]
