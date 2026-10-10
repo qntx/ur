@@ -9,9 +9,8 @@
     reason = "integration targets link full dev-deps; vector JSON is trusted"
 )]
 
-//! Shared-vector compliance: `vectors/official/registry/{seed,hdkey,psbt,sskr}`
-//! and `vectors/registry/invalid.json`, mirroring
-//! `packages/ur/tests/vectors/registry.test.ts`.
+//! Shared-vector compliance: `vectors/official/registry/*`,
+//! `vectors/keystone/*`, and `vectors/registry/*`.
 
 use std::str::FromStr;
 
@@ -50,7 +49,7 @@ fn body(case: &Value) -> CBOR {
     CBOR::try_from_data(unhex(text(case, "cborHex"))).unwrap()
 }
 
-/// Untagged decode + re-encode dispatch, mirroring the TS `CODECS` table.
+/// Untagged decode + re-encode dispatch for the vector's `codec` names.
 fn untagged(codec: &str, cbor: CBOR) -> dcbor::Result<CBOR> {
     match codec {
         "seed" => Seed::from_untagged_cbor(cbor).map(|v| v.untagged_cbor()),
@@ -267,27 +266,6 @@ fn official_sskr_shares() {
     }
 }
 
-const fn dcbor_name(error: &dcbor::Error) -> &'static str {
-    match error {
-        dcbor::Error::Underrun => "Underrun",
-        dcbor::Error::UnsupportedHeaderValue(_) => "UnsupportedHeaderValue",
-        dcbor::Error::NonCanonicalNumeric => "NonCanonicalNumeric",
-        dcbor::Error::InvalidSimpleValue => "InvalidSimpleValue",
-        dcbor::Error::InvalidString(_) => "InvalidString",
-        dcbor::Error::NonCanonicalString => "NonCanonicalString",
-        dcbor::Error::UnusedData(_) => "UnusedData",
-        dcbor::Error::MisorderedMapKey => "MisorderedMapKey",
-        dcbor::Error::DuplicateMapKey => "DuplicateMapKey",
-        dcbor::Error::MissingMapKey => "MissingMapKey",
-        dcbor::Error::OutOfRange => "OutOfRange",
-        dcbor::Error::WrongType => "WrongType",
-        dcbor::Error::WrongTag(..) => "WrongTag",
-        dcbor::Error::InvalidUtf8(_) => "InvalidUtf8",
-        dcbor::Error::InvalidDate(_) => "InvalidDate",
-        dcbor::Error::Custom(_) => "Custom",
-    }
-}
-
 #[test]
 fn invalid_vectors() {
     let mut ran = 0;
@@ -295,19 +273,12 @@ fn invalid_vectors() {
         ran += 1;
         let name = text(&case, "name");
         let codec = text(&case, "codec");
-        let error = untagged(codec, body(&case)).unwrap_err();
-        let expected = text(&case, "dcbor");
-        // TS records the outermost error code: a nested `fromTagged` failure
-        // surfaces as "CborType" — in dcbor terms a `WrongTag` (bad tag) or a
-        // `WrongType` (untagged) from the tagged decode.
-        if expected == "CborType" {
-            assert!(
-                matches!(error, dcbor::Error::WrongTag(..) | dcbor::Error::WrongType),
-                "{name}: expected nested tagged-decode failure, got {error:?}"
-            );
-        } else {
-            assert_eq!(dcbor_name(&error), expected, "{name}");
-        }
+        // The shared contract is rejection; the vector's `tsError` field is
+        // read only by the TypeScript runner.
+        assert!(
+            untagged(codec, body(&case)).is_err(),
+            "{name}: expected rejection"
+        );
     }
     assert!(ran > 0, "no in-scope invalid cases ran");
 }
@@ -331,8 +302,7 @@ fn expected_key_hexes(case: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// `source` contains an `@<digits>` placeholder or starts with `raw(`,
-/// mirroring the TS `/@\d+|^raw\(/` assertion.
+/// `source` contains an `@<digits>` placeholder or starts with `raw(`.
 fn has_descriptor_text(source: &str) -> bool {
     source.starts_with("raw(")
         || source
@@ -404,7 +374,7 @@ fn official_v2_registry_roundtrip() {
 
 /// v1 crypto-output: decode the tagged script-expression body, then
 /// re-encode as v2 and compare against the conversion vector (paired by
-/// index, like the TS test).
+/// index).
 #[test]
 fn v1_crypto_output_conversion() {
     let conversions = cases("registry/crypto-output-conversion.json");

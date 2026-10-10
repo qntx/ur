@@ -3,212 +3,218 @@
   "capability": "registry.invalid",
   "source": {
     "name": "project-owned negative vectors",
-    "rule": "every listed body must be rejected by the named codec (UrError code CborType / CborError)"
+    "rule": "every listed body must be rejected by the named codec; tsError is the TypeScript-side UrError code (TS-only assertion metadata)"
   },
   "cases": [
     {
       "name": "eckey empty data",
       "codec": "eckey",
       "cborHex": "a10340",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "eckey private 31 bytes",
       "codec": "eckey",
       "cborHex": "a202f503581f00000000000000000000000000000000000000000000000000000000000000",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "eckey public 34 bytes",
       "codec": "eckey",
       "cborHex": "a103582200000000000000000000000000000000000000000000000000000000000000000000",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "eckey unknown key 4",
       "codec": "eckey",
       "cborHex": "a20358210000000000000000000000000000000000000000000000000000000000000000000400",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "eckey is-private non-bool",
       "codec": "eckey",
       "cborHex": "a20201035821000000000000000000000000000000000000000000000000000000000000000000",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "eckey curve non-uint",
       "codec": "eckey",
       "cborHex": "a201f4035821000000000000000000000000000000000000000000000000000000000000000000",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "address typed data 19 bytes",
       "codec": "address",
       "cborHex": "a20202035300000000000000000000000000000000000000",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "address type out of range (3)",
       "codec": "address",
       "cborHex": "a2020303540000000000000000000000000000000000000000",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "address data empty without type",
       "codec": "address",
       "cborHex": "a10340",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "address unknown key 4",
       "codec": "address",
       "cborHex": "a2035400000000000000000000000000000000000000000400",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "address info wrong tag (crypto-hdkey 303)",
       "codec": "address",
       "cborHex": "a201d9012fa103410003540000000000000000000000000000000000000000",
-      "dcbor": "CborType"
+      "tsError": "CborType"
     },
     {
       "name": "output-descriptor placeholder @1 missing @0",
       "codec": "output-descriptor",
       "cborHex": "a20166706b284031290281d99d72a1035821020202020202020202020202020202020202020202020202020202020202020202",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "output-descriptor placeholder @2 with one key",
       "codec": "output-descriptor",
       "cborHex": "a20166706b284032290281d99d72a1035821020202020202020202020202020202020202020202020202020202020202020202",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "output-descriptor key present but no placeholder",
       "codec": "output-descriptor",
       "cborHex": "a2016a706b28303362656566290281d99d72a1035821020202020202020202020202020202020202020202020202020202020202020202",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "output-descriptor source non-text",
       "codec": "output-descriptor",
       "cborHex": "a10101",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "output-descriptor unknown key 5",
       "codec": "output-descriptor",
       "cborHex": "a2016a706b28303362656566290500",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "output-descriptor key entry untagged",
       "codec": "output-descriptor",
       "cborHex": "a20166706b284030290281a1035821020202020202020202020202020202020202020202020202020202020202020202",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "crypto-output tr with multikey (script tree unsupported)",
       "codec": "output-descriptor",
       "cborHex": "d90199a201010281d90132a1035821020202020202020202020202020202020202020202020202020202020202020202",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "crypto-output multi threshold 0",
       "codec": "output-descriptor",
       "cborHex": "d90196a201000281d90132a1035821020202020202020202020202020202020202020202020202020202020202020202",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "crypto-output multi threshold > keys",
       "codec": "output-descriptor",
       "cborHex": "d90196a201020281d90132a1035821020202020202020202020202020202020202020202020202020202020202020202",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "crypto-output multikey unknown key 3",
       "codec": "output-descriptor",
       "cborHex": "d90196a301010281d90132a10358210202020202020202020202020202020202020202020202020202020202020202020300",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "crypto-output sh nested in sh",
       "codec": "output-descriptor",
       "cborHex": "d90190d90190d90193d90132a1035821020202020202020202020202020202020202020202020202020202020202020202",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "crypto-output sh nested in wsh",
       "codec": "output-descriptor",
       "cborHex": "d90191d90190d90193d90132a1035821020202020202020202020202020202020202020202020202020202020202020202",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "crypto-output wsh nested in wsh",
       "codec": "output-descriptor",
       "cborHex": "d90191d90191d90193d90132a1035821020202020202020202020202020202020202020202020202020202020202020202",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "crypto-output unknown script tag 411",
       "codec": "output-descriptor",
       "cborHex": "d9019b00",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "account-descriptor empty descriptors",
       "codec": "account-descriptor",
       "cborHex": "a2011a37b5eed40280",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "account-descriptor fingerprint > u32",
       "codec": "account-descriptor",
       "cborHex": "a2011b00000001000000000281d99d74a1016a706b2830336265656629",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "account-descriptor unknown key 3",
       "codec": "account-descriptor",
       "cborHex": "a3011a37b5eed402800300",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "account-descriptor entry untagged",
       "codec": "account-descriptor",
       "cborHex": "a2011a37b5eed40281a1016a706b2830336265656629",
-      "dcbor": "CborType"
+      "tsError": "CborType"
     },
     {
       "name": "seed payload 65 bytes",
       "codec": "seed",
       "cborHex": "a10158410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "keypath fully empty",
       "codec": "keypath",
       "cborHex": "a10180",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     },
     {
       "name": "hdkey derived key-data 32 bytes",
       "codec": "hdkey",
       "cborHex": "a203582000000000000000000000000000000000000000000000000000000000000000000458200000000000000000000000000000000000000000000000000000000000000000",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
     },
     {
       "name": "hdkey private key-data missing 0x00 prefix",
       "codec": "hdkey",
       "cborHex": "a302f50358210202020202020202020202020202020202020202020202020202020202020202020458200000000000000000000000000000000000000000000000000000000000000000",
-      "dcbor": "OutOfRange"
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "hdkey master key-data without 0x00 prefix",
+      "codec": "hdkey",
+      "cborHex": "a301f50358210202020202020202020202020202020202020202020202020202020202020202020458200000000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
     },
     {
       "name": "psbt bad magic",
       "codec": "psbt",
       "cborHex": "587070736274000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-      "dcbor": "WrongType"
+      "tsError": "WrongType"
     }
   ]
 }

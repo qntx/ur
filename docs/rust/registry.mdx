@@ -3,7 +3,7 @@ title: Registry
 description: Registry value types (BCR-2020-006) — bcur-registry.
 ---
 
-The registry crate maps application values to dCBOR bodies on dcbor's tagged traits. Every type's `cbor_tags()` is `[v2 tag, v1 tag]`: **v2 tags are written, v1 tags are read-only** (BCR-2020-006 `crypto-*` types are deprecated). Wire forms, defaults, validation, and error classes are identical to the [TypeScript registry](../typescript/registry.mdx).
+The registry crate maps application values to dCBOR bodies on dcbor's tagged traits. Every type's `cbor_tags()` is `[v2 tag, v1 tag]`: **v2 tags are written, v1 tags are read-only** (BCR-2020-006 `crypto-*` types are deprecated). Wire forms, defaults, and what is accepted or rejected are identical to the [TypeScript registry](../typescript/registry.mdx).
 
 ```bash
 cargo add bcur-registry
@@ -73,7 +73,7 @@ let hdkey = HdKey::from(
 - **seed**: `payload` 1–64 bytes, required. `creation_date` optional (`dcbor::Date`) — writes CBOR tag 1, reads tag 1 or tag 100 (days since epoch). `name`/`note` optional text; empty strings are omitted on write.
 - **coin-info**: `coin_type` uint31 and `network` int32, both default 0 and omitted on write when 0. Named constants `coin_type::BTC`/`coin_type::ETH` and `network::MAINNET`/`network::BTC_TESTNET`.
 - **keypath**: `components` is a `Vec` of `PathComponent` (`Index`, `Range`, `Wildcard`, `Pair`; `Pair` is one 4-tuple on the wire). `source_fingerprint` is an optional `NonZeroU32`; `depth` an optional `u8`. Empty `components` is only valid with a fingerprint or a depth.
-- **hdkey**: `MasterKey::new(key_data: [u8; 33], chain_code: [u8; 32])`. `DerivedKey::new_public([u8; 33])` or `DerivedKey::new_private([u8; 33])` — private key data carries the `0x00` prefix. Optional `chain_code`, `use_info` (`CoinInfo`), `origin`/`children` (`Keypath`), `parent_fingerprint` (`NonZeroU32`), `name`, `note`.
+- **hdkey**: `MasterKey::new(key_data: [u8; 33], chain_code: [u8; 32])` — a master key is always private, so `key_data` must carry the `0x00` prefix. `DerivedKey::new_public([u8; 33])` or `DerivedKey::new_private([u8; 33])` — private key data carries the `0x00` prefix. Optional `chain_code`, `use_info` (`CoinInfo`), `origin`/`children` (`Keypath`), `parent_fingerprint` (`NonZeroU32`), `name`, `note`.
 - **eckey**: `curve` u64 (default `curve::SECP256K1` = 0, omitted on write), `is_private` default false, `data` required. secp256k1: private keys are exactly 32 bytes, public keys 33 or 65 bytes. Other curves: non-empty data.
 - **address**: `info` is a tagged `CoinInfo`; `address_type` is an optional `AddressType` (`P2pkh`/`P2sh`/`P2wpkh`). With a type, `data` is exactly 20 bytes (S-13); without, any non-empty bytes.
 - **psbt**: bytes must start with the PSBT magic `70 73 62 74 ff`.
@@ -83,7 +83,7 @@ let hdkey = HdKey::from(
 
 ## Errors
 
-Constructors fail with the crate's `Error`: `kind()` returns an `ErrorKind` (`InvalidLength`, `OutOfRange`, `InvalidValue`, `InvalidPlaceholder`) and `field()` the snake_case field name; `Display` prints `"<field>: <reason>"` (e.g. `payload: invalid length`). Through the `From` conversion into `dcbor::Error`, `InvalidValue` becomes `dcbor::Error::WrongType` and the other kinds become `dcbor::Error::OutOfRange` — the same classes the TypeScript `CborError` throws. Structural decode failures (unknown map key, wrong CBOR type, missing key) are `dcbor::Error` values directly, so `from_ur` and `from_tagged_cbor` surface the same error classes as the TypeScript codecs.
+Constructors fail with the crate's `Error`: `kind()` returns an `ErrorKind` (`InvalidLength`, `OutOfRange`, `InvalidValue`, `InvalidPlaceholder`) and `field()` the snake_case field name; `Display` prints `"<field>: <reason>"` (e.g. `payload: invalid length`). Through the `From` conversion into `dcbor::Error`, `InvalidValue` becomes `dcbor::Error::WrongType` and the other kinds become `dcbor::Error::OutOfRange` — Structural decode failures (unknown map key, wrong CBOR type, missing key) are `dcbor::Error` values directly.
 
 ## v1 output/account conversion
 

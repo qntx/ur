@@ -39,6 +39,18 @@ fn json_usize(v: &Value, key: &str) -> usize {
     usize::try_from(v.get(key).and_then(Value::as_u64).unwrap()).unwrap()
 }
 
+/// Frame error categories recorded by the shared vectors (camelCase names
+/// are the vector format, not a library API).
+const fn limit_name(limit: Limit) -> &'static str {
+    match limit {
+        Limit::MessageLength => "messageLength",
+        Limit::FragmentCount => "fragmentCount",
+        Limit::FragmentLength => "fragmentLength",
+        Limit::UriLength => "uriLength",
+        _ => "unknown",
+    }
+}
+
 fn cases(file: &Value) -> &[Value] {
     file.get("cases").and_then(Value::as_array).unwrap()
 }
@@ -76,7 +88,7 @@ fn describe_got(got: &Result<Received, Error>) -> String {
             "{}({:?}, limit {:?})",
             if e.is_fatal() { "fatal" } else { "rejected" },
             e.kind(),
-            e.limit().map(Limit::as_str)
+            e.limit().map(limit_name)
         ),
     }
 }
@@ -95,7 +107,7 @@ fn check_outcome(seed: u64, ci: usize, fi: usize, expected: &Value, got: &Result
             format!("{:?}", e.kind()) == json_str(want, "code")
                 && want
                     .get("limit")
-                    .is_none_or(|l| e.limit().map(Limit::as_str) == l.as_str())
+                    .is_none_or(|l| e.limit().map(limit_name) == l.as_str())
         }
         (Some(_), Ok(_)) => false,
     };

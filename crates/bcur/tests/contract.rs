@@ -33,6 +33,18 @@ fn json(raw: &str) -> Value {
     serde_json::from_str(raw).unwrap()
 }
 
+/// Frame error categories recorded by the shared vectors (camelCase names
+/// are the vector format, not a library API).
+const fn limit_name(limit: Limit) -> &'static str {
+    match limit {
+        Limit::MessageLength => "messageLength",
+        Limit::FragmentCount => "fragmentCount",
+        Limit::FragmentLength => "fragmentLength",
+        Limit::UriLength => "uriLength",
+        _ => "unknown",
+    }
+}
+
 fn json_str<'a>(v: &'a Value, key: &str) -> &'a str {
     v.get(key).and_then(Value::as_str).unwrap()
 }
@@ -176,7 +188,7 @@ fn part_cbor_decode_contract() {
             let got = result.unwrap_err();
             assert_eq!(format!("{:?}", got.kind()), want_kind, "{name}");
             if let Some(limit) = err.get("limit") {
-                assert_eq!(got.limit().map(Limit::as_str), limit.as_str(), "{name}");
+                assert_eq!(got.limit().map(limit_name), limit.as_str(), "{name}");
             }
         } else {
             // Independent structural cross-check: minicbor parses every
