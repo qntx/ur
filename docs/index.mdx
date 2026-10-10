@@ -7,11 +7,12 @@ Uniform Resources (UR, [BCR-2020-005](https://github.com/BlockchainCommons/Resea
 
 ## Packages
 
-| Package    | Registry  | Language             |
-| ---------- | --------- | -------------------- |
-| `@qntx/ur` | npm       | TypeScript           |
-| `bcur`     | crates.io | Rust                 |
-| `bcur-cli` | crates.io | Rust (`bcur` binary) |
+| Package         | Registry  | Language             |
+| --------------- | --------- | -------------------- |
+| `@qntx/ur`      | npm       | TypeScript           |
+| `bcur`          | crates.io | Rust                 |
+| `bcur-registry` | crates.io | Rust                 |
+| `bcur-cli`      | crates.io | Rust (`bcur` binary) |
 
 ## Layers
 
@@ -21,9 +22,7 @@ Uniform Resources (UR, [BCR-2020-005](https://github.com/BlockchainCommons/Resea
 | L2    | GF(2) fountain over opaque bytes             | [BCR-2024-001](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2024-001-multipart-ur.md) | `FountainEncoder`/`FountainDecoder` | `bcur::fountain`                    |
 | L3    | `ur:` URIs, encoders, decoders               | [BCR-2020-005](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-005-ur.md)           | `UrEncoder`/`UrDecoder`             | `bcur::ur`                          |
 | L4    | dCBOR values, codecs                         | dCBOR ([I-D.dcbor](https://datatracker.ietf.org/doc/draft-mcnally-deterministic-cbor/))                       | `@qntx/ur/typed`                    | `bcur::typed` (`dcbor` feature)     |
-| L5    | Registry types (seed, hdkey, descriptors, …) | [BCR-2020-006](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-006-urtypes.md)      | `@qntx/ur/registry`                 | —                                   |
-
-The registry layer (L5) is TypeScript-only in this release.
+| L5    | Registry types (seed, hdkey, descriptors, …) | [BCR-2020-006](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-006-urtypes.md)      | `@qntx/ur/registry`                 | `bcur-registry`                     |
 
 The L1–L3 transport treats payloads as opaque bytes; the dCBOR requirement of BCR-2020-005 is enforced at L4, not on the wire transport.
 

@@ -1,4 +1,4 @@
 {
   "title": "Rust",
-  "pages": ["install", "transport", "typed", "cli"]
+  "pages": ["install", "transport", "typed", "registry", "cli"]
 }
