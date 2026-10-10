@@ -1,5 +1,7 @@
 export { Ur } from "./ur.ts";
 export {
+  type CodecMap,
+  type CodecValue,
   type UrCodec,
   codecUrTypes,
   toUr,

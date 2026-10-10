@@ -9,7 +9,7 @@ function at(list: ReadonlyArray<number>, i: number): number {
   return v;
 }
 
-/** Walker's alias method with reverse-index ordered partition (ur-rs / bcur). */
+/** Walker's alias method with reverse-index ordered partition. */
 export class Sampler {
   readonly #aliases: number[];
   readonly #probs: number[];
@@ -52,7 +52,7 @@ export class Sampler {
       }
       probs[a] = at(weights, a);
       aliases[a] = g;
-      // Evaluation order matches ur-rs `weights[g] += weights[a] - 1.0`; floats are not associative.
+      // Evaluation order is wire-significant: floats are not associative.
       weights[g] = at(weights, g) + (at(weights, a) - 1);
       if (at(weights, g) < 1) {
         s.push(g);

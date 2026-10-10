@@ -1,4 +1,6 @@
 export {
+  type CodecMap,
+  type CodecValue,
   type UrCodec,
   codecUrTypes,
   toUr,

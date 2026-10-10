@@ -45,6 +45,8 @@ Every `tag.name` must be a valid UR type token (validated on use; `InvalidType` 
 | `codecMap(codecs)`        | `UrType → codec` map covering every tag name; a duplicate type is `InvalidType`                  |
 | `fromUrWith(ur, map)`     | Dispatch to the codec registered for `ur.type`; returns `{ type, value }`                        |
 
+`codecMap` is generic over the codec tuple, so `fromUrWith` infers `value` as the union of the codecs' value types — `codecMap([seedCodec, hdKeyCodec])` yields a `CodecMap` whose `value` is `Seed | HdKey`. The helper types are `CodecMap` and `CodecValue`.
+
 ## Multipart composition
 
 `Ur` composes with the transport: encode through `ur.encoder()`, receive through `UrDecoder`, and lift the result back:

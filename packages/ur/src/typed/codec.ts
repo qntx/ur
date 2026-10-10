@@ -67,7 +67,16 @@ export function fromTagged<T>(cbor: Cbor, codec: UrCodec<T>): T {
   });
 }
 
+/** Value type of a codec. */
+export type CodecValue<C> = C extends UrCodec<infer T> ? T : never;
+
+/** `UrType -> codec` map, typed by the union of the codecs' value types. */
+export type CodecMap<T> = ReadonlyMap<UrType, UrCodec<T>>;
+
 /** `UrType -> codec` map covering every tag name; a duplicate type is `InvalidType`. */
+export function codecMap<const C extends ReadonlyArray<UrCodec<unknown>>>(
+  codecs: C,
+): CodecMap<CodecValue<C[number]>>;
 export function codecMap(
   codecs: ReadonlyArray<UrCodec<unknown>>,
 ): ReadonlyMap<UrType, UrCodec<unknown>> {
@@ -84,10 +93,7 @@ export function codecMap(
 }
 
 /** Decodes `ur` through the codec registered for its type. */
-export function fromUrWith(
-  ur: Ur,
-  codecs: ReadonlyMap<UrType, UrCodec<unknown>>,
-): Readonly<{ type: UrType; value: unknown }> {
+export function fromUrWith<T>(ur: Ur, codecs: CodecMap<T>): Readonly<{ type: UrType; value: T }> {
   const codec = codecs.get(ur.type);
   if (codec === undefined) {
     fail({

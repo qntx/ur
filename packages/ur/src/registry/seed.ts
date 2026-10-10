@@ -21,7 +21,7 @@ const SECONDS_PER_DAY = 86_400;
 
 export type Seed = {
   readonly payload: Uint8Array; // 1..=64 bytes
-  readonly creationDate?: CborDate; // tag 1 on write; tag 1 or 100 on read
+  readonly creationDate?: Date; // tag 1 on write; tag 1 or 100 on read
   readonly name?: string; // omitted on write if empty
   readonly note?: string;
 };
@@ -48,7 +48,7 @@ export const seedCodec: UrCodec<Seed> = {
     const map = new CborMap();
     map.set(1, cbor(copyBuf(seed.payload)));
     if (seed.creationDate !== undefined) {
-      map.set(2, seed.creationDate);
+      map.set(2, CborDate.fromDate(seed.creationDate));
     }
     if (seed.name !== undefined && seed.name !== "") {
       map.set(3, assertText(seed.name));
@@ -67,7 +67,7 @@ export const seedCodec: UrCodec<Seed> = {
     const note = map.get(4);
     return Object.freeze({
       payload,
-      ...(date === undefined ? {} : { creationDate: expectSeedDate(date) }),
+      ...(date === undefined ? {} : { creationDate: expectSeedDate(date).toDate() }),
       ...(name === undefined ? {} : { name: expectText(name) }),
       ...(note === undefined ? {} : { note: expectText(note) }),
     });

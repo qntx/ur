@@ -35,11 +35,11 @@ export function fragmentLength(
 }
 
 /** Pad and split a message into `fragmentLength`-sized fragments. */
-export function partition(data: Uint8Array, fragLen: number): Uint8Array[] {
+export function partition(data: Uint8Array, fragLen: number): Array<Uint8Array<ArrayBuffer>> {
   const pad = (fragLen - (data.length % fragLen)) % fragLen;
   const padded = new Uint8Array(data.length + pad);
   padded.set(data);
-  const out: Uint8Array[] = [];
+  const out: Array<Uint8Array<ArrayBuffer>> = [];
   for (let i = 0; i < padded.length; i += fragLen) {
     out.push(padded.subarray(i, i + fragLen));
   }
@@ -58,7 +58,7 @@ export type FountainEncoderOptions = Readonly<{
 /**
  * Fountain encoder. An infinite iterator: produces parts with sequence `firstSequence + 1`, `+2`, …
  * and ends after `0xFFFFFFFF` (UR-ADR-028). For `K == 1` it keeps producing identical parts with
- * rising sequences.
+ * rising sequences. Message problems throw `UrError`; invalid options throw `RangeError`.
  */
 export class FountainEncoder implements IterableIterator<Part> {
   readonly #parts: Uint8Array[];
@@ -82,14 +82,17 @@ export class FountainEncoder implements IterableIterator<Part> {
     if (message.length > MAX_U32) {
       fail("MessageTooLong");
     }
+    if (!Number.isSafeInteger(maxFragmentLength) || maxFragmentLength < 1) {
+      throw new RangeError("maxFragmentLength must be a positive integer");
+    }
     if (
-      !Number.isSafeInteger(maxFragmentLength) ||
-      maxFragmentLength < 1 ||
       !Number.isSafeInteger(minFragmentLength) ||
       minFragmentLength < 1 ||
       minFragmentLength > maxFragmentLength
     ) {
-      fail("InvalidFragmentLength");
+      throw new RangeError(
+        "minFragmentLength must be a positive integer at most maxFragmentLength",
+      );
     }
     if (!Number.isSafeInteger(firstSequence) || firstSequence < 0 || firstSequence > MAX_U32) {
       throw new RangeError("firstSequence must be an integer in 0..=0xFFFFFFFF");
