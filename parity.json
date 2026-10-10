@@ -305,7 +305,7 @@
     {
       "id": "registry.seed",
       "tier": "A",
-      "status": "ts-only",
+      "status": "stable",
       "milestone": "R4",
       "ts": {
         "module": "packages/ur/src/registry/seed.ts",
@@ -314,13 +314,16 @@
           "packages/ur/tests/vectors/registry.test.ts"
         ]
       },
-      "rust": null,
+      "rust": {
+        "module": "crates/bcur-registry/src/seed.rs",
+        "tests": ["crates/bcur-registry/tests/registry.rs", "crates/bcur-registry/tests/unit.rs"]
+      },
       "vectors": ["vectors/official/registry/seed.json"]
     },
     {
       "id": "registry.hdkey",
       "tier": "A",
-      "status": "ts-only",
+      "status": "stable",
       "milestone": "R4",
       "ts": {
         "module": "packages/ur/src/registry/hdkey.ts",
@@ -329,37 +332,52 @@
           "packages/ur/tests/vectors/registry.test.ts"
         ]
       },
-      "rust": null,
+      "rust": {
+        "module": "crates/bcur-registry/src/hdkey.rs",
+        "tests": ["crates/bcur-registry/tests/registry.rs", "crates/bcur-registry/tests/unit.rs"]
+      },
       "vectors": ["vectors/official/registry/hdkey.json"]
     },
     {
       "id": "registry.keypath",
       "tier": "A",
-      "status": "ts-only",
+      "status": "stable",
       "milestone": "R4",
       "ts": {
         "module": "packages/ur/src/registry/keypath.ts",
-        "tests": ["packages/ur/tests/registry/keypath.test.ts"]
+        "tests": [
+          "packages/ur/tests/registry/keypath.test.ts",
+          "packages/ur/tests/vectors/registry.test.ts"
+        ]
       },
-      "rust": null,
-      "vectors": []
+      "rust": {
+        "module": "crates/bcur-registry/src/keypath.rs",
+        "tests": ["crates/bcur-registry/tests/registry.rs", "crates/bcur-registry/tests/unit.rs"]
+      },
+      "vectors": ["vectors/official/registry/hdkey.json", "vectors/registry/invalid.json"]
     },
     {
       "id": "registry.coin-info",
       "tier": "A",
-      "status": "ts-only",
+      "status": "stable",
       "milestone": "R4",
       "ts": {
         "module": "packages/ur/src/registry/coin-info.ts",
-        "tests": ["packages/ur/tests/registry/coin-info.test.ts"]
+        "tests": [
+          "packages/ur/tests/registry/coin-info.test.ts",
+          "packages/ur/tests/vectors/registry.test.ts"
+        ]
       },
-      "rust": null,
-      "vectors": []
+      "rust": {
+        "module": "crates/bcur-registry/src/coin_info.rs",
+        "tests": ["crates/bcur-registry/tests/registry.rs", "crates/bcur-registry/tests/unit.rs"]
+      },
+      "vectors": ["vectors/official/registry/hdkey.json"]
     },
     {
       "id": "registry.sskr",
       "tier": "A",
-      "status": "ts-only",
+      "status": "stable",
       "milestone": "R4",
       "ts": {
         "module": "packages/ur/src/registry/sskr.ts",
@@ -368,13 +386,16 @@
           "packages/ur/tests/vectors/registry.test.ts"
         ]
       },
-      "rust": null,
+      "rust": {
+        "module": "crates/bcur-registry/src/sskr.rs",
+        "tests": ["crates/bcur-registry/tests/registry.rs", "crates/bcur-registry/tests/unit.rs"]
+      },
       "vectors": ["vectors/official/registry/sskr.json"]
     },
     {
       "id": "registry.psbt",
       "tier": "A",
-      "status": "ts-only",
+      "status": "stable",
       "milestone": "R4",
       "ts": {
         "module": "packages/ur/src/registry/psbt.ts",
@@ -383,7 +404,10 @@
           "packages/ur/tests/vectors/registry.test.ts"
         ]
       },
-      "rust": null,
+      "rust": {
+        "module": "crates/bcur-registry/src/psbt.rs",
+        "tests": ["crates/bcur-registry/tests/registry.rs", "crates/bcur-registry/tests/unit.rs"]
+      },
       "vectors": ["vectors/official/registry/psbt.json"]
     },
     {

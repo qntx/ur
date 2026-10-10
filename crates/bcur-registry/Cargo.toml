@@ -1,0 +1,35 @@
+[package]
+name                   = "bcur-registry"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+homepage.workspace     = true
+authors.workspace      = true
+description            = "BCR-2020-006 registry types on the bcur typed dCBOR layer"
+keywords               = ["ur", "cbor", "registry", "bitcoin"]
+categories             = ["encoding", "cryptography"]
+readme                 = "README.md"
+documentation          = "https://docs.rs/bcur-registry"
+# First publish is a later milestone; until then the crate builds in-workspace only.
+publish = false
+
+[package.metadata.docs.rs]
+all-features = true
+
+[dependencies]
+# Must stay on the same dcbor release line as bcur's `dcbor` dependency —
+# otherwise bcur's `UrEncodable`/`UrDecodable` blanket impls do not apply to
+# these `CBORTagged*` impls.
+dcbor   = { version = "0.25", default-features = false, features = ["std", "multithreaded"] }
+sha2    = { version = "0.10", default-features = false }
+zeroize = { version = "1.8", features = ["derive"] }
+
+[dev-dependencies]
+bcur       = { workspace = true, features = ["dcbor"] }
+hex        = { workspace = true }
+serde_json = "1"
+
+[lints]
+workspace = true
