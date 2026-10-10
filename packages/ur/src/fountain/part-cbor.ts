@@ -10,7 +10,7 @@ const MAX_U32 = 0xff_ff_ff_ff;
  * Encode a part as fixed-schema deterministic CBOR: `array(5) [sequence, sequenceCount,
  * messageLength, checksum, data]` with shortest-form integers.
  */
-export function encodePart(part: Part): Uint8Array {
+export function encodePart(part: Part): Uint8Array<ArrayBuffer> {
   validatePart(part);
   const out: number[] = [0x85];
   encodeU32(out, part.sequence);

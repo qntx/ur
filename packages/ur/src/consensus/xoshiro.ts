@@ -30,7 +30,7 @@ export function scaledInt(d: number, low: number, high: number): number {
   return Math.min(Math.floor(d * span), span - 1) + low;
 }
 
-/** Xoshiro256** with SHA-256 seeding matching URKit / ur-rs / bcur. */
+/** Xoshiro256** with SHA-256 seeding. */
 export class Xoshiro256 {
   private s0: bigint;
   private s1: bigint;
@@ -65,8 +65,7 @@ export class Xoshiro256 {
   }
 
   static fromDigest(seed32: Uint8Array): Xoshiro256 {
-    // ur-rs packs each 8-byte BE limb, stores LE, then from_seed LE-loads —
-    // net effect: each state word is the big-endian u64 of that hash limb.
+    // Seed packing: each state word is the big-endian u64 of the matching 8-byte hash limb.
     const view = new DataView(seed32.buffer, seed32.byteOffset, seed32.byteLength);
     return new Xoshiro256(
       view.getBigUint64(0),

@@ -6,18 +6,18 @@ import type { HdKey } from "./hdkey.ts";
 import type { Seed } from "./seed.ts";
 
 /** BCR-2021-002: SHA-256 of the raw seed payload, not the CBOR map. */
-export function seedDigest(seed: Seed): Uint8Array {
-  return sha256(seed.payload);
+export function seedDigest(seed: Seed): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(sha256(seed.payload));
 }
 
 /** BCR-2021-002: dCBOR of [keyData, chainCode | null, coinType, network]. */
-export function hdKeyDigestSource(key: HdKey): Uint8Array {
+export function hdKeyDigestSource(key: HdKey): Uint8Array<ArrayBuffer> {
   const chainCode = key.chainCode === undefined ? null : copyBuf(key.chainCode);
   const coinType = key.kind === "master" ? 0 : (key.useInfo?.type ?? 0);
   const network = key.kind === "master" ? 0 : (key.useInfo?.network ?? 0);
-  return encodeCbor(cbor([copyBuf(key.keyData), chainCode, coinType, network]));
+  return new Uint8Array(encodeCbor(cbor([copyBuf(key.keyData), chainCode, coinType, network])));
 }
 
-export function hdKeyDigest(key: HdKey): Uint8Array {
-  return sha256(hdKeyDigestSource(key));
+export function hdKeyDigest(key: HdKey): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(sha256(hdKeyDigestSource(key)));
 }

@@ -117,26 +117,22 @@ test("empty encoder", () => {
   expect(err.code).toBe("EmptyMessage");
 });
 
-test("invalid maxFragmentLength", () => {
+test("invalid maxFragmentLength is RangeError", () => {
   const message = makeMessage("Wolf", 100);
   const cases = [Number.NaN, -1, 0, 0.5, 1.5, Number.POSITIVE_INFINITY];
   for (const len of cases) {
-    expect(errorOf(() => new FountainEncoder(message, { maxFragmentLength: len })).code).toBe(
-      "InvalidFragmentLength",
-    );
+    expect(() => new FountainEncoder(message, { maxFragmentLength: len })).toThrow(RangeError);
   }
 });
 
-test("invalid minFragmentLength", () => {
+test("invalid minFragmentLength is RangeError", () => {
   const message = makeMessage("Wolf", 100);
   expect(
-    errorOf(() => new FountainEncoder(message, { maxFragmentLength: 10, minFragmentLength: 0 }))
-      .code,
-  ).toBe("InvalidFragmentLength");
+    () => new FountainEncoder(message, { maxFragmentLength: 10, minFragmentLength: 0 }),
+  ).toThrow(RangeError);
   expect(
-    errorOf(() => new FountainEncoder(message, { maxFragmentLength: 10, minFragmentLength: 11 }))
-      .code,
-  ).toBe("InvalidFragmentLength");
+    () => new FountainEncoder(message, { maxFragmentLength: 10, minFragmentLength: 11 }),
+  ).toThrow(RangeError);
 });
 
 test("invalid firstSequence is RangeError", () => {

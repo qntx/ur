@@ -1,7 +1,6 @@
 /**
  * ASCII-only character helpers. `String.prototype.toLowerCase`/`toUpperCase` are Unicode-aware
- * (e.g. `"\u212A"` folds to `"k"`); the UR wire format folds ASCII letters only, like Rust
- * `to_ascii_lowercase`/`to_ascii_uppercase`.
+ * (e.g. `"\u212A"` folds to `"k"`); the UR wire format folds ASCII letters only.
  */
 
 /** True iff every code point of `text` is `<= 0x7F`. */

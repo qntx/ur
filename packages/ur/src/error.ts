@@ -1,6 +1,6 @@
 import type { UrType } from "./ur/type.ts";
 
-/** Discriminated error codes for the UR transport stack. Mirrors `bcur::ErrorKind`. */
+/** Discriminated error codes for the UR transport stack. */
 export type UrErrorCode =
   | "NonAscii"
   | "InvalidWord"
@@ -18,14 +18,13 @@ export type UrErrorCode =
   | "InvalidPadding"
   | "InvalidMessageChecksum"
   | "EmptyMessage"
-  | "InvalidFragmentLength"
   | "MessageTooLong"
   | "NotSinglePart"
   | "CborDecode"
   | "CborType"
   | "Internal";
 
-/** Decoder budget names carried by `ResourceLimit` errors. Mirrors `bcur::Limit`. */
+/** Decoder budget names carried by `ResourceLimit` errors. */
 export type UrLimit = "messageLength" | "fragmentCount" | "fragmentLength" | "uriLength";
 
 /** Per-code error detail; `switch (info.code)` narrows the payload. */
@@ -51,7 +50,6 @@ const MESSAGES: Record<UrErrorCode, string> = {
   InvalidPadding: "invalid fountain part padding",
   InvalidMessageChecksum: "invalid fountain message checksum",
   EmptyMessage: "empty message",
-  InvalidFragmentLength: "invalid fragment length",
   MessageTooLong: "message too long",
   NotSinglePart: "expected single-part UR",
   CborDecode: "dCBOR decode failed",

@@ -1,7 +1,7 @@
 /**
  * Uniform Resources (UR) for TypeScript.
  *
- * Root barrel: the 2.0 transport surface (L1–L3) — Bytewords, fountain codes, and single- and
+ * Root barrel: the transport surface (L1–L3) — Bytewords, fountain codes, and single- and
  * multi-part UR encode/decode over opaque payload bytes plus a type token. This root does not
  * import dcbor: typed dCBOR (L4) lives on `@qntx/ur/typed` and the BCR-2020-006 registry (L5) on
  * `@qntx/ur/registry`.

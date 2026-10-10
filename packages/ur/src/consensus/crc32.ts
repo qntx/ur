@@ -1,6 +1,6 @@
 import { fail } from "../error.ts";
 
-/** CRC-32 ISO-HDLC (polynomial 0xedb88320), matching bcur / ur-rs. */
+/** CRC-32 ISO-HDLC (polynomial 0xedb88320). */
 
 const TABLE = (() => {
   const table = new Uint32Array(256);

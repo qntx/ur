@@ -82,7 +82,7 @@ export function bytemojiIdentifier(data: Uint8Array): string {
 }
 
 /** Decode bytewords and verify CRC-32. Case-insensitive. */
-export function decodeBytewords(text: string, style: BytewordsStyle): Uint8Array {
+export function decodeBytewords(text: string, style: BytewordsStyle): Uint8Array<ArrayBuffer> {
   for (const ch of text) {
     if ((ch.codePointAt(0) ?? 0) > 0x7f) {
       fail("NonAscii");
@@ -97,7 +97,7 @@ export function decodeBytewords(text: string, style: BytewordsStyle): Uint8Array
   return decodeParts(parts, false);
 }
 
-function decodeMinimal(encoded: string): Uint8Array {
+function decodeMinimal(encoded: string): Uint8Array<ArrayBuffer> {
   if (encoded.length % 2 !== 0) {
     fail("InvalidBytewordsLength");
   }
@@ -108,7 +108,7 @@ function decodeMinimal(encoded: string): Uint8Array {
   return decodeParts(parts, true);
 }
 
-function decodeParts(parts: string[], minimal: boolean): Uint8Array {
+function decodeParts(parts: string[], minimal: boolean): Uint8Array<ArrayBuffer> {
   const data = new Uint8Array(parts.length);
   for (const [i, part] of parts.entries()) {
     const expectedLen = minimal ? 2 : 4;
@@ -129,7 +129,7 @@ function decodeParts(parts: string[], minimal: boolean): Uint8Array {
   return stripChecksum(data);
 }
 
-function stripChecksum(data: Uint8Array): Uint8Array {
+function stripChecksum(data: Uint8Array): Uint8Array<ArrayBuffer> {
   if (data.length < 4) {
     fail("InvalidBytewordsChecksum");
   }

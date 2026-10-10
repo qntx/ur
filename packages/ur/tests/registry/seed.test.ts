@@ -1,5 +1,4 @@
 import {
-  CborDate,
   CborError,
   CborMap,
   bytesToHex,
@@ -100,7 +99,7 @@ test("Yinmn payload-only write golden", () => {
 test("Yinmn tag-1 date name note write golden", () => {
   const seed: Seed = {
     payload: payload(seedYinmnFull.payloadHex),
-    creationDate: CborDate.fromEpochSeconds(seedYinmnFull.epochSeconds),
+    creationDate: new Date(seedYinmnFull.epochSeconds * 1000),
     name: seedYinmnFull.name,
     note: seedYinmnFull.note,
   };
@@ -108,7 +107,7 @@ test("Yinmn tag-1 date name note write golden", () => {
   expect(toUr(seed, seedCodec).toString()).toBe(seedYinmnFull.ur);
   const decoded = fromUr(Ur.parse(seedYinmnFull.ur), seedCodec);
   expect(bytesToHex(decoded.payload)).toBe(seedYinmnFull.payloadHex);
-  expect(decoded.creationDate?.epochSeconds).toBe(seedYinmnFull.epochSeconds);
+  expect(decoded.creationDate?.getTime()).toBe(seedYinmnFull.epochSeconds * 1000);
   expect(decoded.name).toBe(seedYinmnFull.name);
   expect(decoded.note).toBe(seedYinmnFull.note);
 });
@@ -122,7 +121,7 @@ test("empty name and note are omitted on write", () => {
 test("round-trip preserves cborEquals", () => {
   const seed: Seed = {
     payload: payload(seedYinmnFull.payloadHex),
-    creationDate: CborDate.fromEpochSeconds(seedYinmnFull.epochSeconds),
+    creationDate: new Date(seedYinmnFull.epochSeconds * 1000),
     name: seedYinmnFull.name,
     note: seedYinmnFull.note,
   };
@@ -152,14 +151,23 @@ test("fromUr copies decoded payload", () => {
 
 test("historical tag 100 date decodes and re-encodes as tag 1 (F-01)", () => {
   const decoded = fromUr(Ur.parse(seedHistoricalTag100Ur), seedCodec);
-  expect(decoded.creationDate?.epochSeconds).toBe(1_589_241_600);
+  expect(decoded.creationDate?.getTime()).toBe(1_589_241_600_000);
   expect(toUr(decoded, seedCodec).toString()).toBe(seedTag1RoundTripUr);
 });
 
 test("official crypto-seed vector with tag 100 decodes and re-encodes as tag 1", () => {
   const decoded = fromUr(Ur.parse(seedHistoricalTag100V1Ur), seedCodec);
-  expect(decoded.creationDate?.epochSeconds).toBe(1_589_241_600);
+  expect(decoded.creationDate?.getTime()).toBe(1_589_241_600_000);
   expect(toUr(decoded, seedCodec).toString()).toBe(seedTag1RoundTripUr);
+});
+
+test("fractional-second creation date round-trips with millisecond precision", () => {
+  const seed: Seed = {
+    payload: payload(seedC709.payloadHex),
+    creationDate: new Date(1_589_241_600_123),
+  };
+  const decoded = fromUr(toUr(seed, seedCodec), seedCodec);
+  expect(decoded.creationDate?.getTime()).toBe(1_589_241_600_123);
 });
 
 test("untagged number creation-date is CborType", () => {

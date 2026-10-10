@@ -1,4 +1,4 @@
-import { CborDate, bytesToHex, hexToBytes } from "@blockchaincommons/dcbor";
+import { bytesToHex, hexToBytes } from "@blockchaincommons/dcbor";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { expect, test } from "vite-plus/test";
 
@@ -16,7 +16,7 @@ test("seedDigest ignores name date note", () => {
   const bare = seedDigest({ payload });
   const full = seedDigest({
     payload,
-    creationDate: CborDate.fromEpochSeconds(seedYinmnFull.epochSeconds),
+    creationDate: new Date(seedYinmnFull.epochSeconds * 1000),
     name: seedYinmnFull.name,
     note: seedYinmnFull.note,
   });

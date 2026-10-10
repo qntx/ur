@@ -1,4 +1,4 @@
-import { bytesToHex, decodeCbor, expectBytes, hexToBytes } from "@blockchaincommons/dcbor";
+import { decodeCbor, expectBytes, hexToBytes } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
 
 import {
@@ -15,7 +15,7 @@ import {
   seedCodec,
   sskrCodec,
 } from "../../src/registry/index.ts";
-import type { Psbt, Seed, UrCodec } from "../../src/registry/index.ts";
+import type { UrCodec } from "../../src/registry/index.ts";
 import { psbt167, psbt167V1Ur, seedC709 } from "./goldens.ts";
 
 function errorOf(fn: () => void): UrError {
@@ -56,14 +56,13 @@ test("codecMap seed+psbt dispatch", () => {
   expect([...map.keys()]).toStrictEqual(["seed", "crypto-seed", "psbt", "crypto-psbt"]);
 
   const seed = fromUrWith(Ur.parse(seedC709.ur), map);
-  expect(seed.type).toBe("seed");
-  expect(bytesToHex((seed.value as Seed).payload)).toBe(seedC709.payloadHex);
+  expect(seed).toStrictEqual({ type: "seed", value: { payload: hexToBytes(seedC709.payloadHex) } });
 
   const psbt = fromUrWith(Ur.parse(psbt167.ur), map);
-  expect(psbt.type).toBe("psbt");
-  expect(bytesToHex((psbt.value as Psbt).bytes)).toBe(
-    bytesToHex(new Uint8Array(expectBytes(decodeCbor(hexToBytes(psbt167.cborHex))))),
-  );
+  expect(psbt).toStrictEqual({
+    type: "psbt",
+    value: { bytes: new Uint8Array(expectBytes(decodeCbor(hexToBytes(psbt167.cborHex)))) },
+  });
 });
 
 test("codecMap dispatches v1 token and reports inbound type", () => {

@@ -3,7 +3,7 @@ title: Decoder limits
 description: The four resource limits that bound a decoding session.
 ---
 
-Multi-part decoding is attacker-facing: frame count, sizes, and string length are all controlled by the sender. Four hard limits bound a session; the defaults are identical in TypeScript and Rust (`DEFAULT_LIMITS` / `DecoderLimits::default()`).
+Multi-part decoding is attacker-facing: frame count, sizes, and string length are all controlled by the sender. Four hard limits bound a session; the defaults are identical in TypeScript and Rust (`DEFAULT_LIMITS` / `DecoderLimits::default()`). In TypeScript `DecoderLimits` is a readonly shape and `DEFAULT_LIMITS` is frozen.
 
 | TS (`DecoderLimits`) | Rust (`DecoderLimits` getter) | Default   | Guards                                       |
 | -------------------- | ----------------------------- | --------- | -------------------------------------------- |

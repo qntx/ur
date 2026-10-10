@@ -23,7 +23,7 @@ TypeScript throws `UrError`; Rust returns `Error` with a `kind()`. Codes and var
 | `InvalidPadding`           | `InvalidPadding`           | yes   | Non-zero padding past the message length                                |
 | `InvalidMessageChecksum`   | `InvalidMessageChecksum`   | yes   | Joined payload failed CRC-32                                            |
 | `EmptyMessage`             | `EmptyMessage`             | no    | Fountain encoder given an empty message                                 |
-| `InvalidFragmentLength`    | `InvalidFragmentLength`    | no    | Fragment bounds not positive, or `min > max`                            |
+| —                          | `InvalidFragmentLength`    | no    | Fragment bounds not positive, or `min > max` (TS throws `RangeError`)   |
 | `MessageTooLong`           | `MessageTooLong`           | no    | Message exceeds the `u32` wire length field                             |
 | `NotSinglePart`            | `NotSinglePart`            | no    | Single-part API used on a multi-part UR                                 |
 | —                          | `NotComplete`              | no    | `into_decoded()` on an unfinished decoder (Rust only; TS reads `state`) |
@@ -32,6 +32,8 @@ TypeScript throws `UrError`; Rust returns `Error` with a `kind()`. Codes and var
 | `Internal`                 | `Internal`                 | yes   | Internal invariant broken                                               |
 
 ## Inspecting errors
+
+TypeScript reserves `UrError` for data and protocol problems. Argument misuse throws built-in errors instead: encoder options (`maxFragmentLength`, `minFragmentLength`, `firstSequence`) throw `RangeError`, and the identifier helpers (`bytewordsIdentifier`, `bytemojiIdentifier`) throw `TypeError` for wrong digest lengths.
 
 TypeScript narrows detail by `code`; `UrError.info` is a discriminated union:
 

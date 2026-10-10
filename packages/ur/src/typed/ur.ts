@@ -68,8 +68,8 @@ export class Ur {
     return Ur.fromCborData(decoded.type, decoded.message);
   }
 
-  toCborData(): Uint8Array {
-    return mapCborType(() => encodeCbor(this.cbor));
+  toCborData(): Uint8Array<ArrayBuffer> {
+    return new Uint8Array(mapCborType(() => encodeCbor(this.cbor)));
   }
 
   toString(): string {

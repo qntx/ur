@@ -1,10 +1,10 @@
 import { expectBytes } from "@blockchaincommons/dcbor";
 import type { Cbor } from "@blockchaincommons/dcbor";
 
-export function copyBuf(bytes: Uint8Array): Uint8Array {
+export function copyBuf(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
   return new Uint8Array(bytes);
 }
 
-export function copyBytes(cbor: Cbor): Uint8Array {
+export function copyBytes(cbor: Cbor): Uint8Array<ArrayBuffer> {
   return copyBuf(expectBytes(cbor));
 }

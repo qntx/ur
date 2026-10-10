@@ -35,7 +35,7 @@ All maps are closed: an unknown key is `CborType`. Validation runs identically o
 
 ## Validation rules
 
-- **seed**: `payload` 1–64 bytes, required. `creationDate` optional — writes CBOR tag 1, reads tag 1 or tag 100 (days since epoch). `name`/`note` optional text; empty strings are omitted on write.
+- **seed**: `payload` 1–64 bytes, required. `creationDate` optional — a native `Date` (millisecond precision); writes CBOR tag 1, reads tag 1 or tag 100 (days since epoch). `name`/`note` optional text; empty strings are omitted on write.
 - **coin-info**: `type` uint31 and `network` int32, both default 0 and omitted on write when 0. Named constants `CoinType.btc`/`CoinType.eth` and `Network.mainnet`/`Network.btcTestnet`.
 - **keypath**: `components` is a `PathComponent[]` (`index`, `range`, `wildcard`, `pair` kinds, each with `hardened`). `sourceFingerprint` is uint32 ≠ 0; `depth` is uint8. Empty `components` is only valid with a fingerprint or a depth.
 - **hdkey**: a master key (map key 1 = true) is always private, so its 33-byte `keyData` carries the `0x00` prefix; `chainCode` (32 bytes) is required. A derived key needs 33-byte `keyData` (private keys carry the `0x00` prefix); `isPrivate` defaults false; optional `chainCode`, `useInfo` (coin-info), `origin`/`children` (keypath), `parentFingerprint` (uint32 ≠ 0), `name`, `note`.
@@ -59,6 +59,15 @@ All maps are closed: an unknown key is `CborType`. Validation runs identically o
 Keys become `@0`, `@1`, … in order of appearance and are collected as v2 `DescriptorKey` values (`hdkey`, `eckey`, or `address` — a v1 `307` address nested inside a script function becomes an `address` key, not an `addr()` function). A bare key expression directly inside `sh`/`wsh` — the KeystoneHQ form `sh(key)` — is read as `sh(cosigner(@0))`. Anything unconvertible — a `tr()` script tree, `sh` inside `sh` or `wsh`, `wsh` inside `wsh` — is `CborType`.
 
 `crypto-account` converts the same way through `accountDescriptorCodec`; entries may carry the `308` tag or be bare script expressions (KeystoneHQ writes the latter). Conversion and nesting edge cases are pinned by `vectors/registry/crypto-output-conversion.json` and `vectors/registry/invalid.json`.
+
+`codecMap` collects codecs for dispatch and keeps the union of their value types:
+
+```ts
+import { codecMap, fromUrWith, hdKeyCodec, seedCodec } from "@qntx/ur/registry";
+
+const map = codecMap([seedCodec, hdKeyCodec]); // CodecMap<Seed | HdKey>
+const { type, value } = fromUrWith(ur, map); // value: Seed | HdKey
+```
 
 ## Digests
 

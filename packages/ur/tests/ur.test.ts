@@ -2,6 +2,7 @@ import { expect, test } from "vite-plus/test";
 
 import { UrError } from "../src/error.ts";
 import type { ReceiveResult } from "../src/fountain/index.ts";
+import { DEFAULT_LIMITS } from "../src/fountain/index.ts";
 import {
   UrDecoder,
   UrEncoder,
@@ -151,11 +152,24 @@ test("invalid scheme", () => {
   expect(() => parseUr("uhr:bytes/aeadaolazmjendeoti")).toThrow(UrError);
 });
 
-test("invalid maxFragmentLength through UrEncoder", () => {
+test("DEFAULT_LIMITS is frozen and decoders keep the defaults after attempted mutation", () => {
+  expect(Object.isFrozen(DEFAULT_LIMITS)).toBe(true);
+  const mutable = DEFAULT_LIMITS as { maxUriLength: number };
+  expect(() => {
+    mutable.maxUriLength = 1;
+  }).toThrow(TypeError);
+  expect(DEFAULT_LIMITS.maxUriLength).toBe(8192);
+
+  // A UR longer than 1 character is still accepted under the untouched defaults.
+  const decoder = new UrDecoder();
+  expect(decoder.receive("ur:bytes/iehsjyhspmwfwfia").status).toBe("accepted");
+});
+
+test("invalid maxFragmentLength through UrEncoder is RangeError", () => {
   const data = new TextEncoder().encode("data");
   const cases = [Number.NaN, -1, 0, 0.5, 1.5, Number.POSITIVE_INFINITY];
   for (const len of cases) {
-    expect(errorOf(() => bytesEncoder(data, len)).code).toBe("InvalidFragmentLength");
+    expect(() => bytesEncoder(data, len)).toThrow(RangeError);
   }
 });
 
