@@ -14,8 +14,9 @@
 use std::num::NonZeroU32;
 
 use bcur_registry::{
-    ChildIndex, CoinInfo, DerivedKey, Error, ErrorKind, HdKey, Keypath, MasterKey, PathComponent,
-    Psbt, Seed, SskrHeader, SskrShare, coin_type, network, register_tags, register_tags_in, tags,
+    AccountDescriptor, Address, AddressType, ChildIndex, CoinInfo, DerivedKey, DescriptorKey,
+    EcKey, Error, ErrorKind, HdKey, Keypath, MasterKey, OutputDescriptor, PathComponent, Psbt,
+    Seed, SskrHeader, SskrShare, coin_type, curve, network, register_tags, register_tags_in, tags,
 };
 use dcbor::{
     CBOR, CBORCase, CBORTagged, CBORTaggedDecodable, CBORTaggedEncodable, TagsStore, TagsStoreTrait,
@@ -433,4 +434,271 @@ fn debug_redacts_secrets() {
         share_debug.contains("[REDACTED]") && share_debug.contains("identifier: 4660"),
         "{share_debug}"
     );
+}
+
+// ---- eckey ----
+
+fn pub_eckey() -> EcKey {
+    let mut data = vec![0x02];
+    data.extend_from_slice(&[0xAB; 32]);
+    EcKey::new(curve::SECP256K1, false, data).unwrap()
+}
+
+#[test]
+fn eckey_validation() {
+    // secp256k1 private must be exactly 32 bytes.
+    assert_eq!(
+        err(EcKey::new(curve::SECP256K1, true, vec![0; 31])).field(),
+        "data"
+    );
+    // secp256k1 public must be 33 or 65 bytes.
+    assert_eq!(
+        err(EcKey::new(curve::SECP256K1, false, vec![0; 34])).field(),
+        "data"
+    );
+    // Other curves only require non-empty data.
+    assert_eq!(err(EcKey::new(1, false, Vec::new())).field(), "data");
+    assert!(EcKey::new(1, false, vec![0; 4]).is_ok());
+    // The curve must fit the JS safe-integer bound.
+    let e = err(EcKey::new(0x20_0000_0000_0000, false, vec![0; 33]));
+    assert_eq!((e.kind(), e.field()), (ErrorKind::OutOfRange, "curve"));
+    let e_len = err(EcKey::new(curve::SECP256K1, true, vec![0; 31]));
+    assert_eq!(e_len.kind(), ErrorKind::InvalidLength);
+}
+
+#[test]
+fn eckey_wire_rules() {
+    // Defaults omitted: curve 0 and public write only key 3.
+    let cbor = pub_eckey().untagged_cbor().to_cbor_data();
+    assert_eq!(hex::encode(&cbor), format!("a103582102{}", "ab".repeat(32)));
+
+    let private = EcKey::new(curve::SECP256K1, true, vec![0x01; 32]).unwrap();
+    let encoded = hex::encode(private.untagged_cbor().to_cbor_data());
+    assert_eq!(encoded, format!("a202f5035820{}", "01".repeat(32)));
+
+    // Non-default curve is written under key 1.
+    let other = EcKey::new(1, false, vec![0; 4]).unwrap();
+    assert_eq!(
+        hex::encode(other.untagged_cbor().to_cbor_data()),
+        "a20101034400000000"
+    );
+
+    // v1 tag reads, v2 tag writes.
+    assert_eq!(EcKey::cbor_tags()[0].value(), 40_306);
+    assert_eq!(EcKey::cbor_tags()[1].value(), 306);
+}
+
+#[test]
+fn eckey_debug_redacts_private_only() {
+    let private = EcKey::new(curve::SECP256K1, true, vec![0x01; 32]).unwrap();
+    let debug = format!("{private:?}");
+    assert!(
+        debug.contains("[REDACTED]") && !debug.contains("data: [1"),
+        "{debug}"
+    );
+    let public = format!("{:?}", pub_eckey());
+    assert!(!public.contains("[REDACTED]"), "{public}");
+}
+
+// ---- address ----
+
+#[test]
+fn address_validation_and_wire() {
+    // Typed payloads must be exactly 20 bytes.
+    assert_eq!(
+        err(Address::new(Some(AddressType::P2wpkh), vec![0; 19])).field(),
+        "data"
+    );
+    // Untyped payloads must be non-empty.
+    assert_eq!(err(Address::new(None, Vec::new())).field(), "data");
+
+    let bare = Address::new(None, vec![0x77; 20]).unwrap();
+    assert_eq!(
+        hex::encode(bare.untagged_cbor().to_cbor_data()),
+        format!("a10354{}", "77".repeat(20))
+    );
+
+    let typed = Address::new(Some(AddressType::P2sh), vec![0x77; 20]).unwrap();
+    assert_eq!(
+        hex::encode(typed.untagged_cbor().to_cbor_data()),
+        format!("a202010354{}", "77".repeat(20))
+    );
+
+    // `with_info` writes a v2-tagged coin-info under key 1.
+    let with_info = bare.with_info(CoinInfo::new(coin_type::ETH, 0).unwrap());
+    let cbor = hex::encode(with_info.untagged_cbor().to_cbor_data());
+    assert!(cbor.starts_with("a201d99d71a101183c03"), "{cbor}");
+
+    // Wire index mapping 0/1/2.
+    for (address_type, index) in [
+        (AddressType::P2pkh, "00"),
+        (AddressType::P2sh, "01"),
+        (AddressType::P2wpkh, "02"),
+    ] {
+        let a = Address::new(Some(address_type), vec![0x77; 20]).unwrap();
+        let hexed = hex::encode(a.untagged_cbor().to_cbor_data());
+        assert!(hexed.contains(&format!("02{index}03")), "{hexed}");
+    }
+}
+
+// ---- output-descriptor ----
+
+fn descriptor_key() -> DescriptorKey {
+    DescriptorKey::from(pub_eckey())
+}
+
+fn placeholder_err(source: &str, keys: Vec<DescriptorKey>) -> Error {
+    err(OutputDescriptor::new(source, keys))
+}
+
+#[test]
+fn output_descriptor_placeholders() {
+    let valid = OutputDescriptor::new("pk(@0)", vec![descriptor_key()]);
+    assert!(valid.is_ok());
+
+    // Placeholder index beyond the keys.
+    let e = placeholder_err("pk(@1)", vec![descriptor_key()]);
+    assert_eq!(
+        (e.kind(), e.field()),
+        (ErrorKind::InvalidPlaceholder, "source")
+    );
+    // Keys with no placeholders at all.
+    assert_eq!(
+        placeholder_err("pkh(x)", vec![descriptor_key()]).kind(),
+        ErrorKind::InvalidPlaceholder
+    );
+    // Leading zero parses as the number: `@01` is key 1.
+    assert!(
+        OutputDescriptor::new("multi(2,@1,@0)", vec![descriptor_key(), descriptor_key()]).is_ok()
+    );
+    assert_eq!(
+        placeholder_err("pk(@01)", vec![descriptor_key()]).kind(),
+        ErrorKind::InvalidPlaceholder
+    );
+    // A digit run that overflows u64.
+    assert_eq!(
+        placeholder_err("pk(@99999999999999999999999999)", vec![descriptor_key()]).kind(),
+        ErrorKind::InvalidPlaceholder
+    );
+    // Duplicates and gaps leave the set smaller than the key count.
+    assert_eq!(
+        placeholder_err("sh(@0,@0)", vec![descriptor_key(), descriptor_key()]).kind(),
+        ErrorKind::InvalidPlaceholder
+    );
+    assert_eq!(
+        placeholder_err(
+            "sh(@0,@2)",
+            vec![descriptor_key(), descriptor_key(), descriptor_key()]
+        )
+        .kind(),
+        ErrorKind::InvalidPlaceholder
+    );
+
+    // InvalidPlaceholder maps to dcbor OutOfRange like the TS outOfRange.
+    assert!(matches!(
+        dcbor::Error::from(placeholder_err("pk(@1)", vec![descriptor_key()])),
+        dcbor::Error::OutOfRange
+    ));
+}
+
+#[test]
+fn output_descriptor_wire_rules() {
+    // No placeholders and no keys: key 2 omitted.
+    let raw = OutputDescriptor::new("raw(deadbeef)", Vec::new()).unwrap();
+    assert_eq!(
+        hex::encode(raw.untagged_cbor().to_cbor_data()),
+        "a1016d72617728646561646265656629"
+    );
+
+    // Name/note write keys 3/4 and empty strings are omitted.
+    let empty_named = raw.clone().with_name("").with_note("");
+    assert_eq!(empty_named.untagged_cbor(), raw.untagged_cbor());
+    let named = raw.with_name("vault").with_note("cold");
+    let hexed = hex::encode(named.untagged_cbor().to_cbor_data());
+    assert!(hexed.contains("03657661756c74"), "{hexed}");
+
+    assert_eq!(OutputDescriptor::cbor_tags()[0].value(), 40_308);
+    assert_eq!(OutputDescriptor::cbor_tags()[1].value(), 308);
+}
+
+#[test]
+fn output_descriptor_v1_nesting_rejection() {
+    let key = EcKey::try_from(CBOR::to_tagged_value(40_306, pub_eckey().untagged_cbor()));
+    assert!(key.is_ok());
+    let pk = CBOR::to_tagged_value(
+        402,
+        CBOR::to_tagged_value(40_306, pub_eckey().untagged_cbor()),
+    );
+    let sh = CBOR::to_tagged_value(400, pk.clone());
+    // sh() at top level converts.
+    assert!(OutputDescriptor::from_untagged_cbor(sh.clone()).is_ok());
+    // sh(sh(...)) and wsh(sh(...)) are rejected.
+    assert!(matches!(
+        OutputDescriptor::from_untagged_cbor(CBOR::to_tagged_value(400, sh.clone())).unwrap_err(),
+        dcbor::Error::WrongType
+    ));
+    assert!(matches!(
+        OutputDescriptor::from_untagged_cbor(CBOR::to_tagged_value(401, sh)).unwrap_err(),
+        dcbor::Error::WrongType
+    ));
+    // sh(wsh(pk(key))) is the one allowed nesting.
+    let wsh = CBOR::to_tagged_value(401, pk);
+    assert_eq!(
+        OutputDescriptor::from_untagged_cbor(CBOR::to_tagged_value(400, wsh))
+            .unwrap()
+            .source(),
+        "sh(wsh(pk(@0)))"
+    );
+    // A KeystoneHQ bare `sh(key)` restores `cosigner`.
+    let bare_key =
+        CBOR::to_tagged_value(400, CBOR::to_tagged_value(306, pub_eckey().untagged_cbor()));
+    assert_eq!(
+        OutputDescriptor::from_untagged_cbor(bare_key)
+            .unwrap()
+            .source(),
+        "sh(cosigner(@0))"
+    );
+}
+
+#[test]
+fn descriptor_key_dispatch() {
+    // From impls and the v2 tagged wire form.
+    let key = DescriptorKey::from(pub_eckey());
+    let cbor = CBOR::from(key.clone());
+    let (tag, _) = cbor.as_tagged_value().unwrap();
+    assert_eq!(tag.value(), 40_306);
+    assert!(matches!(key, DescriptorKey::EcKey(_)));
+
+    // Untagged and foreign-tagged values are WrongType.
+    assert!(matches!(
+        DescriptorKey::try_from(CBOR::from(1_u8)).unwrap_err(),
+        dcbor::Error::WrongType
+    ));
+    assert!(matches!(
+        DescriptorKey::try_from(CBOR::to_tagged_value(40_309, CBOR::from(1_u8))).unwrap_err(),
+        dcbor::Error::WrongType
+    ));
+}
+
+// ---- account-descriptor ----
+
+#[test]
+fn account_descriptor_validation_and_wire() {
+    let e = err(AccountDescriptor::new(0x37b5_eed4, Vec::new()));
+    assert_eq!(
+        (e.kind(), e.field()),
+        (ErrorKind::OutOfRange, "output_descriptors")
+    );
+
+    let descriptor = OutputDescriptor::new("pkh(@0)", vec![descriptor_key()]).unwrap();
+    let account = AccountDescriptor::new(0x37b5_eed4, vec![descriptor]).unwrap();
+    assert_eq!(account.master_fingerprint(), 0x37b5_eed4);
+    assert_eq!(account.output_descriptors().len(), 1);
+    assert_eq!(account.output_descriptors()[0].source(), "pkh(@0)");
+
+    let hexed = hex::encode(account.untagged_cbor().to_cbor_data());
+    // Entries are v2-tagged (40308 = 0x9d74) output-descriptors.
+    assert!(hexed.contains("d99d74"), "{hexed}");
+    assert_eq!(AccountDescriptor::cbor_tags()[0].value(), 40_311);
+    assert_eq!(AccountDescriptor::cbor_tags()[1].value(), 311);
 }
