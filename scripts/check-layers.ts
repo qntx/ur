@@ -16,7 +16,7 @@ export type CrateInfo = {
 type JsonObject = Record<string, unknown>;
 
 // Allowed internal dependency edges. `bcur` is the leaf library crate; the CLI
-// sits on top of it; `bcur-registry` (planned) will extend it the same way.
+// and the registry types sit on top of it.
 const ALLOWED: Record<string, string[]> = {
   bcur: [],
   "bcur-cli": ["bcur"],
