@@ -5,7 +5,7 @@ import { fail } from "../error.ts";
 import { UrEncoder, encodeUr, parseUr, parseUrType, toQrString } from "../ur/index.ts";
 import type { DecodedUr, UrEncoderOptions, UrType } from "../ur/index.ts";
 
-export function mapCborDecode<T>(run: () => T): T {
+function mapCborDecode<T>(run: () => T): T {
   try {
     return run();
   } catch (error) {

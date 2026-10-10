@@ -113,6 +113,16 @@
       "name": "empty whole body",
       "uri": "ur:bytes/",
       "expect": "InvalidBytewordsChecksum"
+    },
+    {
+      "name": "kelvin sign in type",
+      "uri": "ur:Key/lsadaoaxjygonesw",
+      "expect": "InvalidType"
+    },
+    {
+      "name": "kelvin sign in body",
+      "uri": "ur:bytes/hKllo",
+      "expect": "NonAscii"
     }
   ]
 }

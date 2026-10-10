@@ -286,6 +286,8 @@ test("parseUrType lowercases and validates", () => {
   expect(errorOf(() => parseUrType("")).code).toBe("InvalidType");
   expect(errorOf(() => parseUrType("not_a_type")).code).toBe("InvalidType");
   expect(errorOf(() => parseUrType("a b")).code).toBe("InvalidType");
+  // Case folding is ASCII-only: U+212A KELVIN SIGN must not fold to "k".
+  expect(errorOf(() => parseUrType("Key")).code).toBe("InvalidType");
 });
 
 test("isUrType requires canonical lowercase", () => {

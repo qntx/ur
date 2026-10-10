@@ -1,5 +1,6 @@
+import { asciiUpper } from "../ascii.ts";
 import { encodeBytewords } from "../bytewords/index.ts";
-import { UrError, fail } from "../error.ts";
+import { UrError, fail, toUrError } from "../error.ts";
 import type { UrErrorInfo } from "../error.ts";
 import { FountainDecoder, FountainEncoder, encodePart, mergeLimits } from "../fountain/index.ts";
 import type {
@@ -10,7 +11,7 @@ import type {
   Progress,
   ReceiveResult,
 } from "../fountain/index.ts";
-import { parseUr } from "./parse.ts";
+import { parseUrFrame, parseUrHead } from "./parse.ts";
 import type { UrType } from "./type.ts";
 
 export type { DecoderLimits } from "../fountain/index.ts";
@@ -25,7 +26,7 @@ export function encodeUr(type: UrType, message: Uint8Array): string {
 
 /** Uppercase UR string for denser QR alphanumeric mode. */
 export function toQrString(ur: string): string {
-  return ur.toUpperCase();
+  return asciiUpper(ur);
 }
 
 /** {@link UrEncoder} options (fountain encoder options verbatim). */
@@ -104,16 +105,14 @@ type Terminal =
   | Readonly<{ phase: "complete"; value: DecodedUr }>
   | Readonly<{ phase: "failed"; error: UrError }>;
 
-function toUrError(error: unknown): UrError {
-  return error instanceof UrError ? error : new UrError({ code: "Internal" });
-}
-
 /**
  * UR decoder (single-part or fountain).
  *
  * `receive` never throws for frame problems: parse, type, index, bytewords, and consistency
  * failures come back `rejected` with the session unchanged; limit violations and completion-check
- * failures are `fatal` and move the session to `failed`. Terminal sessions return `duplicate` for
+ * failures are `fatal` and move the session to `failed`. Type admission precedes every resource
+ * limit: a frame whose type is foreign to the session is `rejected` `UnexpectedType` no matter its
+ * size, and only an admitted frame can fail the session. Terminal sessions return `duplicate` for
  * every further frame without parsing it (UR-ADR-014). The first successfully ingested frame locks
  * the UR type.
  */
@@ -149,8 +148,12 @@ export class UrDecoder {
   }
 
   #receiveParsed(text: string): ReceiveResult {
-    const parsed = parseUr(text, this.#limits);
-    this.#checkType(parsed.type);
+    // Admission order: scheme/type parse, then the accept list and locked type, then the text
+    // budget, then the frame body. A foreign type is rejected before any limit can fail the
+    // session; the frame decode needs no part limits because `maxUriLength` already bounds it.
+    const head = parseUrHead(text);
+    this.#checkType(head.type);
+    const parsed = parseUrFrame(head, text, this.#limits);
     return parsed.kind === "single"
       ? this.#receiveSingle(parsed.type, parsed.message)
       : this.#receiveFountain(parsed.type, parsed.part);

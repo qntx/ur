@@ -11,6 +11,7 @@ const MAX_U32 = 0xff_ff_ff_ff;
  * messageLength, checksum, data]` with shortest-form integers.
  */
 export function encodePart(part: Part): Uint8Array {
+  validatePart(part);
   const out: number[] = [0x85];
   encodeU32(out, part.sequence);
   encodeU32(out, part.sequenceCount);
@@ -26,7 +27,18 @@ export function encodePart(part: Part): Uint8Array {
  * `maxFragmentLength` to the bstr and `maxFragmentCount` to `sequenceCount`.
  */
 export function decodePart(bytes: Uint8Array, limits?: Partial<DecoderLimits>): Part {
-  const merged = mergeLimits(limits);
+  return decodePartInner(bytes, mergeLimits(limits));
+}
+
+/**
+ * Part decode without `maxFragmentLength`/`maxFragmentCount` checks, for callers whose input is
+ * already bounded (the `UrDecoder` URI-length budget). Semantic validation still applies.
+ */
+export function decodePartRaw(bytes: Uint8Array): Part {
+  return decodePartInner(bytes, undefined);
+}
+
+function decodePartInner(bytes: Uint8Array, limits: DecoderLimits | undefined): Part {
   const cur = { i: 0 };
   if (decodeLen(bytes, cur, 4) !== 5) {
     fail("InvalidPartCbor");
@@ -35,13 +47,13 @@ export function decodePart(bytes: Uint8Array, limits?: Partial<DecoderLimits>): 
   const sequenceCount = decodeU32(bytes, cur);
   const messageLength = decodeU32(bytes, cur);
   const checksum = decodeU32(bytes, cur);
-  const data = decodeBstr(bytes, cur, merged.maxFragmentLength);
+  const data = decodeBstr(bytes, cur, limits?.maxFragmentLength);
   if (cur.i !== bytes.length) {
     fail("InvalidPartCbor");
   }
   const part: Part = { sequence, sequenceCount, messageLength, checksum, data };
   validatePart(part);
-  if (sequenceCount > merged.maxFragmentCount) {
+  if (limits !== undefined && sequenceCount > limits.maxFragmentCount) {
     fail({ code: "ResourceLimit", limit: "fragmentCount" });
   }
   return part;
@@ -131,9 +143,13 @@ function decodeU32(bytes: Uint8Array, cur: { i: number }): number {
   return v;
 }
 
-function decodeBstr(bytes: Uint8Array, cur: { i: number }, maxDataLen: number): Uint8Array {
+function decodeBstr(
+  bytes: Uint8Array,
+  cur: { i: number },
+  maxDataLen: number | undefined,
+): Uint8Array {
   const len = decodeLen(bytes, cur, 2);
-  if (len > maxDataLen) {
+  if (maxDataLen !== undefined && len > maxDataLen) {
     fail({ code: "ResourceLimit", limit: "fragmentLength" });
   }
   if (cur.i + len > bytes.length) {

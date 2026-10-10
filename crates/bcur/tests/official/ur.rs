@@ -93,4 +93,6 @@ fn ur_type_contract() {
     assert_eq!(SEED.as_str(), "seed");
     assert!(UrType::new("SEED").is_ok_and(|t| t.as_str() == "seed"));
     assert!(UrType::new("not_a_type").is_err());
+    // Case folding is ASCII-only: U+212A KELVIN SIGN must not fold to "k".
+    assert!(UrType::new("\u{212a}ey").is_err());
 }

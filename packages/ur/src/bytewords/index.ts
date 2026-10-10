@@ -1,3 +1,4 @@
+import { asciiLower } from "../ascii.ts";
 import { checksum } from "../consensus/crc32.ts";
 import { BYTEMOJIS, MINIMALS, WORDS } from "../constants.ts";
 import { fail } from "../error.ts";
@@ -87,7 +88,7 @@ export function decodeBytewords(text: string, style: BytewordsStyle): Uint8Array
       fail("NonAscii");
     }
   }
-  const lowered = text.toLowerCase();
+  const lowered = asciiLower(text);
   if (style === "minimal") {
     return decodeMinimal(lowered);
   }
@@ -149,7 +150,7 @@ export function canonicalizeByteword(token: string): string | undefined {
       return undefined;
     }
   }
-  const lower = token.toLowerCase();
+  const lower = asciiLower(token);
   if (lower.length === 4) {
     const b = wordByToken.get(lower);
     return b === undefined ? undefined : WORDS[b];

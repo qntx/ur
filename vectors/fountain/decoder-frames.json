@@ -362,6 +362,83 @@
       ]
     },
     {
+      "name": "over-limit-count-after-lock",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "limits": {
+        "maxFragmentCount": 5
+      },
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "part": {
+            "sequence": 1,
+            "sequenceCount": 10,
+            "messageLength": 10,
+            "checksum": 3735928559,
+            "dataHex": "00"
+          },
+          "status": "rejected",
+          "error": {
+            "code": "InconsistentPart"
+          }
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "over-limit-length-after-lock",
+      "message": {
+        "seed": "Wolf",
+        "length": 30
+      },
+      "maxFragmentLength": 10,
+      "limits": {
+        "maxFragmentLength": 12
+      },
+      "frames": [
+        {
+          "sequence": 1,
+          "status": "accepted"
+        },
+        {
+          "sequence": 2,
+          "patch": {
+            "dataHex": "0000000000000000000000000000"
+          },
+          "status": "rejected",
+          "error": {
+            "code": "InconsistentPart"
+          }
+        },
+        {
+          "sequence": 2,
+          "status": "accepted"
+        },
+        {
+          "sequence": 3,
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
       "name": "limit-fragment-length",
       "message": {
         "seed": "Wolf",

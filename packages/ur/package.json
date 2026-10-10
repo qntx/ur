@@ -1,7 +1,7 @@
 {
   "name": "@qntx/ur",
   "version": "1.8.0",
-  "description": "Uniform Resources (UR) transport for JavaScript/TypeScript — Bytewords, fountain codes, and multi-part UR.",
+  "description": "Uniform Resources (UR) for TypeScript: Bytewords, fountain codes, multi-part UR, typed dCBOR, and BCR-2020-006 registry types.",
   "keywords": [
     "blockchain-commons",
     "bytewords",

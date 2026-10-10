@@ -1,6 +1,6 @@
 import { FragmentChooser } from "../consensus/chooser.ts";
 import { checksum } from "../consensus/crc32.ts";
-import { UrError } from "../error.ts";
+import { UrError, toUrError } from "../error.ts";
 import type { UrErrorInfo } from "../error.ts";
 import { mergeLimits } from "./limits.ts";
 import type { DecoderLimits } from "./limits.ts";
@@ -89,17 +89,6 @@ function xorWords(target: Uint32Array, source: Uint32Array): void {
   }
 }
 
-function toUrError(error: unknown): UrError {
-  return error instanceof UrError ? error : new UrError({ code: "Internal" });
-}
-
-/**
- * Incremental Gauss-Jordan fountain decoder over GF(2).
- *
- * Rows are stored in reduced row echelon form keyed by pivot column, at most `K` rows. `receive`
- * never throws for frame problems: outcomes are reported as {@link ReceiveResult}. A fatal result
- * moves the session to `failed`; every further frame is then a `duplicate`.
- */
 /** Stream metadata fixed by the first consistent part. */
 type LockedStream = {
   chooser: FragmentChooser;
@@ -116,6 +105,13 @@ type Session =
   | { phase: "complete"; value: Uint8Array }
   | { phase: "failed"; error: UrError };
 
+/**
+ * Incremental Gauss-Jordan fountain decoder over GF(2).
+ *
+ * Rows are stored in reduced row echelon form keyed by pivot column, at most `K` rows. `receive`
+ * never throws for frame problems: outcomes are reported as {@link ReceiveResult}. A fatal result
+ * moves the session to `failed`; every further frame is then a `duplicate`.
+ */
 export class FountainDecoder {
   readonly #limits: DecoderLimits;
   #session: Session = { phase: "empty" };
@@ -145,9 +141,6 @@ export class FountainDecoder {
     } catch (error) {
       return { status: "rejected", error: toUrError(error) };
     }
-    if (part.data.length > this.#limits.maxFragmentLength) {
-      return this.#fail({ code: "ResourceLimit", limit: "fragmentLength" });
-    }
     const locked = this.#lockStream(part);
     if ("result" in locked) {
       return locked.result;
@@ -170,8 +163,9 @@ export class FountainDecoder {
   }
 
   /**
-   * Returns the locked stream metadata. The first part fixes `K`, `messageLength`, `checksum`, and
-   * `fragmentLength` (limit violations are fatal); later parts must match (`InconsistentPart`).
+   * Returns the locked stream metadata. While a stream is locked the consistency check runs first
+   * (`InconsistentPart`, rejected — it subsumes the fragment-length check); the limits apply only
+   * to the part that locks the stream and are fatal.
    */
   #lockStream(part: Part): { stream: LockedStream } | { result: ReceiveResult } {
     const stream = this.#stream;
@@ -193,6 +187,9 @@ export class FountainDecoder {
     }
     if (part.messageLength > this.#limits.maxMessageLength) {
       return { result: this.#fail({ code: "ResourceLimit", limit: "messageLength" }) };
+    }
+    if (part.data.length > this.#limits.maxFragmentLength) {
+      return { result: this.#fail({ code: "ResourceLimit", limit: "fragmentLength" }) };
     }
     const created: LockedStream = {
       chooser: new FragmentChooser(part.sequenceCount, part.checksum),

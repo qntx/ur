@@ -121,6 +121,32 @@ test("empty and zero-field parts are InvalidPart", () => {
   expect(decoder.state.phase).toBe("empty");
 });
 
+test.each([
+  { name: "sequence zero", sequence: 0 },
+  { name: "sequence over u32", sequence: 2 ** 33 },
+  { name: "sequence non-integer", sequence: 1.5 },
+])("encodePart rejects invalid part: $name", ({ sequence }) => {
+  const part: Part = {
+    sequence,
+    sequenceCount: 1,
+    messageLength: 1,
+    checksum: 0,
+    data: new Uint8Array([0xab]),
+  };
+  expect(codeOf(() => encodePart(part))).toBe("InvalidPart");
+});
+
+test("encodePart rejects empty data", () => {
+  const part: Part = {
+    sequence: 1,
+    sequenceCount: 1,
+    messageLength: 1,
+    checksum: 0,
+    data: new Uint8Array(),
+  };
+  expect(codeOf(() => encodePart(part))).toBe("InvalidPart");
+});
+
 test("part cbor accepts non-shortest integer", () => {
   // array(5) with sequence encoded as 0x18 0x01 (non-shortest for 1)
   const hex =

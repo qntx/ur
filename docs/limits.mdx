@@ -12,7 +12,7 @@ Multi-part decoding is attacker-facing: frame count, sizes, and string length ar
 | `maxFragmentLength`  | `max_fragment_length`        | 8 192     | `part.data` length                           |
 | `maxUriLength`       | `max_uri_length`             | 8 192     | UR string length passed to the decoder       |
 
-A violation is fatal: it fails the whole session (`state` → `failed` / `State::Failed`), not just the frame, and carries `limit`/`Limit` identifying which bound was hit.
+A violation is fatal — but only for a frame the session admits. Type admission runs before every limit: a frame whose type is foreign (not in `accept`, or different from the locked type) is rejected `UnexpectedType` even when it is over-length or over-budget, and once a stream is locked a part that disagrees with it is rejected `InconsistentPart` instead of tripping the fragment-length cap. For an admitted frame, a violation fails the whole session (`state` → `failed` / `State::Failed`), not just the frame, and carries `limit`/`Limit` identifying which bound was hit.
 
 ```ts
 import { UrDecoder } from "@qntx/ur";

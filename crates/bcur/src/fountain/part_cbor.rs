@@ -28,6 +28,16 @@ pub(crate) fn encode_part(part: &Part) -> Vec<u8> {
 
 /// Decodes a part from CBOR, enforcing `limits` and semantic validation.
 pub(crate) fn decode_part(bytes: &[u8], limits: &DecoderLimits) -> Result<Part> {
+    decode_part_inner(bytes, Some(limits))
+}
+
+/// Decodes a part without the resource caps; used where the input is already
+/// bounded by `max_uri_length` (the UR decoder).
+pub(crate) fn decode_part_unlimited(bytes: &[u8]) -> Result<Part> {
+    decode_part_inner(bytes, None)
+}
+
+fn decode_part_inner(bytes: &[u8], limits: Option<&DecoderLimits>) -> Result<Part> {
     let mut i = 0;
     let head = next_byte(bytes, &mut i)?;
     let array_len = decode_argument(head, &mut i, bytes)?;
@@ -38,12 +48,14 @@ pub(crate) fn decode_part(bytes: &[u8], limits: &DecoderLimits) -> Result<Part> 
     let sequence_count = decode_u32(bytes, &mut i)?;
     let message_len = decode_u32(bytes, &mut i)?;
     let checksum = decode_u32(bytes, &mut i)?;
-    let data = decode_bstr(bytes, &mut i, limits)?;
+    let data = decode_bstr(bytes, &mut i, limits.map(|l| l.max_fragment_length))?;
     if i != bytes.len() {
         return Err(Error::new(ErrorKind::InvalidPartCbor));
     }
     let part = Part::new(sequence, sequence_count, message_len, checksum, data)?;
-    if usize::try_from(part.sequence_count()).unwrap_or(usize::MAX) > limits.max_fragment_count {
+    if limits.is_some_and(|l| {
+        usize::try_from(part.sequence_count()).unwrap_or(usize::MAX) > l.max_fragment_count
+    }) {
         return Err(Error::resource_limit(Limit::FragmentCount));
     }
     Ok(part)
@@ -87,14 +99,14 @@ fn decode_u32(bytes: &[u8], i: &mut usize) -> Result<u32> {
         .map_err(|_| Error::new(ErrorKind::InvalidPartCbor))
 }
 
-fn decode_bstr(bytes: &[u8], i: &mut usize, limits: &DecoderLimits) -> Result<Vec<u8>> {
+fn decode_bstr(bytes: &[u8], i: &mut usize, max_len: Option<usize>) -> Result<Vec<u8>> {
     let head = next_byte(bytes, i)?;
     if head >> 5 != 2 {
         return Err(Error::new(ErrorKind::InvalidPartCbor));
     }
     let len = usize::try_from(decode_argument(head, i, bytes)?)
         .map_err(|_| Error::new(ErrorKind::InvalidPartCbor))?;
-    if len > limits.max_fragment_length {
+    if max_len.is_some_and(|max| len > max) {
         return Err(Error::resource_limit(Limit::FragmentLength));
     }
     let end = i

@@ -466,6 +466,46 @@ const FOUNTAIN_CASES: FountainCaseSpec[] = [
     ],
   },
   {
+    // K over the cap after locking: consistency check wins over the limit.
+    name: "over-limit-count-after-lock",
+    message: wolf(30),
+    maxFragmentLength: 10,
+    limits: { maxFragmentCount: 5 },
+    frames: [
+      { sequence: 1 },
+      {
+        part: {
+          sequence: 1,
+          sequenceCount: 10,
+          messageLength: 10,
+          checksum: 0xde_ad_be_ef,
+          dataHex: "00",
+        },
+        expect: { status: "rejected", code: "InconsistentPart" },
+      },
+      { sequence: 2 },
+      { sequence: 3 },
+    ],
+  },
+  {
+    // data len over the cap after locking: consistency check wins over the
+    // fragment-length limit (14 > 12, but the locked fragment length is 10).
+    name: "over-limit-length-after-lock",
+    message: wolf(30),
+    maxFragmentLength: 10,
+    limits: { maxFragmentLength: 12 },
+    frames: [
+      { sequence: 1 },
+      {
+        sequence: 2,
+        patch: { dataHex: "0000000000000000000000000000" },
+        expect: { status: "rejected", code: "InconsistentPart" },
+      },
+      { sequence: 2 },
+      { sequence: 3 },
+    ],
+  },
+  {
     name: "limit-fragment-length",
     message: wolf(30),
     maxFragmentLength: 10,
@@ -744,6 +784,121 @@ function garbageCase(): UrCaseSpec {
   };
 }
 
+/** A `1-3010` part frame (K over the default cap), any type and checksum. */
+function overCountFrame(urType: string, checksum: number): string {
+  const part: Part = {
+    sequence: 1,
+    sequenceCount: 3010,
+    messageLength: 3010,
+    checksum,
+    data: new Uint8Array([0]),
+  };
+  return `ur:${urType}/1-3010/${encodeBytewords(encodePart(part), "minimal")}`;
+}
+
+// foreign type over the cap is rejected UnexpectedType before any limit runs
+function foreignOverLimitCase(message: Uint8Array): UrCaseSpec {
+  const enc = new UrEncoder(parseUrType("bytes"), message, { maxFragmentLength: 10 });
+  return {
+    name: "foreign-over-limit-after-lock",
+    accept: ["bytes"],
+    frames: [
+      { text: nextUr(enc) },
+      {
+        text: overCountFrame("psbt", 0xde_ad_be_ef),
+        expect: { status: "rejected", code: "UnexpectedType" },
+      },
+      { text: nextUr(enc) },
+      { text: nextUr(enc) },
+    ],
+  };
+}
+
+// admitted type, foreign stream over the cap: InconsistentPart, not a limit
+function sameTypeOverLimitCase(message: Uint8Array): UrCaseSpec {
+  const enc = new UrEncoder(parseUrType("bytes"), message, { maxFragmentLength: 10 });
+  return {
+    name: "same-type-over-limit-after-lock",
+    frames: [
+      { text: nextUr(enc) },
+      {
+        text: overCountFrame("bytes", 0xde_ad_be_ef),
+        expect: { status: "rejected", code: "InconsistentPart" },
+      },
+      { text: nextUr(enc) },
+      { text: nextUr(enc) },
+    ],
+  };
+}
+
+function overLimitFirstFrameCase(): UrCaseSpec {
+  return {
+    name: "over-limit-first-frame-admitted",
+    accept: ["bytes"],
+    frames: [
+      {
+        text: overCountFrame("bytes", 0xde_ad_be_ef),
+        expect: { status: "fatal", code: "ResourceLimit", limit: "fragmentCount" },
+      },
+      {
+        text: encodeUr(parseUrType("bytes"), makeMessage("Wolf", 4)),
+        expect: { status: "duplicate" },
+      },
+    ],
+  };
+}
+
+// over-length URI of a foreign type: admission runs before the length budget
+function overLengthForeignCase(): UrCaseSpec {
+  return {
+    name: "over-length-foreign-type",
+    accept: ["bytes"],
+    limits: { maxUriLength: 60 },
+    frames: [
+      {
+        text: `ur:psbt/${"ae".repeat(60)}`,
+        expect: { status: "rejected", code: "UnexpectedType" },
+      },
+      { text: encodeUr(parseUrType("bytes"), makeMessage("Wolf", 4)) },
+    ],
+  };
+}
+
+function overLengthAdmittedCase(): UrCaseSpec {
+  return {
+    name: "over-length-admitted-type",
+    accept: ["bytes"],
+    limits: { maxUriLength: 60 },
+    frames: [
+      {
+        text: `ur:bytes/${"ae".repeat(60)}`,
+        expect: { status: "fatal", code: "ResourceLimit", limit: "uriLength" },
+      },
+    ],
+  };
+}
+
+// U+212A KELVIN SIGN must not fold to "k" (ASCII-only folding like Rust)
+function kelvinTypeCase(): UrCaseSpec {
+  const single = encodeUr(parseUrType("bytes"), makeMessage("Wolf", 4));
+  return {
+    name: "kelvin-sign-type",
+    frames: [
+      {
+        text: `ur:Key${single.slice("ur:bytes".length)}`,
+        expect: { status: "rejected", code: "InvalidType" },
+      },
+    ],
+  };
+}
+
+function kelvinBodyCase(): UrCaseSpec {
+  return {
+    name: "kelvin-sign-body",
+    frames: [{ text: "ur:bytes/hKllo", expect: { status: "rejected", code: "NonAscii" } }],
+  };
+}
+
 // single-part URI after multipart collection starts
 function singleAfterMultipartCase(message: Uint8Array): UrCaseSpec {
   const enc = new UrEncoder(parseUrType("bytes"), message, { maxFragmentLength: 10 });
@@ -789,6 +944,13 @@ function postCompletionCase(): UrCaseSpec {
     garbageCase(),
     singleAfterMultipartCase(message),
     postCompletionCase(),
+    foreignOverLimitCase(message),
+    sameTypeOverLimitCase(message),
+    overLimitFirstFrameCase(),
+    overLengthForeignCase(),
+    overLengthAdmittedCase(),
+    kelvinTypeCase(),
+    kelvinBodyCase(),
   );
 }
 

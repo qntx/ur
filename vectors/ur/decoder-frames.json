@@ -225,6 +225,148 @@
       ],
       "completeAt": 1,
       "messageHex": "916ec65cf77cadf5"
+    },
+    {
+      "name": "foreign-over-limit-after-lock",
+      "accept": [
+        "bytes"
+      ],
+      "frames": [
+        {
+          "text": "ur:bytes/1-3/lpadaxcsckcyuyrscyckgemejtswhhylkepmykhhtspllgbgfn",
+          "status": "accepted"
+        },
+        {
+          "text": "ur:psbt/1-3010/lpadcfbdsacfbdsacyuepmrnwsfpaeetdejoby",
+          "status": "rejected",
+          "error": {
+            "code": "UnexpectedType"
+          }
+        },
+        {
+          "text": "ur:bytes/2-3/lpaoaxcsckcyuyrscyckgeytsnoyoyaxaedsuttydmfdollbro",
+          "status": "accepted"
+        },
+        {
+          "text": "ur:bytes/3-3/lpaxaxcsckcyuyrscyckgemhhpktpmsrjtgwdpfnsbfnptensn",
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "same-type-over-limit-after-lock",
+      "frames": [
+        {
+          "text": "ur:bytes/1-3/lpadaxcsckcyuyrscyckgemejtswhhylkepmykhhtspllgbgfn",
+          "status": "accepted"
+        },
+        {
+          "text": "ur:bytes/1-3010/lpadcfbdsacfbdsacyuepmrnwsfpaeetdejoby",
+          "status": "rejected",
+          "error": {
+            "code": "InconsistentPart"
+          }
+        },
+        {
+          "text": "ur:bytes/2-3/lpaoaxcsckcyuyrscyckgeytsnoyoyaxaedsuttydmfdollbro",
+          "status": "accepted"
+        },
+        {
+          "text": "ur:bytes/3-3/lpaxaxcsckcyuyrscyckgemhhpktpmsrjtgwdpfnsbfnptensn",
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 4,
+      "messageHex": "916ec65cf77cadf55cd7f9cda1a1030026ddd42e905b77adc36e4f2d3ccb"
+    },
+    {
+      "name": "over-limit-first-frame-admitted",
+      "accept": [
+        "bytes"
+      ],
+      "frames": [
+        {
+          "text": "ur:bytes/1-3010/lpadcfbdsacfbdsacyuepmrnwsfpaeetdejoby",
+          "status": "fatal",
+          "error": {
+            "code": "ResourceLimit",
+            "limit": "fragmentCount"
+          }
+        },
+        {
+          "text": "ur:bytes/mejtswhhnllktdvt",
+          "status": "duplicate"
+        }
+      ]
+    },
+    {
+      "name": "over-length-foreign-type",
+      "accept": [
+        "bytes"
+      ],
+      "limits": {
+        "maxUriLength": 60
+      },
+      "frames": [
+        {
+          "text": "ur:psbt/aeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeae",
+          "status": "rejected",
+          "error": {
+            "code": "UnexpectedType"
+          }
+        },
+        {
+          "text": "ur:bytes/mejtswhhnllktdvt",
+          "status": "accepted"
+        }
+      ],
+      "completeAt": 2,
+      "messageHex": "916ec65c"
+    },
+    {
+      "name": "over-length-admitted-type",
+      "accept": [
+        "bytes"
+      ],
+      "limits": {
+        "maxUriLength": 60
+      },
+      "frames": [
+        {
+          "text": "ur:bytes/aeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeae",
+          "status": "fatal",
+          "error": {
+            "code": "ResourceLimit",
+            "limit": "uriLength"
+          }
+        }
+      ]
+    },
+    {
+      "name": "kelvin-sign-type",
+      "frames": [
+        {
+          "text": "ur:Key/mejtswhhnllktdvt",
+          "status": "rejected",
+          "error": {
+            "code": "InvalidType"
+          }
+        }
+      ]
+    },
+    {
+      "name": "kelvin-sign-body",
+      "frames": [
+        {
+          "text": "ur:bytes/hKllo",
+          "status": "rejected",
+          "error": {
+            "code": "NonAscii"
+          }
+        }
+      ]
     }
   ]
 }
