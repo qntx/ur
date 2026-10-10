@@ -59,20 +59,22 @@ fn cases(file: &Value) -> &[Value] {
 fn encode_all(case: &Value, message: &[u8]) -> Vec<String> {
     let ur_type = UrType::new(json_str(case, "urType")).unwrap();
     let options = case.get("options").unwrap();
-    let opts = EncoderOptions {
-        max_fragment_len: json_usize(options, "maxFragmentLength"),
-        min_fragment_len: options
-            .get("minFragmentLength")
-            .and_then(Value::as_u64)
-            .map_or(10, |v| usize::try_from(v).unwrap()),
-        first_sequence: u32::try_from(
+    let opts = EncoderOptions::new(json_usize(options, "maxFragmentLength"))
+        .with_min_fragment_len(
             options
-                .get("firstSequence")
+                .get("minFragmentLength")
                 .and_then(Value::as_u64)
-                .unwrap(),
+                .map_or(10, |v| usize::try_from(v).unwrap()),
         )
-        .unwrap(),
-    };
+        .with_first_sequence(
+            u32::try_from(
+                options
+                    .get("firstSequence")
+                    .and_then(Value::as_u64)
+                    .unwrap(),
+            )
+            .unwrap(),
+        );
     let m = case.get("encoded").and_then(Value::as_array).unwrap().len();
     Encoder::new(ur_type, message.to_vec(), opts)
         .unwrap()

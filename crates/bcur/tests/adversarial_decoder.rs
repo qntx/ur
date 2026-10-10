@@ -20,10 +20,7 @@ fn uri_len_limit_fails_session() {
     let mut enc = Encoder::new(ur_type!("bytes"), data, EncoderOptions::new(10)).unwrap();
     let part = enc.next().unwrap();
 
-    let mut decoder = Decoder::new(DecoderLimits {
-        max_uri_length: 16,
-        ..DecoderLimits::default()
-    });
+    let mut decoder = Decoder::new(DecoderLimits::default().with_max_uri_length(16));
     assert!(matches!(
         decoder.receive(&part),
         Err(ref e) if e.kind() == ErrorKind::ResourceLimit
@@ -45,10 +42,7 @@ fn fragment_count_limit_fails() {
     let mut enc = Encoder::new(ur_type!("bytes"), data, EncoderOptions::new(10)).unwrap();
     assert!(enc.fragment_count() > 1);
 
-    let mut decoder = Decoder::new(DecoderLimits {
-        max_fragment_count: 1,
-        ..DecoderLimits::default()
-    });
+    let mut decoder = Decoder::new(DecoderLimits::default().with_max_fragment_count(1));
     let part = enc.next().unwrap();
     assert!(matches!(
         decoder.receive(&part),
@@ -63,10 +57,7 @@ fn fragment_count_limit_fails() {
 fn message_length_limit_fails() {
     let data = b"Ten chars!".repeat(16);
     let mut enc = Encoder::new(ur_type!("bytes"), data, EncoderOptions::new(10)).unwrap();
-    let mut decoder = Decoder::new(DecoderLimits {
-        max_message_length: 8,
-        ..DecoderLimits::default()
-    });
+    let mut decoder = Decoder::new(DecoderLimits::default().with_max_message_length(8));
     assert!(matches!(
         decoder.receive(&enc.next().unwrap()),
         Err(ref e) if e.kind() == ErrorKind::ResourceLimit

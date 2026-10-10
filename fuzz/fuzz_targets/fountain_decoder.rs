@@ -44,12 +44,12 @@ fn synthesize(data: &[u8], at: usize) -> Option<Part> {
 }
 
 fuzz_target!(|data: &[u8]| {
-    let mut decoder = Decoder::new(DecoderLimits {
-        max_fragment_count: 64,
-        max_fragment_length: 64,
-        max_message_length: 4096,
-        ..DecoderLimits::default()
-    });
+    let mut decoder = Decoder::new(
+        DecoderLimits::default()
+            .with_max_fragment_count(64)
+            .with_max_fragment_length(64)
+            .with_max_message_length(4096),
+    );
     let mut phase = 0_u8;
 
     // Stream A: raw CBOR chunks decoded as parts.

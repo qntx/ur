@@ -71,4 +71,4 @@ let fatal = error.is_fatal();
 let inner = core::error::Error::source(&error); // Some(&dcbor::Error) for CborDecode/CborType
 ```
 
-`Limit::as_str()` returns the TS `UrLimit` string form (`"messageLength"`, `"fragmentCount"`, `"fragmentLength"`, `"uriLength"`).
+`Limit` implements `Display` with human-readable text (`message length`, `fragment count`, `fragment length`, `URI length`), so a `ResourceLimit` error reads `resource limit exceeded: message length`.

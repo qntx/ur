@@ -366,11 +366,9 @@ fn fountain_encoder_options() {
                 );
             }
             "sequences" => {
-                let options = crate::fountain::EncoderOptions {
-                    max_fragment_len: max,
-                    min_fragment_len: min,
-                    first_sequence: case["firstSequence"].as_u64().unwrap_or(0) as u32,
-                };
+                let options = crate::fountain::EncoderOptions::new(max)
+                    .with_min_fragment_len(min)
+                    .with_first_sequence(case["firstSequence"].as_u64().unwrap_or(0) as u32);
                 let mut enc = crate::fountain::Encoder::new(message_of(case), options)
                     .unwrap_or_else(|e| panic!("{name}: {e}"));
                 let want_seqs = u64s(&case["sequences"]);
@@ -413,10 +411,8 @@ fn official_decoder() {
     for case in doc["cases"].as_array().unwrap() {
         let max = case["maxFragmentLength"].as_u64().unwrap() as usize;
         let message = message_of(case);
-        let options = crate::fountain::EncoderOptions {
-            first_sequence: case["firstSeqNum"].as_u64().unwrap_or(0) as u32,
-            ..crate::fountain::EncoderOptions::new(max)
-        };
+        let options = crate::fountain::EncoderOptions::new(max)
+            .with_first_sequence(case["firstSeqNum"].as_u64().unwrap_or(0) as u32);
         let mut enc = crate::fountain::Encoder::new(message.clone(), options).unwrap();
         let mut dec = crate::fountain::Decoder::default();
         loop {
@@ -534,10 +530,7 @@ fn official_ur_multipart() {
         let mut enc = crate::ur::Encoder::new(
             ur_type,
             payload.clone(),
-            crate::fountain::EncoderOptions {
-                first_sequence: first_seq,
-                ..crate::fountain::EncoderOptions::new(max)
-            },
+            crate::fountain::EncoderOptions::new(max).with_first_sequence(first_seq),
         )
         .unwrap();
         if let Some(parts_file) = case["partsFile"].as_str() {
@@ -570,16 +563,16 @@ fn limits_of(case: &Value) -> crate::fountain::DecoderLimits {
     let limits = &case["limits"];
     let mut out = crate::fountain::DecoderLimits::default();
     if let Some(v) = limits["maxMessageLength"].as_u64() {
-        out.max_message_length = v as usize;
+        out = out.with_max_message_length(v as usize);
     }
     if let Some(v) = limits["maxFragmentCount"].as_u64() {
-        out.max_fragment_count = v as usize;
+        out = out.with_max_fragment_count(v as usize);
     }
     if let Some(v) = limits["maxFragmentLength"].as_u64() {
-        out.max_fragment_length = v as usize;
+        out = out.with_max_fragment_length(v as usize);
     }
     if let Some(v) = limits["maxUriLength"].as_u64() {
-        out.max_uri_length = v as usize;
+        out = out.with_max_uri_length(v as usize);
     }
     out
 }
@@ -658,11 +651,9 @@ fn fountain_decoder_frames() {
     for case in doc["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
         let max = case["maxFragmentLength"].as_u64().unwrap() as usize;
-        let options = crate::fountain::EncoderOptions {
-            max_fragment_len: max,
-            min_fragment_len: case["minFragmentLength"].as_u64().unwrap_or(10) as usize,
-            first_sequence: case["firstSequence"].as_u64().unwrap_or(0) as u32,
-        };
+        let options = crate::fountain::EncoderOptions::new(max)
+            .with_min_fragment_len(case["minFragmentLength"].as_u64().unwrap_or(10) as usize)
+            .with_first_sequence(case["firstSequence"].as_u64().unwrap_or(0) as u32);
         let mut enc = crate::fountain::Encoder::new(message_of(case), options).unwrap();
         let mut cache: alloc::collections::BTreeMap<u32, crate::fountain::Part> =
             alloc::collections::BTreeMap::new();

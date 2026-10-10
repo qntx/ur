@@ -168,18 +168,22 @@ fn part_cbor_decode_contract() {
         let limits = case
             .get("limits")
             .map(|l| {
-                let d = DecoderLimits::default();
-                let get = |k: &str, dflt: usize| {
+                let get_opt = |k: &str| {
                     l.get(k)
                         .and_then(Value::as_u64)
-                        .map_or(dflt, |v| usize::try_from(v).unwrap())
+                        .map(|v| usize::try_from(v).unwrap())
                 };
-                DecoderLimits {
-                    max_message_length: get("maxMessageLength", d.max_message_length),
-                    max_fragment_count: get("maxFragmentCount", d.max_fragment_count),
-                    max_fragment_length: get("maxFragmentLength", d.max_fragment_length),
-                    ..d
+                let mut limits = DecoderLimits::default();
+                if let Some(v) = get_opt("maxMessageLength") {
+                    limits = limits.with_max_message_length(v);
                 }
+                if let Some(v) = get_opt("maxFragmentCount") {
+                    limits = limits.with_max_fragment_count(v);
+                }
+                if let Some(v) = get_opt("maxFragmentLength") {
+                    limits = limits.with_max_fragment_length(v);
+                }
+                limits
             })
             .unwrap_or_default();
         let result = Part::from_cbor(&cbor, &limits);
@@ -299,18 +303,18 @@ fn decoder_limits_contract() {
     let spec = json(vector!("limits/defaults.json"));
     let limits = DecoderLimits::default();
     assert_eq!(
-        limits.max_message_length,
+        limits.max_message_length(),
         json_usize(&spec, "maxMessageLength")
     );
     assert_eq!(
-        limits.max_fragment_count,
+        limits.max_fragment_count(),
         json_usize(&spec, "maxFragmentCount")
     );
     assert_eq!(
-        limits.max_fragment_length,
+        limits.max_fragment_length(),
         json_usize(&spec, "maxFragmentLength")
     );
-    assert_eq!(limits.max_uri_length, json_usize(&spec, "maxUriLength"));
+    assert_eq!(limits.max_uri_length(), json_usize(&spec, "maxUriLength"));
 }
 
 #[test]
@@ -321,10 +325,7 @@ fn resource_limits_fail_session() {
     let uri_part = uri_enc.next().unwrap();
     assert_session_fails(
         Limit::UriLength,
-        Decoder::new(DecoderLimits {
-            max_uri_length: 16,
-            ..DecoderLimits::default()
-        }),
+        Decoder::new(DecoderLimits::default().with_max_uri_length(16)),
         &uri_part,
     );
 
@@ -335,10 +336,7 @@ fn resource_limits_fail_session() {
     let fragment_part = fragment_enc.next().unwrap();
     assert_session_fails(
         Limit::FragmentCount,
-        Decoder::new(DecoderLimits {
-            max_fragment_count: 1,
-            ..DecoderLimits::default()
-        }),
+        Decoder::new(DecoderLimits::default().with_max_fragment_count(1)),
         &fragment_part,
     );
 }

@@ -106,9 +106,9 @@ pub fn decode(encoded: &str, style: Style) -> Result<Vec<u8>> {
         Style::Uri => '-',
         Style::Minimal => return decode_minimal(&lowered),
     };
-    // An empty input carries no checksum; classify it like the TypeScript
-    // decoder and the official vectors do, before `split` yields one empty
-    // "word" that would surface as `InvalidWord`.
+    // An empty input carries no checksum; classify it as a checksum failure
+    // (as the official vectors do) before `split` yields one empty "word"
+    // that would surface as `InvalidWord`.
     if lowered.is_empty() {
         return Err(Error::new(ErrorKind::InvalidBytewordsChecksum));
     }

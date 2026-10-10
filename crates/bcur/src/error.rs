@@ -20,20 +20,18 @@ pub enum Limit {
     UriLength,
 }
 
-impl Limit {
-    /// TS `UrLimit` string form.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::MessageLength => "messageLength",
-            Self::FragmentCount => "fragmentCount",
-            Self::FragmentLength => "fragmentLength",
-            Self::UriLength => "uriLength",
-        }
+impl core::fmt::Display for Limit {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(match self {
+            Self::MessageLength => "message length",
+            Self::FragmentCount => "fragment count",
+            Self::FragmentLength => "fragment length",
+            Self::UriLength => "URI length",
+        })
     }
 }
 
-/// Error kinds, one-to-one with the TS `UrErrorCode` union.
+/// The category of an [`Error`], for matching and diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ErrorKind {
@@ -75,8 +73,8 @@ pub enum ErrorKind {
     MessageTooLong,
     /// A single-part API was used on a multi-part UR.
     NotSinglePart,
-    /// `into_*` on a decoder that has not completed (Rust only; TS uses
-    /// `state`).
+    /// A consuming completion call (`into_*`) was made on a decoder that
+    /// has not completed.
     NotComplete,
     /// The payload is not well-formed deterministic CBOR.
     CborDecode,
@@ -87,7 +85,7 @@ pub enum ErrorKind {
 }
 
 impl ErrorKind {
-    /// TS `UrError.message` text for kinds without detail.
+    /// Display text for kinds without detail.
     const fn message(self) -> &'static str {
         match self {
             Self::NonAscii => "bytewords string is not ASCII",
@@ -258,7 +256,7 @@ impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match &self.detail {
             Detail::Limit(limit) => {
-                write!(f, "{}: {}", self.kind.message(), limit.as_str())
+                write!(f, "{}: {limit}", self.kind.message())
             }
             Detail::UnexpectedType { expected, found } => {
                 let expected = expected
