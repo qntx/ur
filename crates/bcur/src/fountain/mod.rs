@@ -32,7 +32,7 @@ use crate::error::{Error, ErrorKind, Limit, Result};
 /// |-------|---------|-------------|
 /// | `max_message_length` | `1_048_576` (1 MiB) | First part's `message_len`; single-part UR payload |
 /// | `max_fragment_count` | `2_000` | First part's `K`; `Part` CBOR decode |
-/// | `max_fragment_length` | `8_192` | Every `part.data.len()`; `Part` CBOR bstr |
+/// | `max_fragment_length` | `8_192` | First part's `data.len()` (later parts must match it); `Part` CBOR bstr |
 /// | `max_uri_length` | `8_192` | `ur::Decoder::receive` string length |
 ///
 /// `max_uri_length` = 8192 is a string-API `DoS` bound, above any single QR
@@ -40,8 +40,11 @@ use crate::error::{Error, ErrorKind, Limit, Result};
 ///
 /// Per-session memory bound: `K·fragment_len` bytes of row data plus
 /// `K·ceil(K/8)` bytes of column masks — about 1.5 MiB at the defaults
-/// (UR-ADR-015). A violation is a fatal [`ErrorKind::ResourceLimit`]: the
-/// decoder enters [`State::Failed`].
+/// (UR-ADR-015). A violation is a fatal [`ErrorKind::ResourceLimit`] — the
+/// decoder enters [`State::Failed`] — but only for a frame the session
+/// admits: `ur::Decoder` rejects a foreign-type frame `UnexpectedType` before
+/// any limit applies, and once a stream is locked an inconsistent part is
+/// rejected `InconsistentPart` instead of failing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DecoderLimits {
     /// Max original message length in bytes.
@@ -208,10 +211,9 @@ impl Iterator for Encoder {
         self.sequence = sequence.get();
         let indexes = self.chooser.choose(sequence);
         let mut mixed = alloc::vec![0_u8; self.fragment_len];
-        // `indexes` is sorted ascending; merge-scan the fragment chunks.
-        let mut selected = indexes.iter().copied().peekable();
-        for (chunk, index) in self.fragments.chunks_exact(self.fragment_len).zip(0_u32..) {
-            if selected.next_if_eq(&index).is_some() {
+        for &index in &indexes {
+            let start = index as usize * self.fragment_len;
+            if let Some(chunk) = self.fragments.get(start..start + self.fragment_len) {
                 xor_in_place(&mut mixed, chunk);
             }
         }
@@ -422,6 +424,11 @@ impl Decoder {
     /// [`State::Failed`]. The frame that triggers a failed completion check
     /// returns that fatal error itself.
     ///
+    /// While a stream is locked the consistency check runs first: a part whose
+    /// `K`, `message_len`, `checksum`, or `data` length differs from the locked
+    /// stream is rejected `InconsistentPart` — a resource limit is fatal only
+    /// for the part that locks the stream.
+    ///
     /// # Errors
     ///
     /// Rejected (state unchanged): [`ErrorKind::InconsistentPart`].
@@ -432,9 +439,6 @@ impl Decoder {
         if matches!(self.phase, Phase::Complete(_) | Phase::Failed(_)) {
             self.processed = self.processed.saturating_add(1);
             return Ok(Received::Duplicate);
-        }
-        if part.data().len() > self.limits.max_fragment_length {
-            return Err(self.fail(Error::resource_limit(Limit::FragmentLength)));
         }
         if self.chooser.is_none() {
             self.lock_metadata(part)?;
@@ -479,6 +483,9 @@ impl Decoder {
         };
         if message_length > self.limits.max_message_length {
             return Err(self.fail(Error::resource_limit(Limit::MessageLength)));
+        }
+        if part.data().len() > self.limits.max_fragment_length {
+            return Err(self.fail(Error::resource_limit(Limit::FragmentLength)));
         }
         // `Part` validates nonzero fields at construction.
         let Some(count_nz) = NonZeroU32::new(part.sequence_count()) else {
@@ -734,6 +741,12 @@ impl Part {
     /// [`ErrorKind::ResourceLimit`] when `limits` are exceeded.
     pub fn from_cbor(bytes: &[u8], limits: &DecoderLimits) -> Result<Self> {
         part_cbor::decode_part(bytes, limits)
+    }
+
+    /// Decodes a part without the resource caps; used where the input is
+    /// already bounded by `max_uri_length` (the UR decoder).
+    pub(crate) fn from_cbor_unlimited(bytes: &[u8]) -> Result<Self> {
+        part_cbor::decode_part_unlimited(bytes)
     }
 }
 

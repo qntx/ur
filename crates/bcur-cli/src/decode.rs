@@ -27,10 +27,11 @@ pub(crate) struct DecodeArgs {
 
 pub(crate) fn run(args: &DecodeArgs) -> Result<()> {
     let text = read_text(args.input.as_deref())?;
-    let lines: Vec<&str> = text
+    let lines: Vec<(usize, &str)> = text
         .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
+        .enumerate()
+        .map(|(i, line)| (i + 1, line.trim()))
+        .filter(|(_, line)| !line.is_empty())
         .collect();
     if lines.is_empty() {
         return Err(Error::msg("no UR lines in input"));
@@ -41,21 +42,26 @@ pub(crate) fn run(args: &DecodeArgs) -> Result<()> {
         decoder = decoder.accept([UrType::new(t)?]);
     }
 
-    for (idx, line) in lines.iter().enumerate() {
-        decoder.receive(line)?;
-        let progress = decoder.progress();
-        if progress.fragment_count() > 0 {
-            eprintln!(
-                "part {} rank={}/{} recovered={}",
-                idx + 1,
-                progress.rank(),
-                progress.fragment_count(),
-                progress.recovered(),
-            );
-        }
-        if matches!(decoder.state(), State::Complete(_)) {
-            let data = decoder.into_decoded()?.into_parts().1;
-            return write_bytes(args.out.as_deref(), &data, args.hex);
+    for (lineno, line) in lines {
+        match decoder.receive(line) {
+            Ok(_) => {
+                let progress = decoder.progress();
+                if progress.fragment_count() > 0 {
+                    eprintln!(
+                        "part {} rank={}/{} recovered={}",
+                        lineno,
+                        progress.rank(),
+                        progress.fragment_count(),
+                        progress.recovered(),
+                    );
+                }
+                if matches!(decoder.state(), State::Complete(_)) {
+                    let data = decoder.into_decoded()?.into_parts().1;
+                    return write_bytes(args.out.as_deref(), &data, args.hex);
+                }
+            }
+            Err(error) if error.is_fatal() => return Err(error.into()),
+            Err(error) => eprintln!("bcur: skipped line {lineno}: {error}"),
         }
     }
     Err(Error::msg(

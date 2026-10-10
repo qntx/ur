@@ -71,7 +71,11 @@ export class FountainEncoder implements IterableIterator<Part> {
   #lastIndexes: ReadonlyArray<number> = [];
 
   constructor(message: Uint8Array, options: FountainEncoderOptions) {
-    const { maxFragmentLength, minFragmentLength = 10, firstSequence = 0 } = options;
+    const {
+      maxFragmentLength,
+      minFragmentLength = DEFAULT_MIN_FRAGMENT_LENGTH,
+      firstSequence = 0,
+    } = options;
     if (message.length === 0) {
       fail("EmptyMessage");
     }
@@ -134,13 +138,11 @@ export class FountainEncoder implements IterableIterator<Part> {
     }
     this.#seq += 1;
     const indexes = this.#chooser.choose(this.#seq);
-    // `indexes` is sorted ascending; merge-scan the fragments.
     const mixed = new Uint8Array(this.#fragLen);
-    let nextIndex = 0;
-    for (const [i, fragment] of this.#parts.entries()) {
-      if (indexes[nextIndex] === i) {
+    for (const i of indexes) {
+      const fragment = this.#parts[i];
+      if (fragment !== undefined) {
         xorInto(mixed, fragment);
-        nextIndex += 1;
       }
     }
     const part: Part = {

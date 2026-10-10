@@ -17,7 +17,7 @@ export class FragmentChooser {
     for (let x = 1; x <= fragmentCount; x++) {
       weights.push(1 / x);
     }
-    this.#degrees = Sampler.new(weights);
+    this.#degrees = new Sampler(weights);
   }
 
   /**

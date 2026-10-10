@@ -1,3 +1,4 @@
+import { asciiLower } from "../ascii.ts";
 import { fail } from "../error.ts";
 
 declare const urTypeBrand: unique symbol;
@@ -7,7 +8,7 @@ export type UrType = string & { readonly [urTypeBrand]: true };
 
 /** Validate and lowercase a UR type token. Throws `UrError(InvalidType)`. */
 export function parseUrType(text: string): UrType {
-  const lower = text.toLowerCase();
+  const lower = asciiLower(text);
   if (lower.length === 0 || !/^[a-z0-9-]+$/.test(lower)) {
     fail("InvalidType");
   }

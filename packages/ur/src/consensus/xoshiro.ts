@@ -121,7 +121,7 @@ export class Xoshiro256 {
     for (let x = 1; x <= length; x++) {
       weights.push(1 / x);
     }
-    const sampler = Sampler.new(weights);
+    const sampler = new Sampler(weights);
     return sampler.next(this) + 1;
   }
 

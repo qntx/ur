@@ -60,7 +60,7 @@ test("shuffle", () => {
 test("sampler", () => {
   const weights = [1, 2, 4, 8];
   const xoshiro = Xoshiro256.fromString("Wolf");
-  const sampler = Sampler.new(weights);
+  const sampler = new Sampler(weights);
   const expected = [
     3, 3, 3, 3, 3, 3, 3, 0, 2, 3, 3, 3, 3, 1, 2, 2, 1, 3, 3, 2, 3, 3, 1, 1, 2, 1, 1, 3, 1, 3,
   ];

@@ -36,6 +36,7 @@
 - `fromTagged` accepts any tag in `codec.tags`, so v1 nested keypath/coin-info tags 304/305 decode; `codecMap` registers every accepted name, including the v1 tokens.
 
 - License is now `MIT OR Apache-2.0` (1.8.0 and earlier remain MIT). New `LICENSE-MIT` / `LICENSE-APACHE` files replace `LICENSE`.
+- Decoder admission order changed in both languages: scheme, then type, then type admission (`accept` list and locked type), then the ASCII and `maxUriLength` checks, then the frame body. A resource limit is now fatal only for a frame the session admits — a foreign-type frame is rejected `UnexpectedType` no matter its size, and once a fountain stream is locked an inconsistent part is rejected `InconsistentPart` instead of tripping the fragment-length cap. `parseUr`/`ur::parse` share the same order (minus admission) and still apply the part limits.
 - Repository moved to `github.com/qntx/ur` (was `qntx/ur.js`).
 - Fountain index sorting no longer uses ES2023 `Array.prototype.toSorted`, so the package runs on Hermes V1 (React Native).
 - Rust crates `bcur` and `bcur-cli` moved into this repository from qntx-labs/bcur (b2c1fb1); their earlier history lives in that repository's CHANGELOG. Workspace version is lockstep with `@qntx/ur`; MSRV is Rust 1.99.
@@ -45,6 +46,9 @@
 
 - F-01 (UR-ADR-019): `seedCodec` now reads a creation date tagged 1 **or** the historical tag 100 (days since epoch, per the BCR-2020-006 `100(18394)` example); writes always emit tag 1.
 - Rust `UrDecodable::from_ur` accepted only the first `cbor_tags()` name; it now accepts every named tag, matching the TS `fromUr` semantics.
+- TypeScript case folding is now ASCII-only in `parseUr`, `parseUrType`, `decodeBytewords`, `canonicalizeByteword`, and `toQrString`, matching the Rust behavior — `ur:\u212Aey/…` and `parseUrType("\u212Aey")` now throw `InvalidType` instead of folding U+212A KELVIN SIGN to `k`.
+- `encodePart` validates its argument and throws `InvalidPart` on hand-built invalid parts (`sequence` zero/non-u32/non-integer, empty `data`), matching what Rust's `Part::new` enforces at construction.
+- `bcur decode` no longer aborts on a rejected line: it prints `bcur: skipped line N: <error>` to stderr and continues. Fatal errors still abort, and input ending before completion still exits nonzero.
 
 ## 1.8.0 - 2026-09-27
 

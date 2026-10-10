@@ -87,6 +87,54 @@ fn fountain_encode_decode_roundtrip() {
 }
 
 #[test]
+fn decode_skips_rejected_lines() {
+    let payload = vec![0x5a_u8; 256];
+    let encoded = bcur()
+        .args([
+            "encode",
+            "--type",
+            "bytes",
+            "--max-chars",
+            "100",
+            "--count",
+            "80",
+        ])
+        .write_stdin(payload.as_slice())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(encoded).expect("utf8");
+    let mut lines: Vec<String> = text.lines().map(str::to_owned).collect();
+    // A garbage line and a foreign-type frame between valid frames.
+    lines.insert(1, "not-a-ur".to_owned());
+    lines.insert(3, "ur:psbt/hsidiaecdkfpsa".to_owned());
+    let input = lines.join("\n");
+
+    bcur()
+        .args(["decode"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .stdout(predicate::eq(payload.as_slice()))
+        .stderr(predicate::str::contains("skipped line 2"))
+        .stderr(predicate::str::contains("skipped line 4"));
+}
+
+#[test]
+fn decode_fails_on_fatal_line() {
+    // An admitted `ur:bytes` frame over the URI-length budget is fatal.
+    let oversized = format!("ur:bytes/{}\n", "ae".repeat(4200));
+    bcur()
+        .args(["decode"])
+        .write_stdin(oversized)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("resource limit"));
+}
+
+#[test]
 fn decode_first_complete_single_part_wins() {
     bcur()
         .args(["decode", "--hex"])

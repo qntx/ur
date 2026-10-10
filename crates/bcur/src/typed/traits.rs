@@ -53,7 +53,7 @@ pub trait UrDecodable: Sized {
     ///
     /// [`ErrorKind::InvalidType`] if no `cbor_tags()` entry is named;
     /// [`ErrorKind::UnexpectedType`] if the UR type matches none of the tag
-    /// names; [`ErrorKind::CborDecode`] if untagged decode fails.
+    /// names; [`ErrorKind::CborType`] if untagged decode fails.
     fn from_ur(ur: &Ur) -> Result<Self>;
 }
 

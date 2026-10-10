@@ -31,6 +31,8 @@ Each fountain part carries `{seq, K, messageLen, crc32, data}` as CBOR. Part CBO
 
 ## Decoder
 
+Each frame is admitted in this order: the `ur:` scheme (ASCII case-insensitive), the type token up to the first `/`, then — inside a decoder — the session's type admission (`accept` list, then the locked type). Only after admission does the text budget run: the whole URI must be ASCII (`NonAscii`), then `maxUriLength`, then the part grammar (indices, bytewords, part CBOR). A resource limit is fatal only for a frame the session admits: a foreign-type frame is `rejected` `UnexpectedType` even when over-length or over-budget, and once a stream is locked an inconsistent part is `rejected` `InconsistentPart` rather than tripping the fragment-length cap. `parseUr`/`ur::parse` follow the same order minus admission, and still apply the part limits at part decode.
+
 Per-frame results:
 
 | TS `ReceiveResult.status` | Rust                      | Meaning                                          |

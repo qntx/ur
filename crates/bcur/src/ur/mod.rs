@@ -170,18 +170,42 @@ pub enum ParsedUr {
 ///
 /// Scheme, type, index, bytewords, part-CBOR, or limit errors.
 pub fn parse(text: &str, limits: &DecoderLimits) -> Result<ParsedUr> {
-    if text.len() > limits.max_uri_length {
-        return Err(Error::resource_limit(Limit::UriLength));
-    }
-    let uri = text.to_ascii_lowercase();
-    let rest0 = uri
-        .strip_prefix("ur:")
+    let (ur_type, rest) = parse_head(text)?;
+    check_text(text, limits)?;
+    parse_rest(ur_type, rest, Some(limits))
+}
+
+/// Steps 1–2: the `ur:` scheme (ASCII case-insensitive) and the type token up
+/// to the first `/`, without folding or allocating the whole input.
+fn parse_head(text: &str) -> Result<(UrType, &str)> {
+    let (scheme, rest0) = text
+        .split_at_checked(3)
         .ok_or_else(|| Error::new(ErrorKind::InvalidScheme))?;
+    if !scheme.eq_ignore_ascii_case("ur:") {
+        return Err(Error::new(ErrorKind::InvalidScheme));
+    }
     let (type_str, rest) = rest0
         .split_once('/')
         .ok_or_else(|| Error::new(ErrorKind::TypeUnspecified))?;
-    let ur_type = UrType::new(type_str)?;
+    Ok((UrType::new(type_str)?, rest))
+}
 
+/// Steps 4–5: the whole text must be ASCII — making `len()` the character
+/// count — then the URI-length budget.
+const fn check_text(text: &str, limits: &DecoderLimits) -> Result<()> {
+    if !text.is_ascii() {
+        return Err(Error::new(ErrorKind::NonAscii));
+    }
+    if text.len() > limits.max_uri_length {
+        return Err(Error::resource_limit(Limit::UriLength));
+    }
+    Ok(())
+}
+
+/// Step 6: indices grammar, bytewords, and part CBOR. `limits == None`
+/// decodes the part without caps — the caller's `max_uri_length` already
+/// bounds the frame.
+fn parse_rest(ur_type: UrType, rest: &str, limits: Option<&DecoderLimits>) -> Result<ParsedUr> {
     match rest.rsplit_once('/') {
         None => Ok(ParsedUr::Single {
             ur_type,
@@ -190,7 +214,10 @@ pub fn parse(text: &str, limits: &DecoderLimits) -> Result<ParsedUr> {
         Some((indices, body)) => {
             let (seq, count) = decode_indices(indices)?;
             let cbor = bytewords::decode(body, Style::Minimal)?;
-            let part = Part::from_cbor(&cbor, limits)?;
+            let part = match limits {
+                Some(l) => Part::from_cbor(&cbor, l)?,
+                None => Part::from_cbor_unlimited(&cbor)?,
+            };
             if part.sequence() != seq || part.sequence_count() != count {
                 return Err(Error::new(ErrorKind::InvalidIndices));
             }
@@ -418,6 +445,10 @@ impl Decoder {
     /// multi-part URI completes it through the fountain path. The first
     /// successfully ingested frame locks the type.
     ///
+    /// Type admission precedes every resource limit: a frame whose type is
+    /// foreign to the session is rejected `UnexpectedType` no matter its
+    /// size, and only an admitted frame can fail the session.
+    ///
     /// # Errors
     ///
     /// Rejected (state unchanged): parse, type, index, bytewords, part CBOR,
@@ -429,11 +460,13 @@ impl Decoder {
             self.processed = self.processed.saturating_add(1);
             return Ok(Received::Duplicate);
         }
-        let parsed = parse(text, &self.limits).map_err(|e| self.fatalize(e))?;
-        let ur_type = match &parsed {
-            ParsedUr::Single { ur_type, .. } | ParsedUr::Multi { ur_type, .. } => ur_type,
-        };
-        self.check_type(ur_type)?;
+        // Admission order: scheme and type, then the accept list and the
+        // locked type, then the text budget, then the frame body. The part
+        // decodes without caps because `max_uri_length` already bounds it.
+        let (ur_type, rest) = parse_head(text)?;
+        self.check_type(&ur_type)?;
+        check_text(text, &self.limits).map_err(|e| self.fatalize(e))?;
+        let parsed = parse_rest(ur_type, rest, None).map_err(|e| self.fatalize(e))?;
         match parsed {
             ParsedUr::Single {
                 ur_type: ty,

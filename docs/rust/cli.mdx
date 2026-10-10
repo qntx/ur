@@ -75,6 +75,8 @@ QR rendering uses error-correction level Quartile (Q). With `--qr`, `--max-chars
 
 Progress (`rank`, `recovered`, `K`) goes to stderr; the decoded message goes to stdout or `--out`.
 
+A rejected line (bad syntax, foreign type, bad checksum) does not abort the run: `bcur` prints `bcur: skipped line N: <error>` to stderr and continues — tolerant input interleaved with valid frames still decodes. A fatal error (a resource limit hit by an admitted frame, or a failed completion check) aborts with that error. If the input ends before the session completes, `bcur` exits nonzero.
+
 ### `bcur qr`
 
 | Flag            | Default | Role                       |

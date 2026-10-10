@@ -417,7 +417,7 @@ test.each(degreeNonceCases)("consensus.sampler $name", (c) => {
 });
 
 test.each(samplerRows)("consensus.sampler $name", (c) => {
-  const sampler = Sampler.new(c.probabilities);
+  const sampler = new Sampler(c.probabilities);
   const rng = Xoshiro256.fromString(c.rngSeed);
   const samples = Array.from({ length: c.count }, () => sampler.next(rng));
   expect({ samples, totals: countsByKey(samples) }).toStrictEqual({

@@ -103,3 +103,8 @@ type PlainCode = Exclude<UrErrorCode, "ResourceLimit" | "UnexpectedType">;
 export function fail(arg: PlainCode | UrErrorInfo, options?: { cause?: unknown }): never {
   throw new UrError(typeof arg === "string" ? { code: arg } : arg, options);
 }
+
+/** Converts a thrown value to {@link UrError}; non-`UrError` values become `Internal` with `cause`. */
+export function toUrError(error: unknown): UrError {
+  return error instanceof UrError ? error : new UrError({ code: "Internal" }, { cause: error });
+}
