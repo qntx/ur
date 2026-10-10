@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.0.0 - 2026-10-10
+
 ### Breaking
 
 - Unified error model in both languages. TS `UrError` carries a discriminated `info` (`{ code, limit }` for `ResourceLimit`, `{ code, expected: UrType[], found: UrType }` for `UnexpectedType`, `{ code }` otherwise) plus `code` and `fatal` getters; `failPoison`, `DecoderPoison`, and the flat `expected`/`found`/`limit` fields are gone. Rust `bcur::Error` is an opaque struct with `kind()`, `is_fatal()`, `limit()`, `expected_types()`, `found_type()`, and `std::error::Error::source()` for wrapped dCBOR errors; `ErrorKind` and `Limit` replace the enum variants, `ResourceKind`, `CborError`, and `CborErrorKind`. Renamed codes: `EmptyPart`/`InvalidSequence` -> `InvalidPart`, `InvalidFragmentLen` -> `InvalidFragmentLength`, `DecoderState` -> `Internal`, `Cbor` -> `CborDecode`/`CborType`; limit names are camelCase (`messageLength`, `fragmentCount`, `fragmentLength`, `uriLength`) and the `sequence` limit is gone.
