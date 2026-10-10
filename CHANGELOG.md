@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Breaking
+
+- `bcur`: `DecoderLimits` and `fountain::EncoderOptions` fields are now private. Construct them with `DecoderLimits::default().with_max_*` / `EncoderOptions::new(..).with_*` builders and read values through the same-name getters.
+- `bcur`: `Limit::as_str` is removed; `Limit` now implements `Display` with human-readable text (`message length`, `fragment count`, `fragment length`, `URI length`), used by the `ResourceLimit` error message.
+
 ### Fixed
 
 - Master `hdkey` values must carry `0x00`-prefixed key data (BCR-2020-007: a master key is always private); both the TypeScript `hdKeyCodec` and the Rust `MasterKey` reject other prefixes on encode and decode. Rust `MasterKey::new` now returns `Result`.

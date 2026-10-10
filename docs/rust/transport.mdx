@@ -86,7 +86,7 @@ while let Some(frame) = encoder.next() {
 }
 ```
 
-`EncoderOptions` fields: `max_fragment_len`, `min_fragment_len` (default 10), `first_sequence` (default 0). Multi-part iteration ends after sequence `u32::MAX`.
+`EncoderOptions::new(max_fragment_len)` defaults `min_fragment_len` to 10 and `first_sequence` to 0; override them with `.with_min_fragment_len(n)` / `.with_first_sequence(n)` and read them back with the same-name getters. Multi-part iteration ends after sequence `u32::MAX`.
 
 ## Decoding
 

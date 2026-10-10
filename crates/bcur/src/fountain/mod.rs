@@ -45,16 +45,74 @@ use crate::error::{Error, ErrorKind, Limit, Result};
 /// admits: `ur::Decoder` rejects a foreign-type frame `UnexpectedType` before
 /// any limit applies, and once a stream is locked an inconsistent part is
 /// rejected `InconsistentPart` instead of failing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DecoderLimits {
+    max_message_length: usize,
+    max_fragment_count: usize,
+    max_fragment_length: usize,
+    max_uri_length: usize,
+}
+
+impl DecoderLimits {
     /// Max original message length in bytes.
-    pub max_message_length: usize,
+    #[must_use]
+    pub const fn max_message_length(&self) -> usize {
+        self.max_message_length
+    }
+
     /// Max fragment count `K` (`sequence_count`).
-    pub max_fragment_count: usize,
+    #[must_use]
+    pub const fn max_fragment_count(&self) -> usize {
+        self.max_fragment_count
+    }
+
     /// Max `part.data.len()` on every part.
-    pub max_fragment_length: usize,
+    #[must_use]
+    pub const fn max_fragment_length(&self) -> usize {
+        self.max_fragment_length
+    }
+
     /// Max UR string length accepted by `ur::Decoder::receive`.
-    pub max_uri_length: usize,
+    #[must_use]
+    pub const fn max_uri_length(&self) -> usize {
+        self.max_uri_length
+    }
+
+    /// Sets the max original message length in bytes.
+    #[must_use]
+    pub const fn with_max_message_length(self, max_message_length: usize) -> Self {
+        Self {
+            max_message_length,
+            ..self
+        }
+    }
+
+    /// Sets the max fragment count `K` (`sequence_count`).
+    #[must_use]
+    pub const fn with_max_fragment_count(self, max_fragment_count: usize) -> Self {
+        Self {
+            max_fragment_count,
+            ..self
+        }
+    }
+
+    /// Sets the max `part.data.len()` on every part.
+    #[must_use]
+    pub const fn with_max_fragment_length(self, max_fragment_length: usize) -> Self {
+        Self {
+            max_fragment_length,
+            ..self
+        }
+    }
+
+    /// Sets the max UR string length accepted by `ur::Decoder::receive`.
+    #[must_use]
+    pub const fn with_max_uri_length(self, max_uri_length: usize) -> Self {
+        Self {
+            max_uri_length,
+            ..self
+        }
+    }
 }
 
 impl Default for DecoderLimits {
@@ -69,16 +127,11 @@ impl Default for DecoderLimits {
 }
 
 /// Options for the fountain [`Encoder`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EncoderOptions {
-    /// Max fragment length in bytes. Fragments may exceed it when
-    /// `min_fragment_len` binds (`URKit` `findNominalFragmentLength`).
-    pub max_fragment_len: usize,
-    /// Min fragment length in bytes; caps `K` at `floor(len / min)`.
-    pub min_fragment_len: usize,
-    /// Sequence number preceding the first emitted part (first part is
-    /// `first_sequence + 1`).
-    pub first_sequence: u32,
+    max_fragment_len: usize,
+    min_fragment_len: usize,
+    first_sequence: u32,
 }
 
 impl EncoderOptions {
@@ -90,6 +143,46 @@ impl EncoderOptions {
             max_fragment_len,
             min_fragment_len: 10,
             first_sequence: 0,
+        }
+    }
+
+    /// Max fragment length in bytes. Fragments may exceed it when
+    /// `min_fragment_len` binds (`URKit` `findNominalFragmentLength`).
+    #[must_use]
+    pub const fn max_fragment_len(&self) -> usize {
+        self.max_fragment_len
+    }
+
+    /// Min fragment length in bytes; caps `K` at `floor(len / min)`.
+    #[must_use]
+    pub const fn min_fragment_len(&self) -> usize {
+        self.min_fragment_len
+    }
+
+    /// Sequence number preceding the first emitted part (first part is
+    /// `first_sequence + 1`).
+    #[must_use]
+    pub const fn first_sequence(&self) -> u32 {
+        self.first_sequence
+    }
+
+    /// Sets the min fragment length in bytes; caps `K` at
+    /// `floor(len / min)`.
+    #[must_use]
+    pub const fn with_min_fragment_len(self, min_fragment_len: usize) -> Self {
+        Self {
+            min_fragment_len,
+            ..self
+        }
+    }
+
+    /// Sets the sequence number preceding the first emitted part (first
+    /// part is `first_sequence + 1`).
+    #[must_use]
+    pub const fn with_first_sequence(self, first_sequence: u32) -> Self {
+        Self {
+            first_sequence,
+            ..self
         }
     }
 }
@@ -820,10 +913,10 @@ mod tests {
     #[test]
     fn decoder_limits_default_budget_is_locked() {
         let limits = DecoderLimits::default();
-        assert_eq!(limits.max_message_length, 1_048_576);
-        assert_eq!(limits.max_fragment_count, 2_000);
-        assert_eq!(limits.max_fragment_length, 8_192);
-        assert_eq!(limits.max_uri_length, 8_192);
+        assert_eq!(limits.max_message_length(), 1_048_576);
+        assert_eq!(limits.max_fragment_count(), 2_000);
+        assert_eq!(limits.max_fragment_length(), 8_192);
+        assert_eq!(limits.max_uri_length(), 8_192);
     }
 
     #[test]
@@ -892,15 +985,9 @@ mod tests {
     #[test]
     fn test_empty_encoder() {
         assert_eq!(
-            Encoder::new(
-                Vec::new(),
-                EncoderOptions {
-                    min_fragment_len: 1,
-                    ..EncoderOptions::new(1)
-                }
-            )
-            .unwrap_err()
-            .kind(),
+            Encoder::new(Vec::new(), EncoderOptions::new(1).with_min_fragment_len(1))
+                .unwrap_err()
+                .kind(),
             ErrorKind::EmptyMessage
         );
     }
@@ -997,14 +1084,8 @@ mod tests {
     #[test]
     fn test_redundant_mixed_part_is_duplicate() {
         let message = make_message("Wolf", 128);
-        let mut encoder = Encoder::new(
-            message,
-            EncoderOptions {
-                min_fragment_len: 1,
-                ..EncoderOptions::new(16)
-            },
-        )
-        .unwrap();
+        let mut encoder =
+            Encoder::new(message, EncoderOptions::new(16).with_min_fragment_len(1)).unwrap();
         let k = usize::try_from(encoder.fragment_count()).unwrap();
         let parts: Vec<Part> = core::iter::from_fn(|| encoder.next())
             .take(k * 40)
@@ -1065,20 +1146,11 @@ mod tests {
 
     #[test]
     fn test_resource_limit_fragment_count_fails() {
-        let limits = DecoderLimits {
-            max_fragment_count: 1,
-            ..DecoderLimits::default()
-        };
+        let limits = DecoderLimits::default().with_max_fragment_count(1);
         let mut decoder = Decoder::new(limits);
         let message = make_message("Wolf", 64);
-        let mut encoder = Encoder::new(
-            message,
-            EncoderOptions {
-                min_fragment_len: 1,
-                ..EncoderOptions::new(8)
-            },
-        )
-        .unwrap();
+        let mut encoder =
+            Encoder::new(message, EncoderOptions::new(8).with_min_fragment_len(1)).unwrap();
         assert!(encoder.fragment_count() > 1);
         assert!(matches!(
             decoder.receive(&encoder.next().unwrap()),
@@ -1096,20 +1168,11 @@ mod tests {
 
     #[test]
     fn test_resource_limit_message_length_fails() {
-        let limits = DecoderLimits {
-            max_message_length: 16,
-            ..DecoderLimits::default()
-        };
+        let limits = DecoderLimits::default().with_max_message_length(16);
         let mut decoder = Decoder::new(limits);
         let message = make_message("Wolf", 64);
-        let mut encoder = Encoder::new(
-            message,
-            EncoderOptions {
-                min_fragment_len: 1,
-                ..EncoderOptions::new(8)
-            },
-        )
-        .unwrap();
+        let mut encoder =
+            Encoder::new(message, EncoderOptions::new(8).with_min_fragment_len(1)).unwrap();
         assert!(matches!(
             decoder.receive(&encoder.next().unwrap()),
             Err(ref e) if e.kind() == ErrorKind::ResourceLimit
@@ -1120,10 +1183,7 @@ mod tests {
 
     #[test]
     fn test_resource_limit_fragment_length_fails() {
-        let limits = DecoderLimits {
-            max_fragment_length: 16,
-            ..DecoderLimits::default()
-        };
+        let limits = DecoderLimits::default().with_max_fragment_length(16);
         let mut decoder = Decoder::new(limits);
         // K=1 part whose 20-byte payload exceeds the cap.
         let data = alloc::vec![0_u8; 20];
@@ -1199,14 +1259,8 @@ mod tests {
     #[test]
     fn test_progress_fields() {
         let message = make_message("Wolf", 100);
-        let mut encoder = Encoder::new(
-            message,
-            EncoderOptions {
-                min_fragment_len: 1,
-                ..EncoderOptions::new(10)
-            },
-        )
-        .unwrap();
+        let mut encoder =
+            Encoder::new(message, EncoderOptions::new(10).with_min_fragment_len(1)).unwrap();
         let k = encoder.fragment_count();
         let mut decoder = Decoder::default();
         let mut seen = 0_u32;
@@ -1246,23 +1300,9 @@ mod tests {
     #[test]
     fn test_invalid_fragment_lengths() {
         for options in [
-            EncoderOptions {
-                max_fragment_len: 0,
-                ..EncoderOptions {
-                    min_fragment_len: 1,
-                    ..EncoderOptions::new(1)
-                }
-            },
-            EncoderOptions {
-                max_fragment_len: 5,
-                min_fragment_len: 6,
-                first_sequence: 0,
-            },
-            EncoderOptions {
-                max_fragment_len: 5,
-                min_fragment_len: 0,
-                first_sequence: 0,
-            },
+            EncoderOptions::new(0).with_min_fragment_len(1),
+            EncoderOptions::new(5).with_min_fragment_len(6),
+            EncoderOptions::new(5).with_min_fragment_len(0),
         ] {
             assert_eq!(
                 Encoder::new(b"x".to_vec(), options).unwrap_err().kind(),
@@ -1300,10 +1340,7 @@ mod tests {
 
     #[test]
     fn test_iterator_ends_after_u32_max() {
-        let options = EncoderOptions {
-            first_sequence: u32::MAX,
-            ..EncoderOptions::new(64)
-        };
+        let options = EncoderOptions::new(64).with_first_sequence(u32::MAX);
         let mut encoder = Encoder::new(b"hello".to_vec(), options).unwrap();
         assert!(encoder.next().is_none());
         assert!(encoder.next().is_none());
@@ -1311,10 +1348,7 @@ mod tests {
 
     #[test]
     fn test_first_sequence_offsets_emission() {
-        let options = EncoderOptions {
-            first_sequence: 0xffff_fffe,
-            ..EncoderOptions::new(64)
-        };
+        let options = EncoderOptions::new(64).with_first_sequence(0xffff_fffe);
         let mut encoder = Encoder::new(b"hello".to_vec(), options).unwrap();
         assert_eq!(encoder.next().unwrap().sequence(), u32::MAX);
         assert!(encoder.next().is_none());
@@ -1416,10 +1450,7 @@ mod tests {
             let message = rng.next_bytes(length);
             let mut encoder = Encoder::new(
                 message.clone(),
-                EncoderOptions {
-                    min_fragment_len: 5,
-                    ..EncoderOptions::new(max_len)
-                },
+                EncoderOptions::new(max_len).with_min_fragment_len(5),
             )
             .unwrap();
             let k = encoder.fragment_count();

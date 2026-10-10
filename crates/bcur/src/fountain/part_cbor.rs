@@ -48,13 +48,17 @@ fn decode_part_inner(bytes: &[u8], limits: Option<&DecoderLimits>) -> Result<Par
     let sequence_count = decode_u32(bytes, &mut i)?;
     let message_len = decode_u32(bytes, &mut i)?;
     let checksum = decode_u32(bytes, &mut i)?;
-    let data = decode_bstr(bytes, &mut i, limits.map(|l| l.max_fragment_length))?;
+    let data = decode_bstr(
+        bytes,
+        &mut i,
+        limits.map(DecoderLimits::max_fragment_length),
+    )?;
     if i != bytes.len() {
         return Err(Error::new(ErrorKind::InvalidPartCbor));
     }
     let part = Part::new(sequence, sequence_count, message_len, checksum, data)?;
     if limits.is_some_and(|l| {
-        usize::try_from(part.sequence_count()).unwrap_or(usize::MAX) > l.max_fragment_count
+        usize::try_from(part.sequence_count()).unwrap_or(usize::MAX) > l.max_fragment_count()
     }) {
         return Err(Error::resource_limit(Limit::FragmentCount));
     }
@@ -309,10 +313,7 @@ mod tests {
     fn rejects_oversized_data() {
         let part = Part::new(1, 1, 32, 0, alloc::vec![0; 32]).unwrap();
         let cbor = encode_part(&part);
-        let limits = DecoderLimits {
-            max_fragment_length: 16,
-            ..DecoderLimits::default()
-        };
+        let limits = DecoderLimits::default().with_max_fragment_length(16);
         let err = decode_part(&cbor, &limits).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::ResourceLimit);
         assert_eq!(err.limit(), Some(Limit::FragmentLength));
@@ -322,10 +323,7 @@ mod tests {
     fn rejects_oversize_fragment_count() {
         let part = Part::new(1, 9, 17, 0, alloc::vec![0xab; 2]).unwrap();
         let cbor = encode_part(&part);
-        let limits = DecoderLimits {
-            max_fragment_count: 8,
-            ..DecoderLimits::default()
-        };
+        let limits = DecoderLimits::default().with_max_fragment_count(8);
         let err = decode_part(&cbor, &limits).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::ResourceLimit);
         assert_eq!(err.limit(), Some(Limit::FragmentCount));

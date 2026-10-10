@@ -5,12 +5,12 @@ description: The four resource limits that bound a decoding session.
 
 Multi-part decoding is attacker-facing: frame count, sizes, and string length are all controlled by the sender. Four hard limits bound a session; the defaults are identical in TypeScript and Rust (`DEFAULT_LIMITS` / `DecoderLimits::default()`).
 
-| TS (`DecoderLimits`) | Rust (`DecoderLimits` field) | Default   | Guards                                       |
-| -------------------- | ---------------------------- | --------- | -------------------------------------------- |
-| `maxMessageLength`   | `max_message_length`         | 1 048 576 | Original payload length (declared or actual) |
-| `maxFragmentCount`   | `max_fragment_count`         | 2 000     | Fragment count `K`                           |
-| `maxFragmentLength`  | `max_fragment_length`        | 8 192     | `part.data` length                           |
-| `maxUriLength`       | `max_uri_length`             | 8 192     | UR string length passed to the decoder       |
+| TS (`DecoderLimits`) | Rust (`DecoderLimits` getter) | Default   | Guards                                       |
+| -------------------- | ----------------------------- | --------- | -------------------------------------------- |
+| `maxMessageLength`   | `max_message_length`          | 1 048 576 | Original payload length (declared or actual) |
+| `maxFragmentCount`   | `max_fragment_count`          | 2 000     | Fragment count `K`                           |
+| `maxFragmentLength`  | `max_fragment_length`         | 8 192     | `part.data` length                           |
+| `maxUriLength`       | `max_uri_length`              | 8 192     | UR string length passed to the decoder       |
 
 A violation is fatal — but only for a frame the session admits. Type admission runs before every limit: a frame whose type is foreign (not in `accept`, or different from the locked type) is rejected `UnexpectedType` even when it is over-length or over-budget, and once a stream is locked a part that disagrees with it is rejected `InconsistentPart` instead of tripping the fragment-length cap. For an admitted frame, a violation fails the whole session (`state` → `failed` / `State::Failed`), not just the frame, and carries `limit`/`Limit` identifying which bound was hit.
 
@@ -24,10 +24,7 @@ const decoder = new UrDecoder({ limits: { maxMessageLength: 4096 } });
 use bcur::ur::Decoder;
 use bcur::DecoderLimits;
 
-let decoder = Decoder::new(DecoderLimits {
-    max_message_length: 4096,
-    ..DecoderLimits::default()
-});
+let decoder = Decoder::new(DecoderLimits::default().with_max_message_length(4096));
 ```
 
 Per-session memory is bounded by `K · fragmentLength` bytes of fragment data — at most `maxMessageLength + fragmentLength`, since `K` fragments overshoot the message by less than one fragment — plus `K · ⌈K/8⌉` bytes of elimination bit masks (500,000 bytes at `K = 2000`), about 1.5 MiB at the defaults.

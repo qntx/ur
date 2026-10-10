@@ -129,6 +129,34 @@ const _: fn(&fountain::Decoder) -> &[u32] = fountain::Decoder::last_indexes;
 const _: fn(fountain::Decoder) -> bcur::Result<Vec<u8>> = fountain::Decoder::into_message;
 const _: fn(&mut fountain::Decoder) = fountain::Decoder::reset;
 
+// DecoderLimits / EncoderOptions / Limit
+const _: fn() -> DecoderLimits = <DecoderLimits as Default>::default;
+const _: fn(DecoderLimits, usize) -> DecoderLimits = DecoderLimits::with_max_message_length;
+const _: fn(DecoderLimits, usize) -> DecoderLimits = DecoderLimits::with_max_fragment_count;
+const _: fn(DecoderLimits, usize) -> DecoderLimits = DecoderLimits::with_max_fragment_length;
+const _: fn(DecoderLimits, usize) -> DecoderLimits = DecoderLimits::with_max_uri_length;
+const _: fn(&DecoderLimits) -> usize = DecoderLimits::max_message_length;
+const _: fn(&DecoderLimits) -> usize = DecoderLimits::max_fragment_count;
+const _: fn(&DecoderLimits) -> usize = DecoderLimits::max_fragment_length;
+const _: fn(&DecoderLimits) -> usize = DecoderLimits::max_uri_length;
+const _: fn(usize) -> EncoderOptions = EncoderOptions::new;
+const _: fn(EncoderOptions, usize) -> EncoderOptions = EncoderOptions::with_min_fragment_len;
+const _: fn(EncoderOptions, u32) -> EncoderOptions = EncoderOptions::with_first_sequence;
+const _: fn(&EncoderOptions) -> usize = EncoderOptions::max_fragment_len;
+const _: fn(&EncoderOptions) -> usize = EncoderOptions::min_fragment_len;
+const _: fn(&EncoderOptions) -> u32 = EncoderOptions::first_sequence;
+const _: fn(&Limit, &mut core::fmt::Formatter<'_>) -> core::fmt::Result =
+    <Limit as core::fmt::Display>::fmt;
+const _: fn() = assert_send_sync::<DecoderLimits>;
+const _: fn() = assert_send_sync::<EncoderOptions>;
+const _: fn() = assert_send_sync::<Error>;
+const _: fn() = assert_send_sync::<Limit>;
+const _: fn() = assert_hash_copy::<DecoderLimits>;
+const _: fn() = assert_hash_copy::<EncoderOptions>;
+
+const fn assert_send_sync<T: Send + Sync>() {}
+const fn assert_hash_copy<T: core::hash::Hash + Copy>() {}
+
 // crate root re-exports
 const _: fn(&Error) -> ErrorKind = Error::kind;
 const _: fn(&Error) -> Option<Limit> = Error::limit;

@@ -196,7 +196,7 @@ const fn check_text(text: &str, limits: &DecoderLimits) -> Result<()> {
     if !text.is_ascii() {
         return Err(Error::new(ErrorKind::NonAscii));
     }
-    if text.len() > limits.max_uri_length {
+    if text.len() > limits.max_uri_length() {
         return Err(Error::resource_limit(Limit::UriLength));
     }
     Ok(())
@@ -499,7 +499,7 @@ impl Decoder {
         if !matches!(self.fountain.state(), State::Empty) {
             return Err(Error::new(ErrorKind::InconsistentPart));
         }
-        if message.len() > self.limits.max_message_length {
+        if message.len() > self.limits.max_message_length() {
             return Err(self.fail(Error::resource_limit(Limit::MessageLength)));
         }
         self.locked.get_or_insert_with(|| ur_type.clone());
@@ -776,10 +776,7 @@ mod tests {
         let mut encoder = Encoder::new(
             UrType::new("my-scheme").unwrap(),
             data.to_vec(),
-            EncoderOptions {
-                min_fragment_len: 5,
-                ..EncoderOptions::new(5)
-            },
+            EncoderOptions::new(5).with_min_fragment_len(5),
         )
         .unwrap();
         assert_eq!(
@@ -996,10 +993,7 @@ mod tests {
                 && e.expected_types() == [UrType::new("beta").unwrap()]
         ));
 
-        let limits = DecoderLimits {
-            max_uri_length: 8,
-            ..DecoderLimits::default()
-        };
+        let limits = DecoderLimits::default().with_max_uri_length(8);
         let mut short = Decoder::new(limits);
         assert!(matches!(
             short.receive(&part),
@@ -1051,10 +1045,7 @@ mod tests {
         let part = enc.next().unwrap();
         let short = "ur:bytes/iehsjyhspmwfwfia";
         assert!(part.len() > short.len());
-        let limits = DecoderLimits {
-            max_uri_length: short.len(),
-            ..DecoderLimits::default()
-        };
+        let limits = DecoderLimits::default().with_max_uri_length(short.len());
         let mut decoder = Decoder::new(limits);
         assert!(matches!(
             decoder.receive(&part),
