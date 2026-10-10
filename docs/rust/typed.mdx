@@ -1,0 +1,92 @@
+---
+title: Typed layer
+description: typed::Ur and the UrEncodable/UrDecodable traits — bcur feature dcbor.
+---
+
+The typed layer (`feature = "dcbor"`, implies `std`) is the first dCBOR parse in the crate: a `typed::Ur` is a validated type token plus a deterministic-CBOR body. The body on the wire is **untagged** — the tag name becomes the UR type.
+
+## The `Ur` value
+
+```rust
+use bcur::{Ur, ur_type};
+
+let ur = Ur::new(ur_type!("test"), vec![1, 2, 3]); // cbor: impl Into<dcbor::CBOR>
+assert_eq!(ur.to_string(), "ur:test/lsadaoaxjygonesw");
+assert_eq!(ur.ur_type().as_str(), "test");
+ur.to_qr_string(); // uppercase form for QR alphanumeric mode
+ur.to_cbor_data(); // dCBOR bytes
+ur.cbor();         // &dcbor::CBOR
+ur.into_cbor();    // consume into dcbor::CBOR
+```
+
+```rust
+use std::str::FromStr;
+use bcur::Ur;
+
+let ur = Ur::from_str("ur:test/lsadaoaxjygonesw")?; // single-part only; NotSinglePart on frames
+let rebuilt = Ur::from_cbor_data(ur_type, &data)?;  // CborDecode if not dCBOR
+let typed: Ur = decoded.try_into()?;                // TryFrom<ur::Decoded> after a decode session
+```
+
+`ur.encoder(EncoderOptions)` returns an `ur::Encoder` over the dCBOR bytes for multipart streaming.
+
+## `UrEncodable` / `UrDecodable`
+
+Application types implement dcbor's tagged traits; the blanket impls do the rest:
+
+```rust
+use dcbor::{CBOR, CBORTagged, CBORTaggedDecodable, CBORTaggedEncodable, Tag};
+use bcur::{UrDecodable, UrEncodable};
+
+struct Note(String);
+
+impl CBORTagged for Note {
+    fn cbor_tags() -> Vec<Tag> {
+        vec![Tag::with_static_name(9001, "x-note")] // first tag's name is the UR type
+    }
+}
+
+impl CBORTaggedEncodable for Note {
+    fn untagged_cbor(&self) -> CBOR {
+        self.0.clone().into()
+    }
+}
+
+impl CBORTaggedDecodable for Note {
+    fn from_untagged_cbor(cbor: CBOR) -> dcbor::Result<Self> {
+        Ok(Self(cbor.try_into()?))
+    }
+}
+
+// CBORTaggedDecodable also requires TryFrom<CBOR> for the tagged form.
+impl TryFrom<CBOR> for Note {
+    type Error = dcbor::Error;
+
+    fn try_from(cbor: CBOR) -> dcbor::Result<Self> {
+        Self::from_tagged_cbor(cbor)
+    }
+}
+
+let ur = Note("hi".into()).to_ur()?; // ur:x-note/…
+let back = Note::from_ur(&ur)?;
+```
+
+Semantics: `to_ur` writes the **first** `cbor_tags()` entry's name as the UR type with the untagged body; `from_ur` accepts the type when it matches **any** registered tag name. A tag without a name — or a name that is not a valid UR type token — is `InvalidType`; a UR type that matches none of the names is `UnexpectedType` carrying the full expected list; a body that fails the type's untagged decode is `CborType`.
+
+## Multipart composition
+
+`Ur` composes with the transport: `ur.encoder(options)` for frames, `ur::Decoder` to receive, `TryFrom<ur::Decoded>` to lift the result back:
+
+```rust
+use bcur::ur::Decoder;
+use bcur::{State, Ur};
+
+let mut decoder = Decoder::default();
+for frame in ur.encoder(EncoderOptions::new(100))?.by_ref() {
+    decoder.receive(&frame)?;
+    if matches!(decoder.state(), State::Complete(_)) {
+        break;
+    }
+}
+let ur2 = Ur::try_from(decoder.into_decoded()?)?;
+```

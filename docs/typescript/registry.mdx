@@ -1,0 +1,77 @@
+---
+title: Registry
+description: Registry value codecs (BCR-2020-006) — @qntx/ur/registry.
+---
+
+Registry codecs map application values to dCBOR bodies. Every codec is an `UrCodec` (see [typed](./typed.mdx)) whose `tags` are `[v2 tag, v1 tag]`: **v2 tags are written, v1 tags are read-only** (BCR-2020-006 `crypto-*` types are deprecated). This layer is TypeScript-only in this release.
+
+```ts
+import { fromUr, seedCodec, toUr } from "@qntx/ur/registry";
+
+const seed = { payload: bytes, name: "Alice's seed" };
+const ur = toUr(seed, seedCodec); // ur:seed/…  (v2 tag name)
+const back = fromUr(ur, seedCodec); // accepts ur:seed and ur:crypto-seed
+```
+
+(`/registry` re-exports the typed helpers — `Ur`, `toUr`, `fromUr`, `codecMap`, `fromUrWith`, and friends — so one import covers both.)
+
+## Types
+
+| v2 UR type           | v2 tag | v1 read type       | v1 tag | Codec                    | Value                                     |
+| -------------------- | ------ | ------------------ | ------ | ------------------------ | ----------------------------------------- |
+| `seed`               | 40300  | `crypto-seed`      | 300    | `seedCodec`              | `Seed`                                    |
+| `hdkey`              | 40303  | `crypto-hdkey`     | 303    | `hdKeyCodec`             | `HdKey` = `MasterHdKey` or `DerivedHdKey` |
+| `keypath`            | 40304  | `crypto-keypath`   | 304    | `keypathCodec`           | `Keypath`                                 |
+| `coin-info`          | 40305  | `crypto-coin-info` | 305    | `coinInfoCodec`          | `CoinInfo`                                |
+| `eckey`              | 40306  | `crypto-eckey`     | 306    | `ecKeyCodec`             | `EcKey`                                   |
+| `address`            | 40307  | `crypto-address`   | 307    | `addressCodec`           | `Address`                                 |
+| `output-descriptor`  | 40308  | `crypto-output`    | 308    | `outputDescriptorCodec`  | `OutputDescriptor`                        |
+| `sskr`               | 40309  | `crypto-sskr`      | 309    | `sskrCodec`              | `SskrShare`                               |
+| `psbt`               | 40310  | `crypto-psbt`      | 310    | `psbtCodec`              | `Psbt`                                    |
+| `account-descriptor` | 40311  | `crypto-account`   | 311    | `accountDescriptorCodec` | `AccountDescriptor`                       |
+| `envelope`           | 200    | —                  | —      | `envelopeCodec`          | `Cbor`                                    |
+
+All maps are closed: an unknown key is `CborType`. Validation runs identically on encode and decode. Embedded tagged values (e.g. `coin-info` inside `hdkey` or `address`) accept both v1 and v2 tags on read and always write v2.
+
+## Validation rules
+
+- **seed**: `payload` 1–64 bytes, required. `creationDate` optional — writes CBOR tag 1, reads tag 1 or tag 100 (days since epoch). `name`/`note` optional text; empty strings are omitted on write.
+- **coin-info**: `type` uint31 and `network` int32, both default 0 and omitted on write when 0. Named constants `CoinType.btc`/`CoinType.eth` and `Network.mainnet`/`Network.btcTestnet`.
+- **keypath**: `components` is a `PathComponent[]` (`index`, `range`, `wildcard`, `pair` kinds, each with `hardened`). `sourceFingerprint` is uint32 ≠ 0; `depth` is uint8. Empty `components` is only valid with a fingerprint or a depth.
+- **hdkey**: a master key (map key 1 = true) needs 33-byte `keyData` + 32-byte `chainCode`. A derived key needs 33-byte `keyData` (private keys carry the `0x00` prefix); `isPrivate` defaults false; optional `chainCode`, `useInfo` (coin-info), `origin`/`children` (keypath), `parentFingerprint` (uint32 ≠ 0), `name`, `note`.
+- **eckey**: `curve` uint (default 0 = secp256k1, omitted on write), `isPrivate` default false, `data` required. Curve 0: private keys are exactly 32 bytes, public keys 33 or 65 bytes. Other curves: non-empty data.
+- **address**: `info` is a tagged coin-info; `type` is `"p2pkh" | "p2sh" | "p2wpkh"`. With `type`, `data` is exactly 20 bytes (S-13); without it, `data` is any non-empty bytes.
+- **psbt**: `bytes` must start with the PSBT magic `70 73 62 74 ff`.
+- **sskr**: `identifier` uint16; `groupThreshold`, `groupCount`, `memberThreshold` in 1–16; `groupIndex < groupCount`; `memberIndex` in 0–15; `groupThreshold <= groupCount`. The share is a packed 5-byte header plus `shareValue` bytes.
+- **output-descriptor**: `source` is a descriptor text with `@n` placeholders; the placeholder set must be exactly `0..keys.length - 1` (no gaps, no extras — no placeholders means `keys` is empty). `keys` entries are tagged `hdkey`, `eckey`, or `address` values (`DescriptorKey` unions). `name`/`note` optional text.
+- **account-descriptor**: `masterFingerprint` uint32, `outputDescriptors` at least one entry.
+- **envelope**: structural validation only. `assertEnvelopeContent(cbor)` walks the envelope tree (leaf tag 201, known-value 40000, encrypted 40002, compressed 40003, assertions as single-entry maps, elided as 32-byte digests) and rejects nesting past `ENVELOPE_MAX_DEPTH` (64). It does not interpret contents.
+
+## v1 output/account conversion
+
+`crypto-output` bodies are BCR-2020-010 script-expression trees (tags 400–410: `sh` `wsh` `pk` `pkh` `wpkh` `combo` `multi` `sortedmulti` `raw` `tr` `cosigner`). On read the converter emits BIP-380 descriptor text. The emitted functions are exactly:
+
+- key functions: `pk(@n)`, `pkh(@n)`, `wpkh(@n)`, `combo(@n)`, `cosigner(@n)`;
+- wrappers: `sh(…)` and `wsh(…)`, combinable only as `sh(wsh(…))` per BIP-380 (`sh` is top-level only; `wsh` is top-level or directly inside `sh`);
+- multisig: `multi(k,@n,…)` and `sortedmulti(k,@n,…)`;
+- `raw(<lowercase hex>)` (carries no key) and `tr(@n)` (BIP-386 single-key form only).
+
+Keys become `@0`, `@1`, … in order of appearance and are collected as v2 `DescriptorKey` values (`hdkey`, `eckey`, or `address` — a v1 `307` address nested inside a script function becomes an `address` key, not an `addr()` function). A bare key expression directly inside `sh`/`wsh` — the KeystoneHQ form `sh(key)` — is read as `sh(cosigner(@0))`. Anything unconvertible — a `tr()` script tree, `sh` inside `sh` or `wsh`, `wsh` inside `wsh` — is `CborType`.
+
+`crypto-account` converts the same way through `accountDescriptorCodec`; entries may carry the `308` tag or be bare script expressions (KeystoneHQ writes the latter). Conversion and nesting edge cases are pinned by `vectors/registry/crypto-output-conversion.json` and `vectors/registry/invalid.json`.
+
+## Digests
+
+[BCR-2021-002](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2021-002-digest.md) object digests:
+
+```ts
+import { hdKeyDigest, hdKeyDigestSource, seedDigest } from "@qntx/ur/registry";
+
+seedDigest(seed); // SHA-256 of the raw payload bytes
+hdKeyDigest(key); // SHA-256 of the dCBOR digest preimage
+hdKeyDigestSource(key); // the preimage: dCBOR-encoded [keyData, chainCode|null, coinType, network]
+```
+
+## Tag tables
+
+`TAGS` maps every value name (`seed`, `hdkey`, `crypto-seed`, …) to its `dcbor` `Tag`; `SCRIPT_TAGS` maps script-expression names (`sh`, `multi`, `tr`, …) to tags 400–410. The numeric `TAG_*` constants are internal — use the tables.

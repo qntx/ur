@@ -1,0 +1,126 @@
+---
+title: Transport
+description: Bytewords, UR encode/decode, and the fountain codecs — @qntx/ur root export.
+---
+
+The root export is transport-only: opaque payload bytes plus a type token. Nothing here parses CBOR.
+
+## Bytewords
+
+```ts
+import { decodeBytewords, encodeBytewords } from "@qntx/ur";
+
+const data = new Uint8Array([1, 2, 3]);
+const text = encodeBytewords(data, "minimal"); // "adaoaxgorflaca"
+decodeBytewords(text, "minimal"); // Uint8Array [1, 2, 3]
+```
+
+Styles are required on every call: `"standard"` (4-letter words, space-separated), `"uri"` (hyphen-separated), `"minimal"` (2 letters per byte, what URs use). `decodeBytewords` is case-insensitive and verifies the trailing CRC-32.
+
+| Function                           | Returns                                                     |
+| ---------------------------------- | ----------------------------------------------------------- |
+| `bytewordsChecksum(data, style)`   | The four CRC-32 checksum words only (URKit `checksumWords`) |
+| `bytewordsEncodedLength(n, style)` | Encoded length of `n` bytes, no checksum                    |
+| `bytewordsIdentifier(data)`        | 4-word identifier of a 4-byte digest (BCR-2020-012)         |
+| `bytemojiIdentifier(data)`         | 4-emoji identifier of a 4-byte digest (BCR-2024-008)        |
+| `canonicalizeByteword(token)`      | Full word for a 2–4 letter token, or `undefined`            |
+| `crc32(data)`                      | CRC-32 of `data`                                            |
+| `WORDS`, `MINIMALS`, `BYTEMOJIS`   | The 256-entry tables                                        |
+
+## Type tokens
+
+`UrType` is a branded string: canonical lowercase `[a-z0-9-]+`.
+
+```ts
+import { isUrType, parseUrType } from "@qntx/ur";
+
+parseUrType("Seed"); // "seed" (lowercased); throws UrError(InvalidType) on bad tokens
+isUrType("seed"); // true — canonical form only, no folding
+isUrType("SEED"); // false
+```
+
+## Single-part URs
+
+```ts
+import { encodeUr, parseUr, parseUrType } from "@qntx/ur";
+
+const type = parseUrType("test");
+const ur = encodeUr(type, new Uint8Array([0x83, 0x01, 0x02, 0x03])); // "ur:test/lsadaoaxjygonesw"
+
+const parsed = parseUr(ur);
+// { kind: "single", type: "test", message: Uint8Array [0x83, 0x01, 0x02, 0x03] }
+```
+
+`parseUr` returns `{ kind: "single", type, message }` or `{ kind: "multi", type, part }` for a fountain frame. `toQrString(ur)` uppercases a UR for QR alphanumeric mode.
+
+## Multi-part encoding
+
+`UrEncoder` is an `IterableIterator` of UR strings:
+
+```ts
+import { UrEncoder } from "@qntx/ur";
+
+const encoder = new UrEncoder(type, message, { maxFragmentLength: 100 });
+encoder.fragmentCount; // K
+encoder.isSinglePart; // true when K == 1
+
+for (const frame of encoder) {
+  showQr(frame); // K == 1 repeats the identical single-part UR; multi-part ends after seq 0xFFFFFFFF
+  if (encoder.isComplete) {
+    break; // emit at least one full set, keep looping for fountain redundancy
+  }
+}
+```
+
+Options: `maxFragmentLength` (required), `minFragmentLength` (default 10), `firstSequence` (default 0).
+
+## Decoding
+
+`UrDecoder.receive` never throws on frame problems — it returns per-frame results:
+
+```ts
+import { UrDecoder } from "@qntx/ur";
+
+const decoder = new UrDecoder({ accept: [type] });
+for (const frame of capturedFrames) {
+  const result = decoder.receive(frame); // "accepted" | "duplicate" | "rejected" | "fatal"
+  if (result.status === "fatal" || result.status === "rejected") {
+    console.error(result.error.code);
+  }
+  const state = decoder.state;
+  if (state.phase === "complete") {
+    state.value.type; // UrType
+    state.value.message; // Uint8Array
+    break;
+  }
+  if (state.phase === "failed") {
+    throw state.error;
+  }
+}
+```
+
+- `new UrDecoder({ limits?, accept? })` — `accept` restricts admitted types; the first ingested frame locks the type. See [Decoder limits](../limits.mdx).
+- `decoder.state` — `empty` | `collecting` | `complete` | `failed`; `collecting` carries `progress`.
+- `decoder.progress` — `{ fragmentCount, rank, recovered, processed, ratio }`.
+- `decoder.lastIndexes` — fragment indexes mixed into the most recent part.
+- `decoder.reset()` — back to `empty`, keeping limits and `accept`.
+
+## Raw fountain layer
+
+For custom transport (not `ur:` URIs), `FountainEncoder` and `FountainDecoder` work on `Part` objects directly:
+
+```ts
+import { FountainDecoder, FountainEncoder, decodePart, encodePart } from "@qntx/ur";
+
+const encoder = new FountainEncoder(message, { maxFragmentLength: 100 });
+const decoder = new FountainDecoder();
+for (const part of encoder) {
+  const wire = encodePart(part); // CBOR bytes (shortest-form integers)
+  decoder.receive(decodePart(wire)); // lenient decode: any definite-width integer
+  if (decoder.state.phase === "complete") {
+    break;
+  }
+}
+```
+
+`FountainEncoder` is an infinite `IterableIterator` of `Part` values (identical parts with rising sequences for `K == 1`, terminating after sequence `0xFFFFFFFF`). `Part` is plain data `{ sequence, sequenceCount, messageLength, checksum, data }`.

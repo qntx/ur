@@ -1,0 +1,29 @@
+---
+title: Install
+description: Installing @qntx/ur and its runtime requirements.
+---
+
+```bash
+npm install @qntx/ur
+```
+
+## Subpath exports
+
+| Import              | Contents                                               |
+| ------------------- | ------------------------------------------------------ |
+| `@qntx/ur`          | L1–L3 transport: bytewords, fountain, UR encode/decode |
+| `@qntx/ur/typed`    | L4: `Ur` value + `UrCodec` helpers (dCBOR)             |
+| `@qntx/ur/registry` | L5: registry codecs (seed, hdkey, descriptors, …)      |
+
+`/typed` and `/registry` need the peer dependency:
+
+```bash
+npm install @blockchaincommons/dcbor@1.0.0-beta.3
+```
+
+## Runtimes
+
+- **ESM only.** The package ships `dist/*.mjs` (ES2022); there is no CommonJS build.
+- **Node ≥ 20.19.0** for the root transport. `/typed` and `/registry` follow the `dcbor` floor of **Node ≥ 22.12**.
+- **Bun** is fully supported.
+- **React Native / Hermes V1**: the root needs only `TextEncoder` (available in Hermes V1). `/typed` and `/registry` additionally need `TextDecoder` with `{ fatal: true }` — Expo ships one; bare React Native needs a polyfill.

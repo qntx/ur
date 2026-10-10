@@ -1,0 +1,92 @@
+---
+title: Typed layer
+description: Ur value type and the UrCodec contract — @qntx/ur/typed.
+---
+
+The typed layer is the first dCBOR parse in the package: a `Ur` is a type token plus a deterministic-CBOR body. The CBOR carried on the wire is **untagged** — the tag name becomes the UR type.
+
+## The `Ur` value
+
+```ts
+import { Ur } from "@qntx/ur/typed";
+
+const ur = Ur.fromCbor("test", [1, 2, 3]); // CborInput
+ur.type; // "test"
+ur.toString(); // "ur:test/lsadaoaxjygonesw"
+ur.toQrString(); // uppercase form for QR alphanumeric mode
+ur.toCborData(); // dCBOR bytes
+
+Ur.parse("ur:test/lsadaoaxjygonesw"); // single-part only; NotSinglePart on a fountain frame
+Ur.fromCborData("test", ur.toCborData()); // wrap encoded dCBOR; CborDecode if not dCBOR
+Ur.fromDecoded(decoded); // wrap a completed UrDecoder result ({ type, message })
+```
+
+`ur.encoder(options)` returns an `UrEncoder` over the dCBOR bytes for multipart streaming.
+
+## `UrCodec`
+
+```ts
+type UrCodec<T> = Readonly<{
+  tags: readonly [Tag, ...Tag[]]; // dcbor Tag values; tags[0] is written, all are read
+  encode(value: T): Cbor; // untagged body
+  decode(cbor: Cbor): T;
+}>;
+```
+
+Every `tag.name` must be a valid UR type token (validated on use; `InvalidType` otherwise). Structural mismatches inside `encode`/`decode` surface as `UrError(CborType)`.
+
+| Function                  | Behavior                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `codecUrTypes(codec)`     | Every tag name as `UrType`, write-preferred first                                                |
+| `toUr(value, codec)`      | `Ur` with `tags[0]`'s name as type and the untagged body                                         |
+| `fromUr(ur, codec)`       | Decode when `ur.type` is one of the tag names; else `UnexpectedType` carrying all accepted names |
+| `toTagged(value, codec)`  | `tags[0]`-wrapped `Cbor` (for embedding in larger structures)                                    |
+| `fromTagged(cbor, codec)` | Unwrap any of the codec's tags, then decode the body                                             |
+| `codecMap(codecs)`        | `UrType → codec` map covering every tag name; a duplicate type is `InvalidType`                  |
+| `fromUrWith(ur, map)`     | Dispatch to the codec registered for `ur.type`; returns `{ type, value }`                        |
+
+## Multipart composition
+
+`Ur` composes with the transport: encode through `ur.encoder()`, receive through `UrDecoder`, and lift the result back:
+
+```ts
+import { UrDecoder } from "@qntx/ur";
+import { Ur } from "@qntx/ur/typed";
+
+const decoder = new UrDecoder();
+for (const frame of ur.encoder({ maxFragmentLength: 100 })) {
+  decoder.receive(frame);
+  if (decoder.state.phase === "complete") {
+    break;
+  }
+}
+const state = decoder.state;
+if (state.phase === "complete") {
+  const decoded = Ur.fromDecoded(state.value);
+}
+```
+
+## A custom codec
+
+```ts
+import { Tag, cbor, expectText } from "@blockchaincommons/dcbor";
+import { fromUr, toUr } from "@qntx/ur/typed";
+import type { UrCodec } from "@qntx/ur/typed";
+
+type Note = { readonly text: string };
+
+const noteCodec: UrCodec<Note> = {
+  tags: [Tag.from(9001, "x-note")],
+  encode(note) {
+    return cbor(note.text);
+  },
+  decode(value) {
+    return { text: expectText(value) };
+  },
+};
+
+const ur = toUr({ text: "hello" }, noteCodec); // ur:x-note/…
+const note = fromUr(ur, noteCodec);
+```
+
+Registry codecs ([registry](./registry.mdx)) are built exactly this way; `codecMap` collects them for dispatch.

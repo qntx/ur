@@ -1,0 +1,31 @@
+---
+title: Install
+description: Adding bcur to a Rust project, features, and platform support.
+---
+
+```bash
+cargo add bcur
+```
+
+With the typed dCBOR layer:
+
+```bash
+cargo add bcur --features dcbor
+```
+
+## Features
+
+| Feature | Default | Description                                              |
+| ------- | ------- | -------------------------------------------------------- |
+| `std`   | yes     | Host builds                                              |
+| `dcbor` | no      | `typed::Ur`, `UrEncodable`, `UrDecodable`; implies `std` |
+
+The transport layers (L1–L3) are `no_std` + `alloc`: build with `--no-default-features` for embedded targets.
+
+## Toolchain
+
+Edition 2024, MSRV **1.99** (`rust-version` in `Cargo.toml`, pinned by `rust-toolchain.toml`).
+
+## Targets
+
+CI builds `bcur` with `--no-default-features` for all six portable targets — `wasm32-unknown-unknown`, `thumbv7m-none-eabi`, `aarch64-linux-android`, `x86_64-linux-android`, `aarch64-apple-ios`, and `aarch64-apple-ios-sim` — and forbids `getrandom` in the dependency tree.

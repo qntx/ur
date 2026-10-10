@@ -1,0 +1,60 @@
+---
+title: Protocol
+description: Wire behavior shared by the TypeScript and Rust implementations.
+---
+
+This page describes what goes on the wire. Both implementations are byte-identical in both directions; everything here is tested by shared vectors and a seeded TS→Rust differential replay.
+
+## UR forms
+
+Two URI forms, case-insensitive on input:
+
+```text
+ur:<type>/<bytewords>                       single-part
+ur:<type>/<seq>-<count>/<bytewords>        multi-part fountain frame
+```
+
+- `<type>` is `[a-z0-9-]+`, lowercased on parse.
+- The part header grammar is `seq = 1*DIGIT "-" 1*DIGIT` with both numbers in `1..=4294967295` (`0xFFFFFFFF`). No signs, no whitespace; leading zeros are allowed.
+- Bytewords use the `minimal` style (2 characters per byte) with a trailing CRC-32 of the payload.
+
+## Fragments
+
+`maxFragmentLength` (required) and `minFragmentLength` (default 10) pick the fragment size `L = ceil(len / K)` where `K = min(ceil(len / max), max(1, floor(len / min)))`. When `min` binds, fragments may exceed `max` — that is the URKit `findNominalFragmentLength` behavior.
+
+Each fountain part carries `{seq, K, messageLen, crc32, data}` as CBOR. Part CBOR integers may arrive in any definite-width form (lenient decode); encoders always emit shortest-form.
+
+## Encoder stream
+
+- Emission order: sequence `firstSequence + 1`, `+2`, … and the stream ends after sequence `0xFFFFFFFF` (no wraparound).
+- `K == 1` (the message fits one fragment): the encoder repeats the identical single-part `ur:<type>/<body>` string on every step — it never emits `1-1` parts. Fountain-level (`Part`) iterators keep producing identical parts with rising sequence numbers.
+
+## Decoder
+
+Per-frame results:
+
+| TS `ReceiveResult.status` | Rust                      | Meaning                                          |
+| ------------------------- | ------------------------- | ------------------------------------------------ |
+| `accepted`                | `Ok(Received::Accepted)`  | Frame increased the GF(2) rank (new information) |
+| `duplicate`               | `Ok(Received::Duplicate)` | Frame added nothing, or the session is terminal  |
+| `rejected`                | `Err(e)`, `!e.is_fatal()` | Bad frame; session unchanged                     |
+| `fatal`                   | `Err(e)`, `e.is_fatal()`  | Limit/completion failure; session → `failed`     |
+
+After `complete` or `failed`, every further frame returns `duplicate`/`Duplicate` without being parsed.
+
+Session states: `empty` → `collecting` → `complete`/`failed`. `progress` reports `{fragmentCount (K), rank, recovered, processed, ratio}` where `ratio = rank / K` is the exact information fraction, not an estimate.
+
+Decoding is incremental Gauss-Jordan elimination over GF(2): each frame is forward-eliminated against retained pivot rows and back-substituted. The session completes when the rank reaches `K` — completion depends only on receiving `K` linearly independent parts, not on which ones, so loss and reordering only change how many frames are needed. No wire change.
+
+## Layering rules
+
+- The L3 transport carries opaque bytes plus a type token. The BCR-2020-005 requirement that a UR message be deterministic CBOR is enforced at L4 (`@qntx/ur/typed` / `bcur::typed`), not by the transport.
+- Registry types that have a v1 form write v2 tags (`40300–40311`) only; v1 tags (`300–311`) are accepted on read and converted (see the registry page). `envelope` (tag 200) has no v1 form.
+
+## Spec rulings
+
+User-visible rulings where the prose specs under-specify:
+
+- `address` with an explicit type carries exactly 20-byte `data` (S-13; the BCR-2023-010 `p2wpkh` example uses type 2 + 20 bytes, not the 32 bytes older text suggests).
+- v1 `crypto-account` entries may be bare script-expression tags `400–410` without an outer `308` tag (KeystoneHQ emits this form); reads accept both, writes always emit v2 `40308` wrappers (S-14).
+- The fountain chooser's `nextDouble` uses round-to-nearest `v / 2^64`; when it rounds to exactly 1.0 (`v >= 2^64 − 2^10`), `nextInt` clamps to `n − 1` — the reference implementations index out of bounds there (S-11).

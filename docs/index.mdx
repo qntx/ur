@@ -1,14 +1,32 @@
 ---
-title: ur.js
-description: Uniform Resources transport for TypeScript.
+title: ur
+description: Uniform Resources for TypeScript and Rust.
 ---
 
-`@qntx/ur` encodes and decodes [Uniform Resources](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-005-ur.md) (UR): Bytewords, fountain codes, and single- or multi-part UR strings.
+Uniform Resources (UR, [BCR-2020-005](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-005-ur.md)) encode binary payloads as URI-friendly `ur:<type>/<bytewords>` strings for QR codes and unreliable channels. Multi-part transfer uses a GF(2) fountain: any subset of parts that reaches full rank reconstructs the message.
 
-The **root** `@qntx/ur` is a **transport-only** contract: opaque payload bytes plus a type token. There is no dCBOR parse and no tag apply/strip on the `.` export. Application types live on `@qntx/ur/registry`. Type `bytes` is host policy; this codec does not refuse it.
+## Packages
 
-L4 lives on `@qntx/ur/typed` and is the first dCBOR parse in this package.
+| Package    | Registry  | Language             |
+| ---------- | --------- | -------------------- |
+| `@qntx/ur` | npm       | TypeScript           |
+| `bcur`     | crates.io | Rust                 |
+| `bcur-cli` | crates.io | Rust (`bcur` binary) |
 
-When `fragmentCount === 1`, `Encoder.nextPart` emits a single-part `ur:<type>/<body>`. An ur-rs `Decoder` will not consume that URI. This `Decoder` still accepts ur-rs fountain `1-1`. Fountain goldens match [bcur](https://github.com/qntx/ur/tree/main/crates/bcur) and ur-rs.
+## Layers
 
-Status: **1.0.0** transport freeze on the `.` export; **1.1.0** adds `@qntx/ur/typed`; **1.2.0** adds `@qntx/ur/registry`; **1.3.0** adds hdkey / keypath / coin-info; **1.4.0** adds sskr; **1.5.0** adds envelope; **1.6.0** adds `codecMap`; **1.7.0** moves the dcbor peer to `beta.3`; **1.8.0** speeds up fountain decoding. `DEFAULT_LIMITS` integers are frozen. Runtime: Node `>=20.19.0` (Node `>=22.12` for `/typed` and `/registry`).
+| Layer | Contents                                     | Spec                                                                                                          | TypeScript                          | Rust                                |
+| ----- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ----------------------------------- |
+| L1    | Bytewords, identifiers, bytemoji             | [BCR-2020-012](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-012-bytewords.md)    | `@qntx/ur`                          | `bcur::bytewords`, `bcur::bytemoji` |
+| L2    | GF(2) fountain over opaque bytes             | [BCR-2024-001](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2024-001-multipart-ur.md) | `FountainEncoder`/`FountainDecoder` | `bcur::fountain`                    |
+| L3    | `ur:` URIs, encoders, decoders               | [BCR-2020-005](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-005-ur.md)           | `UrEncoder`/`UrDecoder`             | `bcur::ur`                          |
+| L4    | dCBOR values, codecs                         | dCBOR ([I-D.dcbor](https://datatracker.ietf.org/doc/draft-mcnally-deterministic-cbor/))                       | `@qntx/ur/typed`                    | `bcur::typed` (`dcbor` feature)     |
+| L5    | Registry types (seed, hdkey, descriptors, …) | [BCR-2020-006](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-006-urtypes.md)      | `@qntx/ur/registry`                 | —                                   |
+
+The registry layer (L5) is TypeScript-only in this release.
+
+The L1–L3 transport treats payloads as opaque bytes; the dCBOR requirement of BCR-2020-005 is enforced at L4, not on the wire transport.
+
+## Conformance
+
+Both implementations run the same frozen vector files under `vectors/`: official BCR and URKit/bc-ur vectors, generated part-CBOR and decoder-frame streams, registry vectors, and v1→v2 conversion expectations. `parity.json` tracks which capabilities each language covers and which tests exercise them. A seeded differential test (`bun run test:parity`) generates randomized encoder/decoder sessions in TypeScript and replays them frame-by-frame in Rust.

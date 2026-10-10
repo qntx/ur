@@ -1,14 +1,74 @@
 ---
 title: Errors
-description: UrError codes for the UR transport stack.
+description: The unified error model — UrError codes and ErrorKind variants are one-to-one.
 ---
 
-Failures throw `UrError` with a stable `code`. Switch on `error.code`, not the message text.
+TypeScript throws `UrError`; Rust returns `Error` with a `kind()`. Codes and variants are one-to-one, and the fatal set is identical. `ErrorKind` is `#[non_exhaustive]`: match with a wildcard arm.
 
-Codes: `InvalidWord`, `InvalidBytewordsChecksum`, `InvalidBytewordsLength`, `NonAscii`, `EmptyMessage`, `EmptyPart`, `InvalidFragmentLen`, `InvalidSequence`, `InconsistentPart`, `InvalidPadding`, `InvalidMessageChecksum`, `InvalidPartCbor`, `DecoderState`, `SinglePartExhausted`, `ResourceLimit`, `InvalidScheme`, `TypeUnspecified`, `InvalidType`, `InvalidIndices`, `NotSinglePart`, `UnexpectedType`, `CborDecode`, `CborType`.
+| TS `UrError.code`          | Rust `ErrorKind`           | Fatal | Meaning                                                                 |
+| -------------------------- | -------------------------- | ----- | ----------------------------------------------------------------------- |
+| `NonAscii`                 | `NonAscii`                 | no    | Bytewords string is not ASCII                                           |
+| `InvalidWord`              | `InvalidWord`              | no    | Unknown or malformed byteword                                           |
+| `InvalidBytewordsLength`   | `InvalidBytewordsLength`   | no    | Bytewords length inconsistent with the style                            |
+| `InvalidBytewordsChecksum` | `InvalidBytewordsChecksum` | no    | Trailing CRC-32 does not match                                          |
+| `InvalidScheme`            | `InvalidScheme`            | no    | Missing `ur:` scheme                                                    |
+| `TypeUnspecified`          | `TypeUnspecified`          | no    | No type token after the scheme                                          |
+| `InvalidType`              | `InvalidType`              | no    | Empty or illegal type token                                             |
+| `InvalidIndices`           | `InvalidIndices`           | no    | Bad `seq-count` header or mismatch with the part                        |
+| `UnexpectedType`           | `UnexpectedType`           | no    | Type not in the accept list / differs from the locked type              |
+| `InvalidPartCbor`          | `InvalidPartCbor`          | no    | Malformed fountain-part CBOR                                            |
+| `InvalidPart`              | `InvalidPart`              | no    | Zero/empty part fields or inconsistent padding                          |
+| `InconsistentPart`         | `InconsistentPart`         | no    | Part conflicts with earlier frames                                      |
+| `ResourceLimit`            | `ResourceLimit`            | yes   | A decoder budget was exceeded (`limit`/`Limit` detail)                  |
+| `InvalidPadding`           | `InvalidPadding`           | yes   | Non-zero padding past the message length                                |
+| `InvalidMessageChecksum`   | `InvalidMessageChecksum`   | yes   | Joined payload failed CRC-32                                            |
+| `EmptyMessage`             | `EmptyMessage`             | no    | Fountain encoder given an empty message                                 |
+| `InvalidFragmentLength`    | `InvalidFragmentLength`    | no    | Fragment bounds not positive, or `min > max`                            |
+| `MessageTooLong`           | `MessageTooLong`           | no    | Message exceeds the `u32` wire length field                             |
+| `NotSinglePart`            | `NotSinglePart`            | no    | Single-part API used on a multi-part UR                                 |
+| —                          | `NotComplete`              | no    | `into_decoded()` on an unfinished decoder (Rust only; TS reads `state`) |
+| `CborDecode`               | `CborDecode`               | no    | Payload is not well-formed deterministic CBOR (L4)                      |
+| `CborType`                 | `CborType`                 | no    | Well-formed CBOR that does not fit the codec's shape (L4/L5)            |
+| `Internal`                 | `Internal`                 | yes   | Internal invariant broken                                               |
 
-`decodeMessage` throws `NotSinglePart` on a multi-part URI. Duplicate single-part URIs of the same type are not `InconsistentPart`: first payload wins, body not compared. Mixing single-part and fountain in one session is `InconsistentPart`. `SinglePartExhausted` is thrown by a fountain encoder when `K == 1` and `nextPart` is called again.
+## Inspecting errors
 
-`CborDecode` / `CborType` are thrown only by `@qntx/ur/typed`. L1–L3 still throw the 1.0 codes. Exhaustive `switch (error.code)` needs a default. `e instanceof UrError` holds when `UrError` is imported from `@qntx/ur` and thrown from `@qntx/ur/typed`.
+TypeScript narrows detail by `code`; `UrError.info` is a discriminated union:
 
-`InvalidType` is a type token that fails `[a-z0-9-]+`. Duplicate `codecMap` entries throw `TypeError`, not `InvalidType`. `fromUrStringWith` on an unknown type is `UnexpectedType`; `expected` is the map keys joined with `|`.
+```ts
+import { UrError } from "@qntx/ur";
+
+try {
+  // …
+} catch (error) {
+  if (error instanceof UrError) {
+    if (error.info.code === "ResourceLimit") {
+      error.info.limit; // "messageLength" | "fragmentCount" | "fragmentLength" | "uriLength"
+    }
+    if (error.info.code === "UnexpectedType") {
+      error.info.expected; // accepted UrType[]
+      error.info.found; // the mismatched type
+    }
+    error.fatal; // session-fatal for a decoder
+  }
+}
+```
+
+Rust reads detail through accessors:
+
+```rust
+use bcur::{Error, ErrorKind};
+
+match error.kind() {
+    ErrorKind::ResourceLimit => { let _ = error.limit(); } // Option<Limit>
+    ErrorKind::UnexpectedType => {
+        let _ = error.expected_types(); // &[UrType]
+        let _ = error.found_type();     // Option<&UrType>
+    }
+    _ => {}
+}
+let fatal = error.is_fatal();
+let inner = core::error::Error::source(&error); // Some(&dcbor::Error) for CborDecode/CborType
+```
+
+`Limit::as_str()` returns the TS `UrLimit` string form (`"messageLength"`, `"fragmentCount"`, `"fragmentLength"`, `"uriLength"`).
