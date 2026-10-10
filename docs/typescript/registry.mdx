@@ -3,7 +3,7 @@ title: Registry
 description: Registry value codecs (BCR-2020-006) — @qntx/ur/registry.
 ---
 
-Registry codecs map application values to dCBOR bodies. Every codec is an `UrCodec` (see [typed](./typed.mdx)) whose `tags` are `[v2 tag, v1 tag]`: **v2 tags are written, v1 tags are read-only** (BCR-2020-006 `crypto-*` types are deprecated). This layer is TypeScript-only in this release.
+Registry codecs map application values to dCBOR bodies. Every codec is an `UrCodec` (see [typed](./typed.mdx)) whose `tags` are `[v2 tag, v1 tag]`: **v2 tags are written, v1 tags are read-only** (BCR-2020-006 `crypto-*` types are deprecated). The Rust counterpart is `bcur-registry` — see [registry](../rust/registry.mdx).
 
 ```ts
 import { fromUr, seedCodec, toUr } from "@qntx/ur/registry";

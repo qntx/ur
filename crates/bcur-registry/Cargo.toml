@@ -12,8 +12,8 @@ keywords               = ["ur", "cbor", "registry", "bitcoin"]
 categories             = ["encoding", "cryptography"]
 readme                 = "README.md"
 documentation          = "https://docs.rs/bcur-registry"
-# First publish is a later milestone; until then the crate builds in-workspace only.
-publish = false
+# Tests live outside the package: they read the repository-root vectors/ tree.
+include = ["src/**/*", "README.md"]
 
 [package.metadata.docs.rs]
 all-features = true

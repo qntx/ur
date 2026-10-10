@@ -1,0 +1,136 @@
+---
+title: Registry
+description: Registry value types (BCR-2020-006) — bcur-registry.
+---
+
+The registry crate maps application values to dCBOR bodies on dcbor's tagged traits. Every type's `cbor_tags()` is `[v2 tag, v1 tag]`: **v2 tags are written, v1 tags are read-only** (BCR-2020-006 `crypto-*` types are deprecated). Wire forms, defaults, validation, and error classes are identical to the [TypeScript registry](../typescript/registry.mdx).
+
+```bash
+cargo add bcur-registry
+cargo add bcur --features dcbor # to_ur / from_ur live on bcur's typed layer
+```
+
+```rust
+use bcur::typed::{UrDecodable, UrEncodable};
+use bcur_registry::Seed;
+
+let seed = Seed::new(vec![0xc7; 16]).unwrap();
+let ur = seed.to_ur().unwrap(); // ur:seed/… (v2 tag name)
+let back = Seed::from_ur(&ur).unwrap(); // accepts ur:seed and ur:crypto-seed
+assert_eq!(seed, back);
+```
+
+## Types
+
+| v2 UR type           | v2 tag | v1 read type       | v1 tag | Type                                  |
+| -------------------- | ------ | ------------------ | ------ | ------------------------------------- |
+| `seed`               | 40300  | `crypto-seed`      | 300    | `Seed`                                |
+| `hdkey`              | 40303  | `crypto-hdkey`     | 303    | `HdKey` = `MasterKey` or `DerivedKey` |
+| `keypath`            | 40304  | `crypto-keypath`   | 304    | `Keypath`                             |
+| `coin-info`          | 40305  | `crypto-coin-info` | 305    | `CoinInfo`                            |
+| `eckey`              | 40306  | `crypto-eckey`     | 306    | `EcKey`                               |
+| `address`            | 40307  | `crypto-address`   | 307    | `Address`                             |
+| `output-descriptor`  | 40308  | `crypto-output`    | 308    | `OutputDescriptor`                    |
+| `sskr`               | 40309  | `crypto-sskr`      | 309    | `SskrShare`                           |
+| `psbt`               | 40310  | `crypto-psbt`      | 310    | `Psbt`                                |
+| `account-descriptor` | 40311  | `crypto-account`   | 311    | `AccountDescriptor`                   |
+
+All maps are closed: an unknown map key is a dcbor `WrongType` error. Validation runs identically on encode (checked constructors) and decode. Embedded tagged values — `CoinInfo` inside `HdKey` or `Address`, `Keypath` inside `HdKey` — accept both v1 and v2 tags on read and always write v2.
+
+## Construction
+
+Values are built by checked `new` constructors returning `Result`, plus consuming `#[must_use]` `with_*` builders for optional fields. Invariants that need no runtime check live in the types: key material is a fixed-size array (`[u8; 33]`, `[u8; 32]`), a required nonzero fingerprint is `NonZeroU32`, and the wire alternatives are enums (`HdKey`, `PathComponent`, `AddressType`, `DescriptorKey`).
+
+```rust
+use std::num::NonZeroU32;
+
+use bcur_registry::{
+    CoinInfo, DerivedKey, HdKey, Keypath, PathComponent, coin_type, network,
+};
+
+let origin = Keypath::new(
+    vec![
+        PathComponent::Index { index: 84, hardened: true },
+        PathComponent::Index { index: 0, hardened: true },
+        PathComponent::Index { index: 0, hardened: true },
+    ],
+    NonZeroU32::new(0x73c5_da0a), // Option<NonZeroU32>
+    None,
+)
+.unwrap();
+
+let hdkey = HdKey::from(
+    DerivedKey::new_public(pub_key_data) // pub_key_data: [u8; 33]
+        .with_use_info(CoinInfo::new(coin_type::BTC, network::MAINNET).unwrap())
+        .with_origin(origin)
+        .with_parent_fingerprint(NonZeroU32::new(0x73c5_da0a).unwrap())
+        .with_name("account"),
+);
+```
+
+## Validation rules
+
+- **seed**: `payload` 1–64 bytes, required. `creation_date` optional (`dcbor::Date`) — writes CBOR tag 1, reads tag 1 or tag 100 (days since epoch). `name`/`note` optional text; empty strings are omitted on write.
+- **coin-info**: `coin_type` uint31 and `network` int32, both default 0 and omitted on write when 0. Named constants `coin_type::BTC`/`coin_type::ETH` and `network::MAINNET`/`network::BTC_TESTNET`.
+- **keypath**: `components` is a `Vec` of `PathComponent` (`Index`, `Range`, `Wildcard`, `Pair`; `Pair` is one 4-tuple on the wire). `source_fingerprint` is an optional `NonZeroU32`; `depth` an optional `u8`. Empty `components` is only valid with a fingerprint or a depth.
+- **hdkey**: `MasterKey::new(key_data: [u8; 33], chain_code: [u8; 32])`. `DerivedKey::new_public([u8; 33])` or `DerivedKey::new_private([u8; 33])` — private key data carries the `0x00` prefix. Optional `chain_code`, `use_info` (`CoinInfo`), `origin`/`children` (`Keypath`), `parent_fingerprint` (`NonZeroU32`), `name`, `note`.
+- **eckey**: `curve` u64 (default `curve::SECP256K1` = 0, omitted on write), `is_private` default false, `data` required. secp256k1: private keys are exactly 32 bytes, public keys 33 or 65 bytes. Other curves: non-empty data.
+- **address**: `info` is a tagged `CoinInfo`; `address_type` is an optional `AddressType` (`P2pkh`/`P2sh`/`P2wpkh`). With a type, `data` is exactly 20 bytes (S-13); without, any non-empty bytes.
+- **psbt**: bytes must start with the PSBT magic `70 73 62 74 ff`.
+- **sskr**: `SskrHeader` fields — `identifier` uint16; `group_threshold`, `group_count`, `member_threshold` in 1–16; `group_index < group_count`; `member_index` in 0–15; `group_threshold <= group_count`. The share is a packed 5-byte header plus `share_value` bytes.
+- **output-descriptor**: `source` is descriptor text with `@n` placeholders; the placeholder set must be exactly `0..keys.len()` (no gaps, no extras — no placeholders means `keys` is empty). `keys` is a `Vec` of `DescriptorKey` (`HdKey`, `EcKey`, or `Address` values written as their v2 tagged CBOR). `name`/`note` optional text.
+- **account-descriptor**: `master_fingerprint` u32; `output_descriptors` at least one entry.
+
+## Errors
+
+Constructors fail with the crate's `Error`: `kind()` returns an `ErrorKind` (`InvalidLength`, `OutOfRange`, `InvalidValue`, `InvalidPlaceholder`) and `field()` the snake_case field name; `Display` prints `"<field>: <reason>"` (e.g. `payload: invalid length`). Through the `From` conversion into `dcbor::Error`, `InvalidValue` becomes `dcbor::Error::WrongType` and the other kinds become `dcbor::Error::OutOfRange` — the same classes the TypeScript `CborError` throws. Structural decode failures (unknown map key, wrong CBOR type, missing key) are `dcbor::Error` values directly, so `from_ur` and `from_tagged_cbor` surface the same error classes as the TypeScript codecs.
+
+## v1 output/account conversion
+
+`crypto-output` bodies are BCR-2020-010 script-expression trees (tags 400–410: `sh` `wsh` `pk` `pkh` `wpkh` `combo` `multi` `sortedmulti` `raw` `tr` `cosigner`). On read the converter emits BIP-380 descriptor text:
+
+```rust
+use std::str::FromStr;
+
+use bcur::Ur;
+use bcur::typed::UrDecodable;
+use bcur_registry::OutputDescriptor;
+
+let ur = Ur::from_str("ur:crypto-output/taadmutaadeyoyaxhdclaoswaalbmwfpwekijndyfefzjtmdrtketphhktmngrlkwsfnospypsasrhhhjonnvwtsqzwljy").unwrap();
+let descriptor = OutputDescriptor::from_ur(&ur).unwrap();
+assert_eq!(descriptor.source(), "pkh(@0)");
+// descriptor.keys() re-encodes each key with its v2 tag
+```
+
+The emitted functions are exactly:
+
+- key functions: `pk(@n)`, `pkh(@n)`, `wpkh(@n)`, `combo(@n)`, `cosigner(@n)`;
+- wrappers: `sh(…)` and `wsh(…)`, combinable only as `sh(wsh(…))` per BIP-380 (`sh` is top-level only; `wsh` is top-level or directly inside `sh`);
+- multisig: `multi(k,@n,…)` and `sortedmulti(k,@n,…)`;
+- `raw(<lowercase hex>)` (carries no key) and `tr(@n)` (BIP-386 single-key form only).
+
+Keys become `@0`, `@1`, … in order of appearance and are collected as `DescriptorKey` values (a v1 `307` address nested inside a script function becomes an `address` key, not an `addr()` function). A bare key expression directly inside `sh`/`wsh` — the KeystoneHQ form `sh(key)` — is read as `sh(cosigner(@0))`. Anything unconvertible — a `tr()` script tree, `sh` inside `sh` or `wsh`, `wsh` inside `wsh` — is a dcbor `WrongType` error.
+
+`crypto-account` converts the same way through `AccountDescriptor`; entries may carry the `308` tag or be bare script expressions (KeystoneHQ writes the latter). Conversion and nesting edge cases are pinned by `vectors/registry/crypto-output-conversion.json` and `vectors/registry/invalid.json`.
+
+## Secrets
+
+`Seed`, `MasterKey`, `DerivedKey`, and `SskrShare` zeroize secret material on drop (`ZeroizeOnDrop`) and redact it in `Debug` (`[REDACTED]`). `EcKey` zeroizes `data` on drop and redacts it in `Debug` only when `is_private()`.
+
+## Digests
+
+[BCR-2021-002](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2021-002-digest.md) object digests:
+
+```rust
+seed.digest(); // [u8; 32] — SHA-256 of the raw payload bytes
+hdkey.digest(); // [u8; 32] — SHA-256 of the dCBOR digest preimage
+hdkey.digest_source(); // Vec<u8> — dCBOR [keyData, chainCode|null, coinType, network]
+```
+
+## Tag tables
+
+`bcur_registry::tags` exposes a `dcbor::Tag` constant for every UR type and script expression (`tags::SEED`, `tags::CRYPTO_SEED`, `tags::SH`, `tags::MULTI`, `tags::TR`, …). `register_tags()` installs all 31 names into dcbor's global tag store for diagnostic output; `register_tags_in(&mut store)` registers them on an explicit `TagsStore`.
+
+## Envelope
+
+The `envelope` UR type (tag 200) is not part of `bcur-registry`; use Blockchain Commons' [`bc-envelope`](https://crates.io/crates/bc-envelope) crate.

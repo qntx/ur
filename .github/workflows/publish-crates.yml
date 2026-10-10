@@ -1,6 +1,6 @@
 # Caller owns on:. Pin at @v2.
-# CARGO_REGISTRY_TOKEN must belong to an owner of both crates on crates.io.
-# Packages publish in dependency order: bcur first, then bcur-cli.
+# CARGO_REGISTRY_TOKEN must belong to an owner of all crates on crates.io.
+# Packages publish in dependency order: bcur first, then bcur-registry and bcur-cli.
 name: Publish to crates.io
 
 on:
@@ -16,6 +16,6 @@ jobs:
     permissions:
       contents: read
     with:
-      packages: "bcur bcur-cli"
+      packages: "bcur bcur-registry bcur-cli"
     secrets:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
