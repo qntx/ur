@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Master `hdkey` values must carry `0x00`-prefixed key data (BCR-2020-007: a master key is always private); both the TypeScript `hdKeyCodec` and the Rust `MasterKey` reject other prefixes on encode and decode. Rust `MasterKey::new` now returns `Result`.
+
 ## 2.1.0 - 2026-10-10
 
 ### Added

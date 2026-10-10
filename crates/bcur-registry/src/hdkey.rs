@@ -33,7 +33,8 @@ pub enum HdKey {
 }
 
 /// A master HD key: 33-byte key data (`0x00 || 32-byte secret`) plus the
-/// 32-byte chain code. The prefix is not checked, matching TypeScript.
+/// 32-byte chain code. BCR-2020-007: a master key is always private, so the
+/// `0x00` prefix is required.
 #[derive(Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct MasterKey {
     key_data: [u8; KEY_DATA_LEN],
@@ -108,12 +109,22 @@ impl fmt::Debug for HdKey {
 
 impl MasterKey {
     /// Creates a master key; `key_data` is the 33-byte `0x00`-prefixed secret.
-    #[must_use]
-    pub const fn new(key_data: [u8; KEY_DATA_LEN], chain_code: [u8; CHAIN_CODE_LEN]) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::OutOfRange`] when `key_data` does not carry the `0x00`
+    /// private prefix.
+    pub const fn new(
+        key_data: [u8; KEY_DATA_LEN],
+        chain_code: [u8; CHAIN_CODE_LEN],
+    ) -> Result<Self> {
+        if key_data[0] != 0 {
+            return Err(Error::new(ErrorKind::OutOfRange, "key_data"));
+        }
+        Ok(Self {
             key_data,
             chain_code,
-        }
+        })
     }
 
     /// The 33-byte key data (`0x00 || secret`).
@@ -458,10 +469,9 @@ impl CBORTaggedDecodable for HdKey {
             let map = closed_int_map(&cbor, MASTER_KEYS)?;
             let key_data = expect_bytes_len::<KEY_DATA_LEN>(&extract(&map, 3)?, "key_data")?;
             let chain_code = expect_bytes_len::<CHAIN_CODE_LEN>(&extract(&map, 4)?, "chain_code")?;
-            return Ok(Self::Master(MasterKey {
-                key_data,
-                chain_code,
-            }));
+            return Ok(Self::Master(
+                MasterKey::new(key_data, chain_code).map_err(dcbor::Error::from)?,
+            ));
         }
         let map = closed_int_map(&cbor, DERIVED_KEYS)?;
         let is_private = match get(&map, 2) {

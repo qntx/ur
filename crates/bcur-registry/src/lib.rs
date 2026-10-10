@@ -4,8 +4,8 @@
 //! `eckey`, `address`, `output-descriptor`, `sskr`, `psbt`,
 //! `account-descriptor`) on `dcbor`'s tagged traits. v1 `crypto-output`
 //! script expressions (BCR-2020-010) convert to `OutputDescriptor` on read.
-//! Every type is byte- and error-compatible with the TypeScript registry in
-//! `@qntx/ur/registry` and round-trips through `ur:<type>` multi-part UR
+//! Every type shares wire bytes and accept/reject behavior with the
+//! `@qntx/ur/registry` TypeScript registry and round-trips through `ur:<type>` multi-part UR
 //! transport via `bcur`'s `typed::{UrEncodable, UrDecodable}` blanket impls
 //! (a dev-dependency of this crate, not a runtime one).
 //!

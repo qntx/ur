@@ -8,8 +8,8 @@
     reason = "integration targets link full dev-deps; failures abort the test"
 )]
 
-//! Constructor validation, Debug redaction, digests frozen from the TypeScript
-//! implementation, tag registration, and wire-shape checks.
+//! Constructor validation, Debug redaction, digest literals, tag registration,
+//! and wire-shape checks.
 
 use std::num::NonZeroU32;
 
@@ -211,7 +211,7 @@ fn seed_payload_range_and_digest() {
     assert_eq!(err(Seed::new(vec![0; 65])).kind(), ErrorKind::InvalidLength);
 
     let seed = Seed::new(vec![0xC7; 16]).unwrap();
-    // Frozen from TypeScript seedDigest (SHA-256 of the raw payload).
+    // Frozen literal: SHA-256 of the raw payload.
     assert_eq!(
         hex::encode(seed.digest()),
         "780962710c098d5d9d12cad1c04310aa50e55db30b8f77189230c82302e9a951"
@@ -311,11 +311,18 @@ fn hdkey_private_prefix() {
     let e = err(DerivedKey::new_private(pub_key_data()));
     assert_eq!((e.kind(), e.field()), (ErrorKind::OutOfRange, "key_data"));
     assert!(DerivedKey::new_private(priv_key_data()).is_ok());
+
+    // A master key is always private (BCR-2020-007): the 0x00 prefix is required.
+    let master_err = err(MasterKey::new(pub_key_data(), chain_code()));
+    assert_eq!(
+        (master_err.kind(), master_err.field()),
+        (ErrorKind::OutOfRange, "key_data")
+    );
 }
 
 #[test]
 fn hdkey_master_wire_shape() {
-    let key = HdKey::Master(MasterKey::new(priv_key_data(), chain_code()));
+    let key = HdKey::Master(MasterKey::new(priv_key_data(), chain_code()).unwrap());
     let cbor = key.untagged_cbor();
     let CBORCase::Map(map) = cbor.as_case() else {
         panic!("master must be a map")
@@ -400,7 +407,7 @@ fn hdkey_digests_frozen_from_ts() {
         "36e61629fabf20a34c31ff3645e46a9235d4f5c99799cb0067ffd8b899984b10"
     );
 
-    let master = HdKey::Master(MasterKey::new(priv_key_data(), chain_code()));
+    let master = HdKey::Master(MasterKey::new(priv_key_data(), chain_code()).unwrap());
     assert_eq!(
         hex::encode(master.digest_source()),
         "845821000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f205820a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf0000"
@@ -417,7 +424,10 @@ fn debug_redacts_secrets() {
         "{seed_debug}"
     );
 
-    let master_debug = format!("{:?}", MasterKey::new(priv_key_data(), chain_code()));
+    let master_debug = format!(
+        "{:?}",
+        MasterKey::new(priv_key_data(), chain_code()).unwrap()
+    );
     assert!(
         master_debug.matches("[REDACTED]").count() == 2,
         "{master_debug}"
@@ -594,7 +604,7 @@ fn output_descriptor_placeholders() {
         ErrorKind::InvalidPlaceholder
     );
 
-    // InvalidPlaceholder maps to dcbor OutOfRange like the TS outOfRange.
+    // InvalidPlaceholder maps to dcbor OutOfRange.
     assert!(matches!(
         dcbor::Error::from(placeholder_err("pk(@1)", vec![descriptor_key()])),
         dcbor::Error::OutOfRange

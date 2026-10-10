@@ -584,6 +584,17 @@ fn limits_of(case: &Value) -> crate::fountain::DecoderLimits {
     out
 }
 
+/// Frame error categories recorded by the shared decoder-frame vectors
+/// (camelCase names are the vector format, not a library API).
+const fn limit_name(limit: crate::Limit) -> &'static str {
+    match limit {
+        crate::Limit::MessageLength => "messageLength",
+        crate::Limit::FragmentCount => "fragmentCount",
+        crate::Limit::FragmentLength => "fragmentLength",
+        crate::Limit::UriLength => "uriLength",
+    }
+}
+
 fn assert_error(frame: &Value, error: &crate::Error, name: &str, i: usize) {
     let want = &frame["error"];
     assert_eq!(
@@ -593,7 +604,7 @@ fn assert_error(frame: &Value, error: &crate::Error, name: &str, i: usize) {
     );
     if let Some(limit) = want["limit"].as_str() {
         assert_eq!(
-            error.limit().map(crate::Limit::as_str),
+            error.limit().map(limit_name),
             Some(limit),
             "{name} frame {i}"
         );

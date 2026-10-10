@@ -52,8 +52,8 @@ function bytesOfLen(value: Cbor, len: number): Uint8Array {
   return bytes;
 }
 
-// Private key-data is `0x00 || 32-byte secret` (BCR-2020-007); public is a 33-byte
-// compressed point. Checked in both directions (registry design table).
+// Private and master key-data is `0x00 || 32-byte secret` (BCR-2020-007: a
+// master key is always private); public key-data is a 33-byte compressed point.
 function assertKeyData(isPrivate: boolean, data: Uint8Array): void {
   if (data.length !== KEY_DATA_LEN || (isPrivate && data[0] !== 0)) {
     throw CborError.outOfRange();
@@ -73,7 +73,8 @@ export const hdKeyCodec: UrCodec<HdKey> = {
     const map = new CborMap();
     if (key.kind === "master") {
       map.set(1, true);
-      map.set(3, cbor(copyLen(key.keyData, KEY_DATA_LEN)));
+      assertKeyData(true, key.keyData);
+      map.set(3, cbor(copyBuf(key.keyData)));
       map.set(4, cbor(copyLen(key.chainCode, CHAIN_CODE_LEN)));
       return cbor(map);
     }
@@ -114,9 +115,11 @@ export const hdKeyCodec: UrCodec<HdKey> = {
         throw CborError.wrongType();
       }
       const map = expectClosedIntMap(value, MASTER_KEYS);
+      const keyData = bytesOfLen(map.getOrThrow(3), KEY_DATA_LEN);
+      assertKeyData(true, keyData);
       return Object.freeze({
         kind: "master",
-        keyData: bytesOfLen(map.getOrThrow(3), KEY_DATA_LEN),
+        keyData,
         chainCode: bytesOfLen(map.getOrThrow(4), CHAIN_CODE_LEN),
       });
     }

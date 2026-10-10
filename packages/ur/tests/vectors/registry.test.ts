@@ -88,7 +88,7 @@ type InvalidCase = {
   name: string;
   codec: string;
   cborHex: string;
-  dcbor: string;
+  tsError: string;
 };
 
 const CODECS: Record<string, UrCodec<unknown>> = {
@@ -302,6 +302,6 @@ test.each(INVALID)("registry invalid: $name", (c) => {
   } catch (error) {
     thrown = error;
   }
-  expect(thrown, `${c.name}: expected ${c.dcbor}`).toBeDefined();
-  expect((thrown as { code?: string }).code).toBe(c.dcbor);
+  expect(thrown, `${c.name}: expected ${c.tsError}`).toBeDefined();
+  expect((thrown as { code?: string }).code).toBe(c.tsError);
 });

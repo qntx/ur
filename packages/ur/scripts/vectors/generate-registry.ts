@@ -5,7 +5,9 @@
  *   `crypto-output`/`crypto-account` → v2 descriptor conversion (source text, v2-tagged keys,
  *   re-encoded v2 CBOR/UR), with an independent placeholder-substitution cross-check wherever every
  *   key is an eckey (or `raw`, which carries no key).
- * - `vectors/registry/invalid.json` — malformed bodies that every codec must reject.
+ * - `vectors/registry/invalid.json` — malformed bodies that every codec must reject. The per-case
+ *   `tsError` field is TypeScript-only assertion metadata (the UrError code the TS decoder throws);
+ *   other runners assert rejection only.
  *
  * Usage: bun packages/ur/scripts/vectors/generate-registry.ts
  */
@@ -209,7 +211,7 @@ const INVALID: Json[] = [
     name: "eckey empty data",
     codec: "eckey",
     cborHex: body([[3, new Uint8Array()]]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "eckey private 31 bytes",
@@ -218,13 +220,13 @@ const INVALID: Json[] = [
       [2, true],
       [3, new Uint8Array(31)],
     ]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "eckey public 34 bytes",
     codec: "eckey",
     cborHex: body([[3, new Uint8Array(34)]]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "eckey unknown key 4",
@@ -233,7 +235,7 @@ const INVALID: Json[] = [
       [3, new Uint8Array(33)],
       [4, 0],
     ]),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "eckey is-private non-bool",
@@ -242,7 +244,7 @@ const INVALID: Json[] = [
       [2, 1],
       [3, new Uint8Array(33)],
     ]),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "eckey curve non-uint",
@@ -251,7 +253,7 @@ const INVALID: Json[] = [
       [1, false],
       [3, new Uint8Array(33)],
     ]),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   // address
   {
@@ -261,7 +263,7 @@ const INVALID: Json[] = [
       [2, 2],
       [3, new Uint8Array(19)],
     ]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "address type out of range (3)",
@@ -270,13 +272,13 @@ const INVALID: Json[] = [
       [2, 3],
       [3, new Uint8Array(20)],
     ]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "address data empty without type",
     codec: "address",
     cborHex: body([[3, new Uint8Array()]]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "address unknown key 4",
@@ -285,7 +287,7 @@ const INVALID: Json[] = [
       [3, new Uint8Array(20)],
       [4, 0],
     ]),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "address info wrong tag (crypto-hdkey 303)",
@@ -294,7 +296,7 @@ const INVALID: Json[] = [
       [1, HDKEY_V1_TAGGED],
       [3, new Uint8Array(20)],
     ]),
-    dcbor: "CborType",
+    tsError: "CborType",
   },
   // output-descriptor (v2 map): placeholder set must equal 0..keys.length-1
   {
@@ -304,7 +306,7 @@ const INVALID: Json[] = [
       [1, "pk(@1)"],
       [2, [EC_PUB_V2]],
     ]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "output-descriptor placeholder @2 with one key",
@@ -313,7 +315,7 @@ const INVALID: Json[] = [
       [1, "pk(@2)"],
       [2, [EC_PUB_V2]],
     ]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "output-descriptor key present but no placeholder",
@@ -322,13 +324,13 @@ const INVALID: Json[] = [
       [1, "pk(03beef)"],
       [2, [EC_PUB_V2]],
     ]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "output-descriptor source non-text",
     codec: "output-descriptor",
     cborHex: body([[1, 1]]),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "output-descriptor unknown key 5",
@@ -337,7 +339,7 @@ const INVALID: Json[] = [
       [1, "pk(03beef)"],
       [5, 0],
     ]),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "output-descriptor key entry untagged",
@@ -346,32 +348,32 @@ const INVALID: Json[] = [
       [1, "pk(@0)"],
       [2, [decodeBody(`a1035821${B32}`)]],
     ]),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   // v1 crypto-output script expressions
   {
     name: "crypto-output tr with multikey (script tree unsupported)",
     codec: "output-descriptor",
     cborHex: hex(taggedValue(SCRIPT_TAGS.tr, multikeyMap(1, [EC_PUB]))),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "crypto-output multi threshold 0",
     codec: "output-descriptor",
     cborHex: hex(taggedValue(SCRIPT_TAGS.multi, multikeyMap(0, [EC_PUB]))),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "crypto-output multi threshold > keys",
     codec: "output-descriptor",
     cborHex: hex(taggedValue(SCRIPT_TAGS.multi, multikeyMap(2, [EC_PUB]))),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "crypto-output multikey unknown key 3",
     codec: "output-descriptor",
     cborHex: hex(taggedValue(SCRIPT_TAGS.multi, multikeyMap(1, [EC_PUB], [[3, 0]]))),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "crypto-output sh nested in sh",
@@ -382,7 +384,7 @@ const INVALID: Json[] = [
         taggedValue(SCRIPT_TAGS.sh, taggedValue(SCRIPT_TAGS.pkh, EC_PUB)),
       ),
     ),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "crypto-output sh nested in wsh",
@@ -393,7 +395,7 @@ const INVALID: Json[] = [
         taggedValue(SCRIPT_TAGS.sh, taggedValue(SCRIPT_TAGS.pkh, EC_PUB)),
       ),
     ),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "crypto-output wsh nested in wsh",
@@ -404,13 +406,13 @@ const INVALID: Json[] = [
         taggedValue(SCRIPT_TAGS.wsh, taggedValue(SCRIPT_TAGS.pkh, EC_PUB)),
       ),
     ),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "crypto-output unknown script tag 411",
     codec: "output-descriptor",
     cborHex: hex(taggedValue(Tag.from(411, "x-unknown"), 0)),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   // account-descriptor
   {
@@ -420,7 +422,7 @@ const INVALID: Json[] = [
       [1, 0x37b5eed4],
       [2, []],
     ]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "account-descriptor fingerprint > u32",
@@ -429,7 +431,7 @@ const INVALID: Json[] = [
       [1, 0x1_00_00_00_00],
       [2, [taggedValue(TAGS["output-descriptor"], mapCbor([[1, "pk(03beef)"]]))]],
     ]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "account-descriptor unknown key 3",
@@ -439,7 +441,7 @@ const INVALID: Json[] = [
       [2, []],
       [3, 0],
     ]),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "account-descriptor entry untagged",
@@ -448,20 +450,20 @@ const INVALID: Json[] = [
       [1, 0x37b5eed4],
       [2, [mapCbor([[1, "pk(03beef)"]])]],
     ]),
-    dcbor: "CborType",
+    tsError: "CborType",
   },
   // shared types
   {
     name: "seed payload 65 bytes",
     codec: "seed",
     cborHex: body([[1, new Uint8Array(65)]]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "keypath fully empty",
     codec: "keypath",
     cborHex: body([[1, []]]),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
   {
     name: "hdkey derived key-data 32 bytes",
@@ -470,7 +472,7 @@ const INVALID: Json[] = [
       [3, new Uint8Array(32)],
       [4, new Uint8Array(32)],
     ]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
   },
   {
     name: "hdkey private key-data missing 0x00 prefix",
@@ -480,13 +482,23 @@ const INVALID: Json[] = [
       [3, new Uint8Array(33).fill(2)],
       [4, new Uint8Array(32)],
     ]),
-    dcbor: "OutOfRange",
+    tsError: "OutOfRange",
+  },
+  {
+    name: "hdkey master key-data without 0x00 prefix",
+    codec: "hdkey",
+    cborHex: body([
+      [1, true],
+      [3, new Uint8Array(33).fill(2)],
+      [4, new Uint8Array(32)],
+    ]),
+    tsError: "OutOfRange",
   },
   {
     name: "psbt bad magic",
     codec: "psbt",
     cborHex: hex(cbor(new Uint8Array([0x70, 0x73, 0x62, 0x74, 0x00, ...new Uint8Array(107)]))),
-    dcbor: "WrongType",
+    tsError: "WrongType",
   },
 ];
 
@@ -495,7 +507,7 @@ const invalid = {
   capability: "registry.invalid",
   source: {
     name: "project-owned negative vectors",
-    rule: "every listed body must be rejected by the named codec (UrError code CborType / CborError)",
+    rule: "every listed body must be rejected by the named codec; tsError is the TypeScript-side UrError code (TS-only assertion metadata)",
   },
   cases: INVALID,
 };
