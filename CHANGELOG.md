@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.1.0 - 2026-10-10
+
 ### Added
 
 - New Rust crate `bcur-registry`: BCR-2020-006 registry types `Seed`, `HdKey`/`MasterKey`/`DerivedKey`, `Keypath`/`PathComponent`, `CoinInfo`, `EcKey`, `Address`, `Psbt`, and `SskrShare`, plus the descriptor types `DescriptorKey`, `OutputDescriptor`, and `AccountDescriptor` on the `bcur` typed dCBOR layer — byte- and error-compatible with `@qntx/ur/registry`, including v1 tag reads, `Seed`/`HdKey` digests (BCR-2021-002), v1 `crypto-output`/`crypto-account` script-expression conversion (BCR-2020-010, with BIP-380 nesting rules and the lenient KeystoneHQ forms), zeroizing secret types, and the 31-tag `tags` module with `register_tags`/`register_tags_in`.
