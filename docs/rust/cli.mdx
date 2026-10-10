@@ -1,0 +1,83 @@
+---
+title: bcur-cli
+description: The bcur command-line encoder/decoder and terminal QR tool.
+---
+
+`bcur-cli` (binary name `bcur`) is a command-line encoder/decoder for Uniform Resources, wrapping the `bcur` transport crate. It renders single-part and fountain URs as terminal QR codes for air-gapped transfer. It is not a wallet, not a camera scanner, and not a PNG/GIF studio.
+
+## Install
+
+```bash
+cargo install bcur-cli
+# or from this repository:
+cargo install --path crates/bcur-cli
+```
+
+## Usage
+
+```bash
+# single-part UR on stdout
+printf 'abc' | bcur encode --type test
+# ur:test/hsidiaecdkfpsa
+
+# hex input (published golden: CBOR array [1,2,3])
+printf '83010203' | bcur encode --type test --hex
+# ur:test/lsadaoaxjygonesw
+
+# terminal QR (Ctrl-C to stop)
+bcur encode --qr --type bytes payload.bin
+
+# force fountain frames: shrink the per-URI budget
+bcur encode --animate --qr --type bytes --max-chars 100 payload.bin
+
+# or set the fragment length directly (bytes; minimum is 10)
+bcur encode --animate --type bytes --max-fragment 20 payload.bin
+
+# recover bytes from captured UR lines
+bcur decode --out recovered.bin < parts.txt
+
+# render already-encoded UR lines as an animated QR
+bcur qr parts.txt
+```
+
+`--type` is only the UR type token (required on `encode`). Payload bytes are sent unchanged — there is no automatic CBOR `bstr` wrap.
+
+Text fountain output (no `--qr`) prints `max(3K, 20)` parts unless `--count` is given. Fountain parts need roughly 80 characters minimum — the `ur:<type>/seq-count/` header, ~60 bytewords characters for the smallest part CBOR (10-byte minimum fragment), plus 12 characters of slack reserved for later sequence numbers — so `--max-chars` below that fails with "cannot fit a fountain part".
+
+## Flags
+
+### `bcur encode`
+
+| Flag             | Default                                        | Role                                 |
+| ---------------- | ---------------------------------------------- | ------------------------------------ |
+| `--type`         | none (required)                                | UR type token                        |
+| `--max-chars`    | `400`, or terminal-derived (≥80) with `--qr`   | Single-part vs fountain; part sizing |
+| `--max-fragment` | auto: largest fragment that fits `--max-chars` | Fragment length in bytes             |
+| `--count`        | `max(3K, 20)`                                  | Parts to emit in text mode           |
+| `--hex`          | off                                            | Input is hex                         |
+| `--qr`           | off                                            | Render QR to the terminal            |
+| `--animate`      | off                                            | Force the fountain/encoder path      |
+| `--interval-ms`  | `200`                                          | Animated QR frame time               |
+| `[input]`        | stdin                                          | Payload file                         |
+
+Without `--animate`, encode prints the single-part URI when it fits `--max-chars`. With `--animate` (or when the single part does not fit), it runs the fountain encoder. An empty payload cannot be fountain-encoded.
+
+QR rendering uses error-correction level Quartile (Q). With `--qr`, `--max-chars` defaults to the terminal width (80 when that cannot be detected).
+
+### `bcur decode`
+
+| Flag         | Default | Role                                |
+| ------------ | ------- | ----------------------------------- |
+| `--type`     | any     | Restrict the session to one UR type |
+| `--hex`      | off     | Write recovered bytes as hex        |
+| `--out`/`-o` | stdout  | Output file                         |
+| `[input]`    | stdin   | File of UR lines                    |
+
+Progress (`rank`, `recovered`, `K`) goes to stderr; the decoded message goes to stdout or `--out`.
+
+### `bcur qr`
+
+| Flag            | Default | Role                       |
+| --------------- | ------- | -------------------------- |
+| `--interval-ms` | `200`   | Animated QR frame time     |
+| `[input]`       | stdin   | File of UR lines to render |

@@ -1,0 +1,140 @@
+---
+title: Transport
+description: Bytewords, UR encode/decode, and the fountain codecs — bcur L1–L3.
+---
+
+The transport is `no_std` + `alloc` and carries opaque payload bytes plus a type token. Nothing here parses CBOR.
+
+## Bytewords
+
+```rust
+use bcur::Style;
+use bcur::bytewords;
+
+let data = [1, 2, 3];
+let text = bytewords::encode(&data, Style::Minimal);
+assert_eq!(text, "adaoaxgorflaca");
+let back = bytewords::decode(&text, Style::Minimal).unwrap();
+assert_eq!(back, data);
+```
+
+`Style` is required on every call: `Standard` (4-letter words, space-separated), `Uri` (hyphen-separated), `Minimal` (2 letters per byte, what URs use). `decode` is case-insensitive and verifies the trailing CRC-32.
+
+| Function                                  | Returns                                                 |
+| ----------------------------------------- | ------------------------------------------------------- |
+| `bytewords::checksum(data, style)`        | The four CRC-32 checksum words only                     |
+| `bytewords::encoded_len(len, style)`      | Encoded length, `const fn`                              |
+| `bytewords::identifier([u8; 4])`          | 4-word identifier of a digest (BCR-2020-012)            |
+| `bytemoji::identifier([u8; 4])`           | 4-emoji identifier of a digest (BCR-2024-008)           |
+| `bytewords::canonicalize(token)`          | `Option<&'static str>` full word for a 2–4 letter token |
+| `bytewords::WORDS`, `bytewords::MINIMALS` | The 256-entry tables                                    |
+
+## Type tokens
+
+`UrType` is a validated newtype: canonical lowercase `[a-z0-9-]+`.
+
+```rust
+use bcur::{UrType, ur_type};
+
+let t = UrType::new("Seed").unwrap(); // lowercases to "seed"
+assert_eq!(t.as_str(), "seed");
+
+let t2 = ur_type!("seed"); // const-validated literal — invalid tokens are compile errors
+```
+
+`UrType` also implements `Display`, `FromStr`, `TryFrom` (for both `&str` and `String`), `AsRef<str>`, `Clone`, `Eq`, `Ord`, and `Hash`.
+
+## Single-part URs
+
+```rust
+use bcur::ur;
+use bcur::{DecoderLimits, ur_type};
+
+let ur = ur::encode(&ur_type!("test"), &[0x83, 0x01, 0x02, 0x03]); // the CBOR array [1,2,3]
+assert_eq!(ur, "ur:test/lsadaoaxjygonesw");
+
+let parsed = ur::parse(&ur, &DecoderLimits::default()).unwrap();
+// ParsedUr::Single { ur_type, message } — or Multi { ur_type, part } for a fountain frame
+
+let qr = ur::to_qr_string(&ur); // uppercase for QR alphanumeric mode
+assert_eq!(qr, "UR:TEST/LSADAOAXJYGONESW");
+```
+
+## Multi-part encoding
+
+`ur::Encoder` is a fused `Iterator` of UR strings:
+
+```rust
+use bcur::fountain::EncoderOptions;
+use bcur::ur::Encoder;
+use bcur::ur_type;
+
+let mut encoder = Encoder::new(
+    ur_type!("test"),
+    message.clone(),
+    EncoderOptions::new(100), // max_fragment_len; min_fragment_len = 10, first_sequence = 0
+).unwrap();
+
+encoder.fragment_count(); // K
+encoder.is_single_part(); // true when K == 1
+
+while let Some(frame) = encoder.next() {
+    show_qr(&frame); // K == 1 repeats the identical single-part UR forever
+    if encoder.is_complete() {
+        break;
+    }
+}
+```
+
+`EncoderOptions` fields: `max_fragment_len`, `min_fragment_len` (default 10), `first_sequence` (default 0). Multi-part iteration ends after sequence `u32::MAX`.
+
+## Decoding
+
+`ur::Decoder::receive` returns `Ok(Received)` per accepted/duplicate frame and `Err` for rejected (`!e.is_fatal()`) or fatal (`e.is_fatal()`) failures:
+
+```rust
+use bcur::ur::Decoder;
+use bcur::{Received, State, ur_type};
+
+let mut decoder = Decoder::default().accept([ur_type!("test")]);
+for frame in &captured_frames {
+    match decoder.receive(frame) {
+        Ok(Received::Accepted) | Ok(Received::Duplicate) => {}
+        Err(e) if e.is_fatal() => break, // session is State::Failed
+        Err(e) => eprintln!("rejected frame: {e}"), // session unchanged
+    }
+    match decoder.state() {
+        State::Complete(_) | State::Failed(_) => break,
+        _ => {}
+    }
+}
+let decoded = decoder.into_decoded()?; // ErrorKind::NotComplete if unfinished
+let (ur_type, message) = decoded.into_parts();
+```
+
+- `state()` → `State::Empty | Collecting(Progress) | Complete(&Decoded) | Failed(&Error)`.
+- `progress()` → `fragment_count` (K), `rank`, `recovered`, `processed`, `ratio` (exact `rank / K`).
+- `last_indexes()` — fragment indexes mixed into the most recent part.
+- `reset()` — back to `Empty`, keeping limits and the accept list.
+
+## Raw fountain layer
+
+For custom transport, `fountain::Encoder` and `fountain::Decoder` work on `Part` values directly:
+
+```rust
+use bcur::fountain::{Decoder, Encoder, EncoderOptions, Part};
+use bcur::{DecoderLimits, State};
+
+let mut encoder = Encoder::new(message.clone(), EncoderOptions::new(100))?;
+let mut decoder = Decoder::new(DecoderLimits::default());
+for part in encoder.by_ref() {
+    let wire = part.to_cbor(); // fixed-schema CBOR, shortest-form integers
+    decoder.receive(&Part::from_cbor(&wire, &DecoderLimits::default())?)?;
+    if matches!(decoder.state(), State::Complete(_)) {
+        break;
+    }
+}
+let recovered = decoder.into_message()?;
+```
+
+`fountain::Encoder` is an infinite `Iterator` of `Part`s (identical parts with rising sequences for `K == 1`, terminating after `u32::MAX`). `Part::from_cbor` accepts any definite-width integer encoding.

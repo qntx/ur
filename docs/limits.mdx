@@ -1,19 +1,33 @@
 ---
 title: Decoder limits
-description: Default DecoderLimits and poison behavior.
+description: The four resource limits that bound a decoding session.
 ---
 
-`DEFAULT_LIMITS` (frozen production Default; same integers as bcur 1.0):
+Multi-part decoding is attacker-facing: frame count, sizes, and string length are all controlled by the sender. Four hard limits bound a session; the defaults are identical in TypeScript and Rust (`DEFAULT_LIMITS` / `DecoderLimits::default()`).
 
-| Limit                   | Default   |
-| ----------------------- | --------- |
-| `maxMessageLength`      | 1 048 576 |
-| `maxFragmentCount`      | 2 000     |
-| `maxFragmentDataLength` | 8 192     |
-| `maxBufferParts`        | 4 000     |
-| `maxReceivedParts`      | 8 000     |
-| `maxUriLen`             | 8 192     |
+| TS (`DecoderLimits`) | Rust (`DecoderLimits` field) | Default   | Guards                                       |
+| -------------------- | ---------------------------- | --------- | -------------------------------------------- |
+| `maxMessageLength`   | `max_message_length`         | 1 048 576 | Original payload length (declared or actual) |
+| `maxFragmentCount`   | `max_fragment_count`         | 2 000     | Fragment count `K`                           |
+| `maxFragmentLength`  | `max_fragment_length`        | 8 192     | `part.data` length                           |
+| `maxUriLength`       | `max_uri_length`             | 8 192     | UR string length passed to the decoder       |
 
-Override with `new Decoder({ limits: { … } })` or `new FountainDecoder({ … })`. Exceeding a limit **poisons** the session: later `receive` and `message` throw `UrError` with code `ResourceLimit`, including `uri_len` on `Decoder`.
+A violation is fatal: it fails the whole session (`state` → `failed` / `State::Failed`), not just the frame, and carries `limit`/`Limit` identifying which bound was hit.
 
-`maxUriLen` is compared to `String.length` (UTF-16 code units), not UTF-8 bytes.
+```ts
+import { UrDecoder } from "@qntx/ur";
+
+const decoder = new UrDecoder({ limits: { maxMessageLength: 4096 } });
+```
+
+```rust
+use bcur::ur::Decoder;
+use bcur::DecoderLimits;
+
+let decoder = Decoder::new(DecoderLimits {
+    max_message_length: 4096,
+    ..DecoderLimits::default()
+});
+```
+
+Per-session memory is bounded by `K · fragmentLength` bytes of fragment data — at most `maxMessageLength + fragmentLength`, since `K` fragments overshoot the message by less than one fragment — plus `K · ⌈K/8⌉` bytes of elimination bit masks (500,000 bytes at `K = 2000`), about 1.5 MiB at the defaults.
