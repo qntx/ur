@@ -71,4 +71,4 @@ let fatal = error.is_fatal();
 let inner = core::error::Error::source(&error); // Some(&dcbor::Error) for CborDecode/CborType
 ```
 
-`Limit` implements `Display` with human-readable text (`message length`, `fragment count`, `fragment length`, `URI length`), which the `ResourceLimit` error message appends after `resource limit exceeded: `.
+`Limit` implements `Display` with human-readable text (`message length`, `fragment count`, `fragment length`, `URI length`), so a `ResourceLimit` error reads `resource limit exceeded: message length`.
