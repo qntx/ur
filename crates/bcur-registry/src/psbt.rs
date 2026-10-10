@@ -2,8 +2,8 @@
 
 use dcbor::{ByteString, CBOR, CBORTagged, CBORTaggedDecodable, CBORTaggedEncodable, Tag};
 
-use crate::expect::expect_bytes;
-use crate::{Error, ErrorKind, Result, tags};
+use crate::read::{bytes, untag};
+use crate::{Error, Result, tags};
 
 const PSBT_MAGIC: [u8; 5] = [0x70, 0x73, 0x62, 0x74, 0xff];
 
@@ -18,19 +18,12 @@ impl Psbt {
     ///
     /// # Errors
     ///
-    /// [`ErrorKind::InvalidLength`] when shorter than the 5-byte magic;
-    /// [`ErrorKind::InvalidValue`] when the magic does not match (→
-    /// `dcbor::Error::WrongType` through the conversion).
+    /// [`Error::InvalidLength`] when shorter than the 5-byte magic;
+    /// [`Error::Invalid`] when the magic does not match.
     pub fn new(bytes: impl Into<Vec<u8>>) -> Result<Self> {
         let bytes = bytes.into();
         assert_psbt(&bytes)?;
         Ok(Self { bytes })
-    }
-
-    /// The PSBT bytes, including the magic.
-    #[must_use]
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.bytes
     }
 
     /// Consumes the value and returns the PSBT bytes.
@@ -40,14 +33,33 @@ impl Psbt {
     }
 }
 
+impl AsRef<[u8]> for Psbt {
+    /// The PSBT bytes, including the magic.
+    fn as_ref(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
 fn assert_psbt(bytes: &[u8]) -> Result<()> {
     if bytes.len() < PSBT_MAGIC.len() {
-        return Err(Error::new(ErrorKind::InvalidLength, "bytes"));
+        return Err(Error::InvalidLength {
+            field: "bytes",
+            len: bytes.len(),
+        });
     }
     if !bytes.starts_with(&PSBT_MAGIC) {
-        return Err(Error::new(ErrorKind::InvalidValue, "bytes"));
+        return Err(Error::Invalid {
+            field: "bytes",
+            reason: "missing the PSBT magic 70736274ff",
+        });
     }
     Ok(())
+}
+
+impl Psbt {
+    fn from_body(cbor: &CBOR) -> Result<Self> {
+        Self::new(bytes(cbor)?)
+    }
 }
 
 impl CBORTagged for Psbt {
@@ -64,9 +76,7 @@ impl CBORTaggedEncodable for Psbt {
 
 impl CBORTaggedDecodable for Psbt {
     fn from_untagged_cbor(cbor: CBOR) -> dcbor::Result<Self> {
-        let bytes = expect_bytes(&cbor)?;
-        assert_psbt(&bytes)?;
-        Ok(Self { bytes })
+        Self::from_body(&cbor).map_err(dcbor::Error::from)
     }
 }
 
@@ -77,9 +87,9 @@ impl From<Psbt> for CBOR {
 }
 
 impl TryFrom<CBOR> for Psbt {
-    type Error = dcbor::Error;
+    type Error = Error;
 
-    fn try_from(cbor: CBOR) -> dcbor::Result<Self> {
-        Self::from_tagged_cbor(cbor)
+    fn try_from(cbor: CBOR) -> Result<Self> {
+        Self::from_body(&untag(cbor, &Self::cbor_tags())?)
     }
 }

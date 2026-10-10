@@ -5,13 +5,12 @@ use dcbor::{CBOR, CBORTaggedEncodable, Tag};
 use crate::address::Address;
 use crate::eckey::EcKey;
 use crate::hdkey::HdKey;
-use crate::tags;
+use crate::{Error, Result, tags};
 
 /// One `keys[n]` entry of an [`crate::OutputDescriptor`].
 ///
 /// On the wire each variant is its own tagged CBOR value (v2 tag written,
-/// v1 or v2 accepted on read); an untagged value or a foreign tag is
-/// `dcbor::Error::WrongType`, matching TypeScript `decodeKey`/`keyExp`.
+/// v1 or v2 accepted on read).
 #[allow(
     variant_size_differences,
     reason = "HdKey's fixed key/chain-code arrays dominate on 32-bit targets; a descriptor holds a handful of keys, so boxing would add an allocation per key for no practical saving"
@@ -37,8 +36,8 @@ impl DescriptorKey {
     }
 }
 
-/// Tag pairs (v2, v1) accepted by [`DescriptorKey::try_from`]; also the
-/// script-expression `keyExp` set.
+/// Tag pairs (v2, v1) of the three key kinds; also the script-expression
+/// `keyExp` set.
 pub(crate) const KEY_TAGS: [[Tag; 2]; 3] = [
     [tags::HDKEY, tags::CRYPTO_HDKEY],
     [tags::ECKEY, tags::CRYPTO_ECKEY],
@@ -75,11 +74,11 @@ impl From<DescriptorKey> for CBOR {
 }
 
 impl TryFrom<CBOR> for DescriptorKey {
-    type Error = dcbor::Error;
+    type Error = Error;
 
-    fn try_from(cbor: CBOR) -> dcbor::Result<Self> {
+    fn try_from(cbor: CBOR) -> Result<Self> {
         let Some((tag, _)) = cbor.as_tagged_value() else {
-            return Err(dcbor::Error::WrongType);
+            return Err(Error::Cbor(dcbor::Error::WrongType));
         };
         let value = tag.value();
         if [tags::HDKEY, tags::CRYPTO_HDKEY]
@@ -100,6 +99,6 @@ impl TryFrom<CBOR> for DescriptorKey {
         {
             return Address::try_from(cbor).map(Self::Address);
         }
-        Err(dcbor::Error::WrongType)
+        Err(Error::UnexpectedTag { tag: value })
     }
 }

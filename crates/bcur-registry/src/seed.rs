@@ -8,8 +8,8 @@ use dcbor::{
 use sha2::{Digest, Sha256};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::expect::{closed_int_map, expect_bytes, expect_int64, expect_text, extract, get};
-use crate::{Error, ErrorKind, Result, tags};
+use crate::read::{MapReader, bytes, int64, text, untag};
+use crate::{Error, Result, tags};
 
 const KEYS: &[u64] = &[1, 2, 3, 4];
 const MAX_PAYLOAD: usize = 64;
@@ -23,9 +23,9 @@ pub struct Seed {
     #[zeroize(skip)]
     creation_date: Option<Date>,
     #[zeroize(skip)]
-    name: String,
+    name: Option<String>,
     #[zeroize(skip)]
-    note: String,
+    note: Option<String>,
 }
 
 impl fmt::Debug for Seed {
@@ -44,17 +44,20 @@ impl Seed {
     ///
     /// # Errors
     ///
-    /// [`ErrorKind::InvalidLength`] when `payload` is empty or exceeds 64 bytes.
+    /// [`Error::InvalidLength`] when `payload` is empty or exceeds 64 bytes.
     pub fn new(payload: impl Into<Vec<u8>>) -> Result<Self> {
         let payload = payload.into();
         if payload.is_empty() || payload.len() > MAX_PAYLOAD {
-            return Err(Error::new(ErrorKind::InvalidLength, "payload"));
+            return Err(Error::InvalidLength {
+                field: "payload",
+                len: payload.len(),
+            });
         }
         Ok(Self {
             payload,
             creation_date: None,
-            name: String::new(),
-            note: String::new(),
+            name: None,
+            note: None,
         })
     }
 
@@ -65,42 +68,36 @@ impl Seed {
         self
     }
 
-    /// Sets the display name (empty names are omitted on write).
+    /// Sets the display name; `""` clears it.
     #[must_use]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = name.into();
+        self.name = nonempty(name.into());
         self
     }
 
-    /// Sets the note (empty notes are omitted on write).
+    /// Sets the note; `""` clears it.
     #[must_use]
     pub fn with_note(mut self, note: impl Into<String>) -> Self {
-        self.note = note.into();
+        self.note = nonempty(note.into());
         self
-    }
-
-    /// The seed payload (1–64 bytes).
-    #[must_use]
-    pub fn payload(&self) -> &[u8] {
-        &self.payload
     }
 
     /// The creation date, when present.
     #[must_use]
-    pub const fn creation_date(&self) -> Option<&Date> {
-        self.creation_date.as_ref()
+    pub const fn creation_date(&self) -> Option<Date> {
+        self.creation_date
     }
 
-    /// The display name.
+    /// The display name, when present.
     #[must_use]
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
     }
 
-    /// The note.
+    /// The note, when present.
     #[must_use]
-    pub fn note(&self) -> &str {
-        &self.note
+    pub fn note(&self) -> Option<&str> {
+        self.note.as_deref()
     }
 
     /// BCR-2021-002 digest: SHA-256 of the raw payload (not the CBOR map).
@@ -110,15 +107,26 @@ impl Seed {
     }
 }
 
+impl AsRef<[u8]> for Seed {
+    /// The seed payload (1–64 bytes).
+    fn as_ref(&self) -> &[u8] {
+        &self.payload
+    }
+}
+
+pub(crate) fn nonempty(text: String) -> Option<String> {
+    if text.is_empty() { None } else { Some(text) }
+}
+
 /// UR-ADR-019: read tag 1 (seconds) or tag 100 (RFC 8943 epoch days); write is
 /// tag 1. Any other tag, a missing tag, or a non-numeric value is `WrongType`.
-fn expect_seed_date(value: &CBOR) -> dcbor::Result<Date> {
+fn read_date(value: &CBOR) -> Result<Date> {
     if let Some((tag, inner)) = value.as_tagged_value() {
         if tag.value() == TAG_EPOCH_DAYS {
-            let days = expect_int64(inner)?;
-            let seconds = days
-                .checked_mul(SECONDS_PER_DAY)
-                .ok_or(dcbor::Error::OutOfRange)?;
+            let days = int64(inner)?;
+            let seconds = days.checked_mul(SECONDS_PER_DAY).ok_or(Error::OutOfRange {
+                field: "creation_date",
+            })?;
             #[allow(
                 clippy::cast_precision_loss,
                 reason = "epoch-day magnitudes stay well inside f64's exact integer range"
@@ -126,11 +134,42 @@ fn expect_seed_date(value: &CBOR) -> dcbor::Result<Date> {
             return Ok(Date::from_timestamp(seconds as f64));
         }
         if tag.value() != 1 {
-            return Err(dcbor::Error::WrongType);
+            return Err(Error::Cbor(dcbor::Error::WrongType));
         }
-        return Date::from_tagged_cbor(value.clone());
+        return Date::from_tagged_cbor(value.clone()).map_err(Error::from);
     }
-    Err(dcbor::Error::WrongType)
+    Err(Error::Cbor(dcbor::Error::WrongType))
+}
+
+impl Seed {
+    fn from_body(cbor: &CBOR) -> Result<Self> {
+        let map = MapReader::closed(cbor, KEYS)?;
+        let payload = bytes(&map.required(1)?)?;
+        if payload.is_empty() || payload.len() > MAX_PAYLOAD {
+            return Err(Error::InvalidLength {
+                field: "payload",
+                len: payload.len(),
+            });
+        }
+        let creation_date = map.optional(2).map(|v| read_date(&v)).transpose()?;
+        // An empty name/note on the wire means absent.
+        let name = map
+            .optional(3)
+            .map(|v| text(&v))
+            .transpose()?
+            .and_then(nonempty);
+        let note = map
+            .optional(4)
+            .map(|v| text(&v))
+            .transpose()?
+            .and_then(nonempty);
+        Ok(Self {
+            payload,
+            creation_date,
+            name,
+            note,
+        })
+    }
 }
 
 impl CBORTagged for Seed {
@@ -146,11 +185,11 @@ impl CBORTaggedEncodable for Seed {
         if let Some(date) = self.creation_date {
             map.insert(2, date.tagged_cbor());
         }
-        if !self.name.is_empty() {
-            map.insert(3, self.name.clone());
+        if let Some(name) = &self.name {
+            map.insert(3, name.clone());
         }
-        if !self.note.is_empty() {
-            map.insert(4, self.note.clone());
+        if let Some(note) = &self.note {
+            map.insert(4, note.clone());
         }
         map.into()
     }
@@ -158,28 +197,7 @@ impl CBORTaggedEncodable for Seed {
 
 impl CBORTaggedDecodable for Seed {
     fn from_untagged_cbor(cbor: CBOR) -> dcbor::Result<Self> {
-        let map = closed_int_map(&cbor, KEYS)?;
-        let payload = expect_bytes(&extract(&map, 1)?)?;
-        if payload.is_empty() || payload.len() > MAX_PAYLOAD {
-            return Err(Error::new(ErrorKind::InvalidLength, "payload").into());
-        }
-        let creation_date = get(&map, 2)
-            .map(|value| expect_seed_date(&value))
-            .transpose()?;
-        let name = get(&map, 3)
-            .map(|value| expect_text(&value))
-            .transpose()?
-            .unwrap_or_default();
-        let note = get(&map, 4)
-            .map(|value| expect_text(&value))
-            .transpose()?
-            .unwrap_or_default();
-        Ok(Self {
-            payload,
-            creation_date,
-            name,
-            note,
-        })
+        Self::from_body(&cbor).map_err(dcbor::Error::from)
     }
 }
 
@@ -190,9 +208,9 @@ impl From<Seed> for CBOR {
 }
 
 impl TryFrom<CBOR> for Seed {
-    type Error = dcbor::Error;
+    type Error = Error;
 
-    fn try_from(cbor: CBOR) -> dcbor::Result<Self> {
-        Self::from_tagged_cbor(cbor)
+    fn try_from(cbor: CBOR) -> Result<Self> {
+        Self::from_body(&untag(cbor, &Self::cbor_tags())?)
     }
 }

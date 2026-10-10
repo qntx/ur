@@ -5,8 +5,8 @@ use core::fmt;
 use dcbor::{ByteString, CBOR, CBORTagged, CBORTaggedDecodable, CBORTaggedEncodable, Tag};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::expect::expect_bytes;
-use crate::{Error, ErrorKind, Result, tags};
+use crate::read::{bytes, untag};
+use crate::{Error, Result, tags};
 
 const HEADER_LEN: usize = 5;
 
@@ -33,51 +33,55 @@ pub struct SskrHeader {
 pub struct SskrShare {
     #[zeroize(skip)]
     header: SskrHeader,
-    share_value: Vec<u8>,
+    value: Vec<u8>,
 }
 
 impl fmt::Debug for SskrShare {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SskrShare")
             .field("header", &self.header)
-            .field("share_value", &"[REDACTED]")
+            .field("value", &"[REDACTED]")
             .finish()
     }
 }
 
-const fn assert_field(value: u8, min: u8, max: u8, field: &'static str) -> Result<u8> {
+const fn field_range(value: u8, min: u8, max: u8, field: &'static str) -> Result<()> {
     if value < min || value > max {
-        return Err(Error::new(ErrorKind::OutOfRange, field));
-    }
-    Ok(value)
-}
-
-const fn assert_group(header: SskrHeader) -> Result<()> {
-    if header.group_threshold > header.group_count {
-        return Err(Error::new(ErrorKind::OutOfRange, "group_threshold"));
-    }
-    if header.group_index >= header.group_count {
-        return Err(Error::new(ErrorKind::OutOfRange, "group_index"));
+        return Err(Error::OutOfRange { field });
     }
     Ok(())
 }
 
 fn assert_header(header: SskrHeader) -> Result<()> {
-    assert_field(header.group_threshold, 1, 16, "group_threshold")?;
-    assert_field(header.group_count, 1, 16, "group_count")?;
-    assert_field(header.group_index, 0, 15, "group_index")?;
-    assert_field(header.member_threshold, 1, 16, "member_threshold")?;
-    assert_field(header.member_index, 0, 15, "member_index")?;
+    field_range(header.group_threshold, 1, 16, "group_threshold")?;
+    field_range(header.group_count, 1, 16, "group_count")?;
+    field_range(header.group_index, 0, 15, "group_index")?;
+    field_range(header.member_threshold, 1, 16, "member_threshold")?;
+    field_range(header.member_index, 0, 15, "member_index")?;
     assert_group(header)
 }
 
-fn pack(header: SskrHeader, share_value: &[u8]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(HEADER_LEN + share_value.len());
+const fn assert_group(header: SskrHeader) -> Result<()> {
+    if header.group_threshold > header.group_count {
+        return Err(Error::OutOfRange {
+            field: "group_threshold",
+        });
+    }
+    if header.group_index >= header.group_count {
+        return Err(Error::OutOfRange {
+            field: "group_index",
+        });
+    }
+    Ok(())
+}
+
+fn pack(header: SskrHeader, value: &[u8]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(HEADER_LEN + value.len());
     bytes.extend_from_slice(&header.identifier.to_be_bytes());
     bytes.push(((header.group_threshold - 1) << 4) | (header.group_count - 1));
     bytes.push((header.group_index << 4) | (header.member_threshold - 1));
     bytes.push(header.member_index);
-    bytes.extend_from_slice(share_value);
+    bytes.extend_from_slice(value);
     bytes
 }
 
@@ -87,13 +91,13 @@ impl SskrShare {
     ///
     /// # Errors
     ///
-    /// [`ErrorKind::OutOfRange`] on any header field out of range or on an
+    /// [`Error::OutOfRange`] on any header field out of range or on an
     /// inconsistent group relationship.
-    pub fn new(header: SskrHeader, share_value: impl Into<Vec<u8>>) -> Result<Self> {
+    pub fn new(header: SskrHeader, value: impl Into<Vec<u8>>) -> Result<Self> {
         assert_header(header)?;
         Ok(Self {
             header,
-            share_value: share_value.into(),
+            value: value.into(),
         })
     }
 
@@ -105,36 +109,30 @@ impl SskrShare {
 
     /// The share value bytes.
     #[must_use]
-    pub fn share_value(&self) -> &[u8] {
-        &self.share_value
+    pub fn value(&self) -> &[u8] {
+        &self.value
     }
 }
 
-impl CBORTagged for SskrShare {
-    fn cbor_tags() -> Vec<Tag> {
-        vec![tags::SSKR, tags::CRYPTO_SSKR]
-    }
-}
-
-impl CBORTaggedEncodable for SskrShare {
-    fn untagged_cbor(&self) -> CBOR {
-        ByteString::from(pack(self.header, &self.share_value)).into()
-    }
-}
-
-impl CBORTaggedDecodable for SskrShare {
-    fn from_untagged_cbor(cbor: CBOR) -> dcbor::Result<Self> {
-        let bytes = expect_bytes(&cbor)?;
-        if bytes.len() < HEADER_LEN {
-            return Err(Error::new(ErrorKind::InvalidLength, "bytes").into());
+impl SskrShare {
+    fn from_body(cbor: &CBOR) -> Result<Self> {
+        let wire = bytes(cbor)?;
+        if wire.len() < HEADER_LEN {
+            return Err(Error::InvalidLength {
+                field: "bytes",
+                len: wire.len(),
+            });
         }
-        let (head, share_value) = bytes.split_at(HEADER_LEN);
+        let (head, value) = wire.split_at(HEADER_LEN);
         let &[b0, b1, b2, b3, b4] = head else {
-            return Err(dcbor::Error::WrongType);
+            return Err(Error::Cbor(dcbor::Error::WrongType));
         };
-        // BCR-2020-011 reserved nibble MUST be 0.
+        // BCR-2020-011: the reserved nibble must be zero.
         if b4 >> 4 != 0 {
-            return Err(Error::new(ErrorKind::InvalidValue, "bytes").into());
+            return Err(Error::Invalid {
+                field: "bytes",
+                reason: "reserved header nibble is not zero",
+            });
         }
         let header = SskrHeader {
             identifier: u16::from_be_bytes([b0, b1]),
@@ -147,8 +145,26 @@ impl CBORTaggedDecodable for SskrShare {
         assert_group(header)?;
         Ok(Self {
             header,
-            share_value: share_value.to_vec(),
+            value: value.to_vec(),
         })
+    }
+}
+
+impl CBORTagged for SskrShare {
+    fn cbor_tags() -> Vec<Tag> {
+        vec![tags::SSKR, tags::CRYPTO_SSKR]
+    }
+}
+
+impl CBORTaggedEncodable for SskrShare {
+    fn untagged_cbor(&self) -> CBOR {
+        ByteString::from(pack(self.header, &self.value)).into()
+    }
+}
+
+impl CBORTaggedDecodable for SskrShare {
+    fn from_untagged_cbor(cbor: CBOR) -> dcbor::Result<Self> {
+        Self::from_body(&cbor).map_err(dcbor::Error::from)
     }
 }
 
@@ -159,9 +175,9 @@ impl From<SskrShare> for CBOR {
 }
 
 impl TryFrom<CBOR> for SskrShare {
-    type Error = dcbor::Error;
+    type Error = Error;
 
-    fn try_from(cbor: CBOR) -> dcbor::Result<Self> {
-        Self::from_tagged_cbor(cbor)
+    fn try_from(cbor: CBOR) -> Result<Self> {
+        Self::from_body(&untag(cbor, &Self::cbor_tags())?)
     }
 }

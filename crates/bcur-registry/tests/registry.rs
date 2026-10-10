@@ -430,7 +430,7 @@ fn v1_crypto_account_conversion() {
             .unwrap_or_else(|e| panic!("{name}: decode failed: {e:?}"));
 
         assert_eq!(
-            u64::from(account.master_fingerprint()),
+            u64::from(u32::from_be_bytes(account.master_fingerprint().to_bytes())),
             expected["masterFingerprint"].as_u64().unwrap(),
             "{name}: fingerprint"
         );
