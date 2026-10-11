@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+
 import { defineConfig } from "bumpp";
 
 // npm package and Cargo workspace versions are lockstep; bumpp rewrites every
@@ -6,8 +8,15 @@ import { defineConfig } from "bumpp";
 const config: ReturnType<typeof defineConfig> = defineConfig({
   files: ["packages/ur/package.json", "Cargo.toml"],
   // The fuzz crate is its own workspace with a path dependency on bcur, so
-  // its lockfile records the bcur version too.
-  execute: "cargo update --workspace && cargo update --workspace --manifest-path fuzz/Cargo.toml",
+  // its lockfile records the bcur version too. A string `execute` is not run
+  // through a shell, so the two updates run as separate processes.
+  execute: () => {
+    for (const manifest of ["Cargo.toml", "fuzz/Cargo.toml"]) {
+      execFileSync("cargo", ["update", "--workspace", "--manifest-path", manifest], {
+        stdio: "inherit",
+      });
+    }
+  },
   // execute rewrites both lockfiles; commit them too.
   all: true,
   commit: true,
