@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 3.0.0 - 2026-10-10
+
 ### Breaking
 
 - `bcur`: `DecoderLimits` and `fountain::EncoderOptions` fields are now private. Construct them with `DecoderLimits::default().with_max_*` / `EncoderOptions::new(..).with_*` builders and read values through the same-name getters.
