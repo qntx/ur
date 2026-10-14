@@ -24,7 +24,7 @@ all-features = true
 # these `CBORTagged*` impls.
 dcbor   = { version = "0.25", default-features = false, features = ["std", "multithreaded"] }
 hex     = { workspace = true }
-sha2    = { version = "0.10", default-features = false }
+sha2    = { version = "0.11", default-features = false }
 zeroize = { version = "1.8", features = ["derive"] }
 
 [dev-dependencies]
