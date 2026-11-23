@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 4.0.0 - 2026-11-23
+
 ### Added
 
 - `@qntx/ur`: opt-in v1 writer codecs `cryptoPsbtCodec`, `cryptoHdKeyCodec`, `cryptoKeypathCodec`, `cryptoCoinInfoCodec`, `cryptoOutputCodec`, and `cryptoAccountCodec` emit the deprecated BCR-2020-006 `crypto-*` wire forms while the default codecs keep writing v2. Writes are presence-preserving (`coin-info` `type`/`network` and derived-`hdkey` `is-private` are written iff set, `0`/`false` included), nested use-info/keypaths carry the v1 tags 305/304, `crypto-output` renders a BCR-2020-010 script-expression tree, and `crypto-account` writes `{1: mfp, 2: [bare script trees]}` — the KeystoneHQ spelling. `name`/`note` and sources outside the write grammar are rejected on encode and decode.

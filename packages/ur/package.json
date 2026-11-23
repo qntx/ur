@@ -1,6 +1,6 @@
 {
   "name": "@qntx/ur",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Uniform Resources (UR) for TypeScript: Bytewords, fountain codes, multi-part UR, typed dCBOR, BCR-2020-006 registry types, and wallet-interop (Keystone/OneKey) codecs.",
   "keywords": [
     "blockchain-commons",
