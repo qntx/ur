@@ -15,7 +15,7 @@ import { addressCodec } from "./address.ts";
 import { ecKeyCodec } from "./eckey.ts";
 import { hdKeyCodec } from "./hdkey.ts";
 import { assertText, expectClosedIntMap } from "./map.ts";
-import { scriptExpressionToDescriptor } from "./script-expression.ts";
+import { descriptorToScriptExpression, scriptExpressionToDescriptor } from "./script-expression.ts";
 import type { DescriptorKey } from "./script-expression.ts";
 import { TAGS } from "./tags.ts";
 
@@ -113,5 +113,40 @@ export const outputDescriptorCodec: UrCodec<OutputDescriptor> = {
     // v1 crypto-output: a tagged script-expression tree -> v2 descriptor value.
     const { source, keys } = scriptExpressionToDescriptor(value);
     return Object.freeze({ source, keys });
+  },
+};
+
+/**
+ * Write `desc` as a BCR-2020-010 script-expression tree — the v1 `crypto-output` body. The tree has
+ * no `name`/`note` slots, so a non-empty one is a `CborError` (empty strings normalize to absent,
+ * as on write). `source` must stay inside the reader's output grammar and its `@n` placeholders
+ * must be exactly `0..keys.length-1`.
+ */
+export function encodeOutputV1(desc: OutputDescriptor): Cbor {
+  if (
+    (desc.name !== undefined && desc.name !== "") ||
+    (desc.note !== undefined && desc.note !== "")
+  ) {
+    throw CborError.wrongType();
+  }
+  assertPlaceholders(desc.source, desc.keys.length);
+  return descriptorToScriptExpression(desc.source, desc.keys);
+}
+
+/**
+ * Deprecated v1 writer (`ur:crypto-output`, tag 308): a script-expression tree whose embedded keys
+ * use the v1 tags (303/306/307). Decode accepts both the tree and a tagged v2 map, but only
+ * descriptors the v1 writer can re-encode — no `name`/`note`, `source` inside the script-expression
+ * grammar.
+ */
+export const cryptoOutputCodec: UrCodec<OutputDescriptor> = {
+  tags: [TAGS["crypto-output"], TAGS["output-descriptor"]],
+  encode(desc) {
+    return encodeOutputV1(desc);
+  },
+  decode(value) {
+    const desc = isMap(value) ? decodeDescriptorMap(value) : scriptExpressionToDescriptor(value);
+    encodeOutputV1(desc);
+    return desc;
   },
 };

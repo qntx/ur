@@ -1,0 +1,694 @@
+{
+  "schema": "interop-vector/v1",
+  "capability": "interop.multi-accounts",
+  "source": {
+    "name": "interop multi-accounts vectors: decode `inputCborHex` ?? `cborHex`, compare `value`, re-encode byte-identically to `cborHex`, emit `ur`",
+    "keystoneJs": "@keystonehq/bc-ur-registry-eth 0.23.0 / -sol 0.9.5 / -tron 0.5.0 + bc-ur-registry 0.8.1 (ISC/Apache-2.0)",
+    "keystoneRust": "ur-registry 1.0.9 (MIT) \u2014 oracle harness outside the repo",
+    "onekey": "OneKeyHQ/firmware-pro d9ad133 core/src/apps/ur_registry (read-only reference)"
+  },
+  "cases": [
+    {
+      "name": "keystone-connect-eth-btc",
+      "urType": "crypto-multi-accounts",
+      "cborHex": "d9044fa5011a73c5da0a0282d9012fa902f403582102d2b36900396c9282fa14628566582f206a5dd0bcc8d5e892611806cafb0301f004582047fdacbd0fefe7043c74e0f8d1a4c36a1ac90f2a5f6d0c1b2a3e4d5c6b7a8f9e05d90131a201183c020006d90130a3018a182cf5183cf500f500f400f4021a73c5da0a030507d90130a3018400f400f4021a73c5da0a0302081a73c5da0a09684b657973746f6e650a706163636f756e742e7374616e64617264d9012fa602f403582103ec9b8f0e1c2a3b4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4cd04582047fdacbd0fefe7043c74e0f8d1a4c36a1ac90f2a5f6d0c1b2a3e4d5c6b7a8f9e05d90131a20100020006d90130a30186182cf500f500f5021a73c5da0a0303081a73c5da0a03684b657973746f6e6504782438653666663366372d346132622d346431652d396335662d3762336532613164306639630565312e322e33",
+      "ur": "ur:crypto-multi-accounts/onadcyjksktnbkaolftaaddlptaowkaxhdclaotdqdinaeesjzmolfzsbbidlpiyhddlcximhltirfsptlvsmohscsamsgzoaxadwtaahdcxflzcpsrybswsvdaafnjyvtyattoxsrimcysobsdrhejnbncwdrfmgthhjeknmynnahtaadehoeadcsfnaoaeamtaaddyotadlecsdwykcsfnykaeykaewkaewkaocyjksktnbkaxahattaaddyotadlraewkaewkaocyjksktnbkaxaoaycyjksktnbkasisgrihkkjkjyjljtihbkjohsiaiajlkpjtjydmjkjyhsjtiehsjpietaaddlolaowkaxhdclaxwpndmybacedrfrgthyjljolymootqzsktbvdyaascydnfngthyjljolymootqzsnaahdcxflzcpsrybswsvdaafnjyvtyattoxsrimcysobsdrhejnbncwdrfmgthhjeknmynnahtaadehoeadaeaoaeamtaaddyotadlncsdwykaeykaeykaocyjksktnbkaxaxaycyjksktnbkaxisgrihkkjkjyjljtihaaksdketiheniyiyeoiyemdpeehseyiddpeeieehihdpesiaeciydpemideoiheyhsehiedyiyesiaahihehdmeydmeolodmsasr",
+      "value": {
+        "masterFingerprint": 1942346250,
+        "keys": [
+          {
+            "curve": "secp256k1",
+            "keyData": "02d2b36900396c9282fa14628566582f206a5dd0bcc8d5e892611806cafb0301f0",
+            "isPrivate": false,
+            "chainCode": "47fdacbd0fefe7043c74e0f8d1a4c36a1ac90f2a5f6d0c1b2a3e4d5c6b7a8f9e",
+            "useInfo": {
+              "coinType": 60,
+              "network": 0
+            },
+            "origin": {
+              "components": "m/44'/60'/0'/0/0",
+              "sourceFingerprint": "73c5da0a",
+              "depth": 5
+            },
+            "children": {
+              "components": "m/0/0",
+              "sourceFingerprint": "73c5da0a",
+              "depth": 2
+            },
+            "parentFingerprint": 1942346250,
+            "name": "Keystone",
+            "note": "account.standard"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03ec9b8f0e1c2a3b4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4cd",
+            "isPrivate": false,
+            "chainCode": "47fdacbd0fefe7043c74e0f8d1a4c36a1ac90f2a5f6d0c1b2a3e4d5c6b7a8f9e",
+            "useInfo": {
+              "coinType": 0,
+              "network": 0
+            },
+            "origin": {
+              "components": "m/44'/0'/0'",
+              "sourceFingerprint": "73c5da0a",
+              "depth": 3
+            },
+            "parentFingerprint": 1942346250
+          }
+        ],
+        "device": "Keystone",
+        "deviceId": "8e6ff3f7-4a2b-4d1e-9c5f-7b3e2a1d0f9c",
+        "version": "1.2.3"
+      },
+      "source": "Keystone JS (bc-ur-registry-*) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "keystone-minimal",
+      "urType": "crypto-multi-accounts",
+      "cborHex": "d9044fa201000281d9012fa103582102d2b36900396c9282fa14628566582f206a5dd0bcc8d5e892611806cafb0301f0",
+      "ur": "ur:crypto-multi-accounts/oeadaeaolytaaddloyaxhdclaotdqdinaeesjzmolfzsbbidlpiyhddlcximhltirfsptlvsmohscsamsgzoaxadwtgafmincn",
+      "value": {
+        "masterFingerprint": 0,
+        "keys": [
+          {
+            "curve": "secp256k1",
+            "keyData": "02d2b36900396c9282fa14628566582f206a5dd0bcc8d5e892611806cafb0301f0"
+          }
+        ]
+      },
+      "source": "Keystone JS (bc-ur-registry-*) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "onekey-ed25519-empty-chaincode",
+      "urType": "crypto-multi-accounts",
+      "cborHex": "d9044fa3011a73c5da0a0281d9012fa502f4035820cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc05d90131a2011901f5020006d90130a20188182cf51901f5f500f500f5030409684b657973746f6e65036a4f6e654b65792050726f",
+      "inputCborHex": "d9044fa3011a73c5da0a0281d9012fa602f4035820cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc044005d90131a2011901f5020006d90130a20188182cf51901f5f500f500f5030409684b657973746f6e65036a4f6e654b65792050726f",
+      "ur": "ur:crypto-multi-accounts/otadcyjksktnbkaolytaaddlonaowkaxhdcxsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfahtaadehoeadcfadykaoaeamtaaddyoeadlocsdwykcfadykykaeykaeykaxaaasisgrihkkjkjyjljtihaximgwjtihgrihkkcxgdjpjlmhfmmwhd",
+      "value": {
+        "masterFingerprint": 1942346250,
+        "keys": [
+          {
+            "curve": "ed25519",
+            "keyData": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "isPrivate": false,
+            "useInfo": {
+              "coinType": 501,
+              "network": 0
+            },
+            "origin": {
+              "components": "m/44'/501'/0'/0'",
+              "depth": 4
+            },
+            "name": "Keystone"
+          }
+        ],
+        "device": "OneKey Pro"
+      },
+      "source": "verified against OneKey firmware-pro d9ad133 encoder (harness outside the repo, nothing vendored)"
+    },
+    {
+      "name": "vendor-keystone-single-secp256k1",
+      "urType": "crypto-multi-accounts",
+      "cborHex": "d9044fa5011ae9181cf30281d9012fa203582102eae4b876a8696134b868f88cc2f51f715f2dbedb7446b8e6edf3d4541c4eb67b06d90130a10188182cf51901f5f500f500f503686b657973746f6e65047828323834373563386438306636633036626166626534366137643137353066336663663235363566370565312e302e30",
+      "ur": "ur:crypto-multi-accounts/onadcywlcscewfaolytaaddloeaxhdclaowdverokopdinhseeroisyalksaykctjshedprnuyjyfgrovawewftyghceglrpkgamtaaddyoyadlocsdwykcfadykykaeykaeykaxisjeihkkjkjyjljtihaaksdeeyeteeemeciaetieetdyiyeniadyenidhsiyidiheeenhsemieehemecdyiyeoiyiaiyeyeceneciyemahihehdmdydmdymtrhnnbd",
+      "value": {
+        "masterFingerprint": 3910671603,
+        "keys": [
+          {
+            "curve": "secp256k1",
+            "keyData": "02eae4b876a8696134b868f88cc2f51f715f2dbedb7446b8e6edf3d4541c4eb67b",
+            "origin": {
+              "components": "m/44'/501'/0'/0'"
+            }
+          }
+        ],
+        "device": "keystone",
+        "deviceId": "28475c8d80f6c06bafbe46a7d1750f3fcf2565f7",
+        "version": "1.0.0"
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/extend/crypto_multi_accounts.rs test_encode"
+    },
+    {
+      "name": "vendor-xpub-two-key-account",
+      "urType": "crypto-multi-accounts",
+      "cborHex": "d9044fa4011aeb16731f0282d9012fa303582103bf6bb4afd36a03ce0fd06d73e86ab21b3ff9c7ea81d2a0d25cf62e1a72a2de1804582033d3f3828fae03ec295b3ff107f83f932d8b054c99e29910c34e174470a83e5706d90130a10186182cf5183cf500f5d9012fa2035820d027455eccf0385fc38f217c5bfbb95f711a16fbe782af7b33a97d1f17ebcd7906d90130a10186182cf51901f5f500f5036e4b657973746f6e6520332050726f0565312e312e30",
+      "ur": "ur:crypto-multi-accounts/oxadcywmcmjkctaolftaaddlotaxhdclaxrsjeqzpeteimaxtobstijnjkvsimprcwfhytstwdlytdnbtdhhyndmcyjpoeuecsaahdcxeotewflfmyplaxwpdthpfhwnatyafhmudpluahgsnlvonlbesrglchfyjopdfmhgamtaaddyoyadlncsdwykcsfnykaeyktaaddloeaxhdcxtidifehysfwtethesrmyclkehpzorhhejscycmzovdlfpekgeoptkictchwmsnkkamtaaddyoyadlncsdwykcfadykykaeykaxjtgrihkkjkjyjljtihcxeocxgdjpjlahihehdmehdmdydleyylld",
+      "value": {
+        "masterFingerprint": 3944117023,
+        "keys": [
+          {
+            "curve": "secp256k1",
+            "keyData": "03bf6bb4afd36a03ce0fd06d73e86ab21b3ff9c7ea81d2a0d25cf62e1a72a2de18",
+            "chainCode": "33d3f3828fae03ec295b3ff107f83f932d8b054c99e29910c34e174470a83e57",
+            "origin": {
+              "components": "m/44'/60'/0'"
+            }
+          },
+          {
+            "curve": "ed25519",
+            "keyData": "d027455eccf0385fc38f217c5bfbb95f711a16fbe782af7b33a97d1f17ebcd79",
+            "origin": {
+              "components": "m/44'/501'/0'"
+            }
+          }
+        ],
+        "device": "Keystone 3 Pro",
+        "version": "1.1.0"
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/extend/crypto_multi_accounts.rs test_decode_multi_accounts (UR literal in test)"
+    },
+    {
+      "name": "vendor-multi-coin-account",
+      "urType": "crypto-multi-accounts",
+      "cborHex": "d9044fa3011a23d048f00286d9012fa402f4035820c8d842a2f17fd7aab608ce2ea535a6e958dffa20caf669b347b911c41719655306d90130a30188182cf51901f5f500f500f5021a23d048f0030509684b657973746f6e65d9012fa402f40358200f957620b228bae2b94c82ddd4c093983a67365555b737ec7ddc1117e61c72e006d90130a30188182cf51901f5f501f500f5021a23d048f0030509684b657973746f6e65d9012fa402f4035820f224e83533dfbb7ce5eeba4600819eab95b204cf0873d4bc61d70e9aff4e54ad06d90130a30188182cf51901f5f502f500f5021a23d048f0030509684b657973746f6e65d9012fa402f40358204e04de2207640112aa6ddef59ed501a4d093c04f22084cfaf80de36835c974cf06d90130a30188182cf51901f5f503f500f5021a23d048f0030509684b657973746f6e65d9012fa402f4035820936fe91eabad7e9f2d674b279abd66e9350ea558adc81244d231097c9689406906d90130a30188182cf51901f5f504f500f5021a23d048f0030509684b657973746f6e65d9012fa402f40358207ca64faf3dbf7c3749a5e994e57668d8af6c3be4aa42e74906050dd0713d4c8906d90130a30188182cf51901f5f505f500f5021a23d048f0030509684b657973746f6e6503684b657973746f6e65",
+      "ur": "ur:crypto-multi-accounts/otadcycntifdwtaolntaaddloxaowkaxhdcxsptpfwoewnlbtspkrpaytodmonecolwlhdurzscxsgyninqdflrhbysschcfihguamtaaddyotadlocsdwykcfadykykaeykaeykaocycntifdwtaxahasisgrihkkjkjyjljtihtaaddloxaowkaxhdcxbsmdkocxprderdvorhgslfuttyrtmumkftioengogorlemwpkiuobychvacejpvtamtaaddyotadlocsdwykcfadykykadykaeykaocycntifdwtaxahasisgrihkkjkjyjljtihtaaddloxaowkaxhdcxwzdkvseceourrkkevwwyrdfgaelynnpymdpraatkayjktyrfhstsbanyzmglghpmamtaaddyotadlocsdwykcfadykykaoykaeykaocycntifdwtaxahasisgrihkkjkjyjljtihtaaddloxaowkaxhdcxglaauecpatieadbgpkjnueyknntladoxtimurtgwcpaygszsyabtvlisecsojytkamtaaddyotadlocsdwykcfadykykaxykaeykaocycntifdwtaxahasisgrihkkjkjyjljtihtaaddloxaowkaxhdcxmujlwlckpypmkbnedpiogrdinyryiywlecbaonhdpmspbgfytdehaskemtldfzinamtaaddyotadlocsdwykcfadykykaaykaeykaocycntifdwtaxahasisgrihkkjkjyjljtihtaaddloxaowkaxhdcxkeolgwpefsrskeemgaonwlmwvwkoistppejzfrvepkfwvdgaamahbttijsfsgsldamtaaddyotadlocsdwykcfadykykahykaeykaocycntifdwtaxahasisgrihkkjkjyjljtihaxisgrihkkjkjyjljtihldmedatk",
+      "value": {
+        "masterFingerprint": 600852720,
+        "keys": [
+          {
+            "curve": "ed25519",
+            "keyData": "c8d842a2f17fd7aab608ce2ea535a6e958dffa20caf669b347b911c417196553",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/501'/0'/0'",
+              "sourceFingerprint": "23d048f0",
+              "depth": 5
+            },
+            "name": "Keystone"
+          },
+          {
+            "curve": "ed25519",
+            "keyData": "0f957620b228bae2b94c82ddd4c093983a67365555b737ec7ddc1117e61c72e0",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/501'/1'/0'",
+              "sourceFingerprint": "23d048f0",
+              "depth": 5
+            },
+            "name": "Keystone"
+          },
+          {
+            "curve": "ed25519",
+            "keyData": "f224e83533dfbb7ce5eeba4600819eab95b204cf0873d4bc61d70e9aff4e54ad",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/501'/2'/0'",
+              "sourceFingerprint": "23d048f0",
+              "depth": 5
+            },
+            "name": "Keystone"
+          },
+          {
+            "curve": "ed25519",
+            "keyData": "4e04de2207640112aa6ddef59ed501a4d093c04f22084cfaf80de36835c974cf",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/501'/3'/0'",
+              "sourceFingerprint": "23d048f0",
+              "depth": 5
+            },
+            "name": "Keystone"
+          },
+          {
+            "curve": "ed25519",
+            "keyData": "936fe91eabad7e9f2d674b279abd66e9350ea558adc81244d231097c96894069",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/501'/4'/0'",
+              "sourceFingerprint": "23d048f0",
+              "depth": 5
+            },
+            "name": "Keystone"
+          },
+          {
+            "curve": "ed25519",
+            "keyData": "7ca64faf3dbf7c3749a5e994e57668d8af6c3be4aa42e74906050dd0713d4c89",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/501'/5'/0'",
+              "sourceFingerprint": "23d048f0",
+              "depth": 5
+            },
+            "name": "Keystone"
+          }
+        ],
+        "device": "Keystone"
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/extend/crypto_multi_accounts.rs test_decode_multi (UR literal in test)"
+    },
+    {
+      "name": "vendor-keystone3pro-v1.1.0-14keys",
+      "urType": "crypto-multi-accounts",
+      "cborHex": "d9044fa5011a52744703028ed9012fa802f4035821034c729aa638b3261640a8f06a5eabbfe4c04d2e0aac434b344147a1a5fa3555a304582096672bdd3ee7212fe7947040e703cddbaab5b498815787a601476c75e7e7899d06d90130a30186182cf5183cf500f5021a52744703030307d90130a2018400f480f40300081ae18decc809684b657973746f6e650a706163636f756e742e7374616e64617264d9012fa602f4035821036b287717eb691cb108d23293fbef416906fa564942ebfeb659a506ed39d9a07f06d90130a30188182cf5183cf500f500f4021a527447030303081a87be59b409684b657973746f6e650a756163636f756e742e6c65646765725f6c6567616379d9012fa602f4035821039f4e693730f116e7ab01dac46b94ad4fcabc3ca7d91a6b121cc26782a8f2b8b206d90130a3018a182cf5183cf500f500f400f4021a527447030303081aaea3081709684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f403582102f6cb8d18cef477defff35eae0d4fbfdb7e929fcf124056642bb52005121f2b8206d90130a3018a182cf5183cf501f500f400f4021a527447030303081afbdad0f009684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f4035821025bac93928fb3a1b42abd1ef04a9df7152c3e3ac9784b0adeb8c74f02d6e081a706d90130a3018a182cf5183cf502f500f400f4021a527447030303081a127d09a409684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f4035821031c4731b1d0f2813f25732a07bc8634a1d43678fb5f3e339e31868e7a3e161b3106d90130a3018a182cf5183cf503f500f400f4021a527447030303081aaa7ae17b09684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f403582103ee66c1903304ae22499bb7236ed9afe9de557ae4aa8756660bd13468e016ebfe06d90130a3018a182cf5183cf504f500f400f4021a527447030303081a53cb808a09684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f403582103b36c22174290c6ce6edb10df4386f7a4dee680313a7daecab7ceb48edb41d0d406d90130a3018a182cf5183cf505f500f400f4021a527447030303081a37d6210c09684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f40358210301e2533680aceb0eea3cd0c23ca1fcec7ef0c085c4ba89986b56d919c6e775c106d90130a3018a182cf5183cf506f500f400f4021a527447030303081a14ff4a1509684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f403582102a54598a178b1153c19a3678851c4e35162c018a1b5f354ad9cbf169fc365e6e106d90130a3018a182cf5183cf507f500f400f4021a527447030303081af4cff0d209684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f403582103934334794763b31983061359e7c5de9aa400083fcdffbb7c3c8791bda35700fe06d90130a3018a182cf5183cf508f500f400f4021a527447030303081a4267812709684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f4035821026f95e551487e0c75ebfdbdcf6c68d4cf3596729f6b0700e4b789f161dd41557906d90130a3018a182cf5183cf509f500f400f4021a527447030303081aa109680309684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa702f403582103ebd552027b73adb1de1aa494ca7cedfe781434d6f102a55355b118a0c5da78bc045820517438aec2b78e81c275a41be63df6083358070cbefdb59de69bd2f99c003e8a06d90130a30186182cf500f500f5021a52744703030307d90130a2018280f40300081a7441f35c09684b657973746f6e65d9012fa702f403582102f3b97cf3f3387e2c4d8c7141a21529a90e0585e9f032706798d18f988a56e3f1045820ac31dee4dd3f4632f984e0a41e8728edc3ec67f614c8f03181490c8945d19d7406d90130a301861831f500f500f5021a52744703030307d90130a2018280f40300081a59fcb26509684b657973746f6e65036e4b657973746f6e6520332050726f047828626635353461326136316463336362303366656362303031333335323563353561356138316433310565312e312e30",
+      "ur": "ur:crypto-multi-accounts/onadcygmjyflaxaomntaaddlpdaowkaxhdclaxgsjpnyoletqddscmfzpdwtimhypyrsvertgtdmbkpsfxgreefpfloyonzsecgootaahdcxmtiodnutfmvdcldlvdmwjofzvdaxsnuypkreqzmklyhgltoladfljzkpvdvdldntamtaaddyotadlncsdwykcsfnykaeykaocygmjyflaxaxaxattaaddyoeadlraewklawkaxaeaycyvylgwpspasisgrihkkjkjyjljtihbkjohsiaiajlkpjtjydmjkjyhsjtiehsjpietaaddlolaowkaxhdclaxjedektchwmincepaaytdeymuzowsfpinamzshfgafwwmzerphkonamweestanblbamtaaddyotadlocsdwykcsfnykaeykaewkaocygmjyflaxaxaxaycyltrnhkqzasisgrihkkjkjyjljtihbkkphsiaiajlkpjtjydmjzihieioihjphejzihiohsiakktaaddlolaowkaxhdclaxneglinemdywncmvdpyadtnssjemwpmgwsgrffnostacyjebgcesaiolfpdwzropramtaaddyotadlecsdwykcsfnykaeykaewkaewkaocygmjyflaxaxaxaycyplotaychasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaoynsblgcstowkktuezmwfhyplbtgwrsuykbmonetkbgfzhfiednrecxahbgctdnlfamtaaddyotadlecsdwykcsfnykadykaewkaewkaocygmjyflaxaxaxaycyzotntiwtasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaohppsmumomyqdoyqzdrryckwtgentylbzdwfmftsoksgrbkuerostgwaotbvtlyosamtaaddyotadlecsdwykcsfnykaoykaewkaewkaocygmjyflaxaxaxaycybgkiasoxasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaxceflehpatiwzlyfhdajkdratrflneeoytyenkszohefmeonnehlnmnknfmcmcwehamtaaddyotadlecsdwykcsfnykaxykaewkaewkaocygmjyflaxaxaxaycypkknvykgasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaxwyiysemheoaaplcpgandrlcnjttapewluegoknvepklthfiybdtteeisvtcmwmzeamtaaddyotadlecsdwykcsfnykaaykaewkaewkaocygmjyflaxaxaxaycygusblaleasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaxqdjzcpchfwmhswtojtuybeurfxlnyloxuevalaehftkiplsgrltoqzmnuyfptityamtaaddyotadlecsdwykcsfnykahykaewkaewkaocygmjyflaxaxaxaycyemtbclbnasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaxadvoguenlapswmbawdfntisafnoyztwpkbwtrtlpssrdldmkjehftacfswvdkpseamtaaddyotadlecsdwykcsfnykamykaewkaewkaocygmjyflaxaxaxaycybbzmgebzasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaoonfemkoykspabzfncfotiologyssvlgyidrtcsoyrewfghpmnsrscmnesrihvavyamtaaddyotadlecsdwykcsfnykatykaewkaewkaocygmjyflaxaxaxaycywktkwttdasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaxmufxeekkfliaqdcflsambwhkvdskuenyoxaeayfhsnzmrkkefnltmeryothgaezeamtaaddyotadlecsdwykcsfnykayykaewkaewkaocygmjyflaxaxaxaycyfwiolydiasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaojlmdvwgyfdkbbnkpwmzcrytkjzistytkecmtjpnejeataeverlldwnhsutfpgokkamtaaddyotadlecsdwykcsfnykasykaewkaewkaocygmjyflaxaxaxaycyoyasisaxasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlosaowkaxhdclaxwmtlgmaokgjkpmpauecyoxmwsgkewezeksbbeetbwnaoongugopacsnbsktnksrfaahdcxgyjyetplsarlmnlysakpoxcwvafsynayeohdatbnrnzcrentvandtdytnsaefmleamtaaddyotadlncsdwykaeykaeykaocygmjyflaxaxaxattaaddyoeadlflawkaxaeaycyjyfpwfhhasisgrihkkjkjyjljtihtaaddlosaowkaxhdclaowfrhkewfwfetkbdwgtlkjsfpoebzdtptbaahlpwlwteyjoiomkttmymklehfvlwnaahdcxpsehueveutfhfgeyytlrvtoxckltdewesrwpioynbbspwtehlygabnldfettntjyamtaaddyotadlncsehykaeykaeykaocygmjyflaxaxaxattaaddyoeadlflawkaxaeaycyhkztprihasisgrihkkjkjyjljtihaxjtgrihkkjkjyjljtihcxeocxgdjpjlaaksdeidiyececeehseyhsenehieiaeoiaiddyeoiyihiaiddydyeheoeoeceyeciaecechsechsetehieeoehahihehdmehdmdypyvtjpns",
+      "value": {
+        "masterFingerprint": 1383352067,
+        "keys": [
+          {
+            "curve": "secp256k1",
+            "keyData": "034c729aa638b3261640a8f06a5eabbfe4c04d2e0aac434b344147a1a5fa3555a3",
+            "isPrivate": false,
+            "chainCode": "96672bdd3ee7212fe7947040e703cddbaab5b498815787a601476c75e7e7899d",
+            "origin": {
+              "components": "m/44'/60'/0'",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "children": {
+              "components": "m/0/?",
+              "depth": 0
+            },
+            "parentFingerprint": 3784174792,
+            "name": "Keystone",
+            "note": "account.standard"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "036b287717eb691cb108d23293fbef416906fa564942ebfeb659a506ed39d9a07f",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/0'/0",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "parentFingerprint": 2277398964,
+            "name": "Keystone",
+            "note": "account.ledger_legacy"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "039f4e693730f116e7ab01dac46b94ad4fcabc3ca7d91a6b121cc26782a8f2b8b2",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/0'/0/0",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "parentFingerprint": 2929920023,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "02f6cb8d18cef477defff35eae0d4fbfdb7e929fcf124056642bb52005121f2b82",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/1'/0/0",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "parentFingerprint": 4225421552,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "025bac93928fb3a1b42abd1ef04a9df7152c3e3ac9784b0adeb8c74f02d6e081a7",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/2'/0/0",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "parentFingerprint": 310184356,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "031c4731b1d0f2813f25732a07bc8634a1d43678fb5f3e339e31868e7a3e161b31",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/3'/0/0",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "parentFingerprint": 2860179835,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03ee66c1903304ae22499bb7236ed9afe9de557ae4aa8756660bd13468e016ebfe",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/4'/0/0",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "parentFingerprint": 1405845642,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03b36c22174290c6ce6edb10df4386f7a4dee680313a7daecab7ceb48edb41d0d4",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/5'/0/0",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "parentFingerprint": 936780044,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "0301e2533680aceb0eea3cd0c23ca1fcec7ef0c085c4ba89986b56d919c6e775c1",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/6'/0/0",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "parentFingerprint": 352274965,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "02a54598a178b1153c19a3678851c4e35162c018a1b5f354ad9cbf169fc365e6e1",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/7'/0/0",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "parentFingerprint": 4107268306,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03934334794763b31983061359e7c5de9aa400083fcdffbb7c3c8791bda35700fe",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/8'/0/0",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "parentFingerprint": 1114079527,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "026f95e551487e0c75ebfdbdcf6c68d4cf3596729f6b0700e4b789f161dd415579",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/9'/0/0",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "parentFingerprint": 2701748227,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03ebd552027b73adb1de1aa494ca7cedfe781434d6f102a55355b118a0c5da78bc",
+            "isPrivate": false,
+            "chainCode": "517438aec2b78e81c275a41be63df6083358070cbefdb59de69bd2f99c003e8a",
+            "origin": {
+              "components": "m/44'/0'/0'",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "children": {
+              "components": "m/?",
+              "depth": 0
+            },
+            "parentFingerprint": 1950479196,
+            "name": "Keystone"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "02f3b97cf3f3387e2c4d8c7141a21529a90e0585e9f032706798d18f988a56e3f1",
+            "isPrivate": false,
+            "chainCode": "ac31dee4dd3f4632f984e0a41e8728edc3ec67f614c8f03181490c8945d19d74",
+            "origin": {
+              "components": "m/49'/0'/0'",
+              "sourceFingerprint": "52744703",
+              "depth": 3
+            },
+            "children": {
+              "components": "m/?",
+              "depth": 0
+            },
+            "parentFingerprint": 1509732965,
+            "name": "Keystone"
+          }
+        ],
+        "device": "Keystone 3 Pro",
+        "deviceId": "bf554a2a61dc3cb03fecb00133525c55a5a81d31",
+        "version": "1.1.0"
+      },
+      "source": "asserted literal: keystone3-firmware@7da0b94135e14af9bfb60f5ca5c300e627496525 rust/apps/wallets/src/keystone_connect.rs (~line 472, version 1.1.0)"
+    },
+    {
+      "name": "vendor-keystone3pro-v1.7.0-16keys",
+      "urType": "crypto-multi-accounts",
+      "cborHex": "d9044fa5011a1250b6bc0290d9012fa802f403582103c4ad25226a98764f7b753b6c763be112c940182e0b6698944c9def253cec4676045820bf103cfabcab325a7463ab5c432a4042109279d6c3531c8c5ea712684cf31f3706d90130a30186182cf5183cf500f5021a1250b6bc030307d90130a2018400f480f40300081a63c5ea6709684b657973746f6e650a706163636f756e742e7374616e64617264d9012fa602f403582103346d8362d8b3c348cc821abe96e79bbc005af54567d0742c9052215322eaa08a06d90130a30188182cf5183cf500f500f4021a1250b6bc0303081a6e7c9e1809684b657973746f6e650a756163636f756e742e6c65646765725f6c6567616379d9012fa602f403582103de2f443b5070e839d6a209ed1afaadfd43daf7bc610a1fefef201a3aca5350ee06d90130a3018a182cf5183cf500f500f400f4021a1250b6bc0303081a769cd41a09684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f403582103a96bae34b46e82eee9c5beae52e446693b5c2e365714b223adea7caae47e1b7f06d90130a3018a182cf5183cf501f500f400f4021a1250b6bc0303081a998dec6209684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f4035821029299ea371a1c6cdcc75b91d26322a2dbdfedb58285e33760a2af82cfee1a7a6e06d90130a3018a182cf5183cf502f500f400f4021a1250b6bc0303081ac49452d709684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f4035821030f1808f972aed2b8e01d92b09b9c0d55b994592fb5599557e0d4828705204a4106d90130a3018a182cf5183cf503f500f400f4021a1250b6bc0303081a0823c44c09684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f4035821021c885e79f19ba2658755952801366f00f5304db8597eb72a78a6886d8175037d06d90130a3018a182cf5183cf504f500f400f4021a1250b6bc0303081aef4e5bae09684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f4035821037653d3a64a3d1fce16d5693e044e9aea644082371f4d31f6eb83096b5b84d97b06d90130a3018a182cf5183cf505f500f400f4021a1250b6bc0303081a364c571b09684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f403582103ded46d3bc515112c1c99b5f5b5f6c4abc76cc40d98ba4c1808c97038fe976ff606d90130a3018a182cf5183cf506f500f400f4021a1250b6bc0303081a456759fc09684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f403582102447d94e1937819a79a0ef56cd7b7a29de7c80a45b34480ef0b593083e418557906d90130a3018a182cf5183cf507f500f400f4021a1250b6bc0303081a09f362d709684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f403582103d94fb59028252ab9353ee376e868cfd59e9d0bc24ef35fe1b06310cd0e4e908b06d90130a3018a182cf5183cf508f500f400f4021a1250b6bc0303081a4e09767009684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa602f4035821034d53b1c2630e12b853b96d70fb671363d5d4ec9406f722b4deea1f2a9eb6e76406d90130a3018a182cf5183cf509f500f400f4021a1250b6bc0303081ac418564209684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa702f40358210246696468fa5c46647bdd186f568983e2a26773dc5b4c174790fee7ef9b9a7c9904582051872c7bb8270a7655ae15d738bb21379962ff11fb048b55630395afcfef442806d90130a30186182cf500f500f5021a1250b6bc030307d90130a2018280f40300081ab5d6f45009684b657973746f6e65d9012fa702f403582103ab6a1908b437179b914dc3cf4b829d7387adf60fdee483e9c748d5ee79ba4be4045820bad8f929afd65c4b3ff78db1a386062374f2d2e6552e9fdc59aa7dd9b5db6e2c06d90130a301861831f500f500f5021a1250b6bc030307d90130a2018280f40300081a197077c809684b657973746f6e65d9012fa702f40358210262ba42544acc4223c74511b37bae54de22565f25f8034f5af8aa10a04c3621b9045820de47dd17679605b84abf439bdf5477c6cb94ff5a541d3cb1734afebfa3d3fdb906d90130a301861854f500f500f5021a1250b6bc030307d90130a2018280f40300081a9f6b7e4b09684b657973746f6e65d9012fa702f403582103e0db6ca7c71e72a40091141b9dc4596ab3a9192ac41eebe1f2b048c654423ecb045820a75805b89c5079ba74e9002c3e587f7c97ea8018ab1d5245638a45de3c845e0b06d90130a301861856f500f500f5021a1250b6bc030307d90130a2018280f40300081a0484004d09684b657973746f6e65036e4b657973746f6e6520332050726f047828626339633466373135376165363937643433346163383536323332306564353335653737373638300565312e372e30",
+      "ur": "ur:crypto-multi-accounts/onadcybggdrprfaomhtaaddlpdaowkaxhdclaxsspmdacpimmkkogwkgkpfrjzkofrvybgsofzcsdmbdiymkmwgsntwsdafnwpfgkoaahdcxrsbefnzsrfpyeyhtjyiapyhhfxdrfzfwbemokktbsrgucelkhyosbgisgswfctemamtaaddyotadlncsdwykcsfnykaeykaocybggdrprfaxaxattaaddyoeadlraewklawkaxaeaycyiaskwdioasisgrihkkjkjyjljtihbkjohsiaiajlkpjtjydmjkjyhsjtiehsjpietaaddlolaowkaxhdclaxeejnlsidtpqdsrfdsflfcyrnmtvdndrfaehtykfeiotijydwmhgmclgucpwdnbleamtaaddyotadlocsdwykcsfnykaeykaewkaocybggdrprfaxaxaycyjtkenncsasisgrihkkjkjyjljtihbkkphsiaiajlkpjtjydmjzihieioihjphejzihiohsiakktaaddlolaowkaxhdclaxuedlfyfrgdjovsestboeaswecyzspmzcfxtnylrfhsbkctwswscxcyftsggugdwyamtaaddyotadlecsdwykcsfnykaeykaewkaewkaocybggdrprfaxaxaycykonstycyasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaxptjepleeqzjtlfwywlskrnplgmvefginfrhhdmenhgbbprcnpmwdkepkvekbcwlbamtaaddyotadlecsdwykcsfnykadykaewkaewkaocybggdrprfaxaxaycynllgwpidasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaomonlwdemcycejzuosthpmetdiacpoeuyurwerelflpvlemhnoepelftkwycyknjtamtaaddyotadlecsdwykcsfnykaoykaewkaewkaocybggdrprfaxaxaycyssmwgmtsasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaxbscsayytjppltdrovtcamopfndnsbtgorhmwhkdlrehkmdhgvttylfltahcxgefpamtaaddyotadlecsdwykcsfnykaxykaewkaewkaocybggdrprfaxaxaycyaycnssgsasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaocelohykkwnndoeihltgomddeadenjlaeykdygtrohkkbrldrksollojnlykpaxkiamtaaddyotadlecsdwykcsfnykaaykaewkaewkaocybggdrprfaxaxaycywsglhpplasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaxkoguteolgefscttocmtlinfmaaglnywdiefzlfemctgtehynwmlsasjehplrtakgamtaaddyotadlecsdwykcsfnykahykaewkaewkaocybggdrprfaxaxaycyengshgcwasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaxuetyjnfrskbzbydwcenlreykreynsspystjzssbtmkrdgscsaysojoetzemsjlynamtaaddyotadlecsdwykcsfnykamykaewkaewkaocybggdrprfaxaxaycyfeiohkztasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaofykimwvymukscfosnybaykjztsrloentvdspbkfeqdfylawsbdhkdylsvecsgokkamtaaddyotadlecsdwykcsfnykatykaewkaewkaocybggdrprfaxaxaycyaswfidtsasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaxtagwremhdedadrrhecfmvlkovsistktlnnntbdsaglwfhevypfiabesnbaglmhluamtaaddyotadlecsdwykcsfnykayykaewkaewkaocybggdrprfaxaxaycyglaskojoasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlolaowkaxhdclaxgtgupasaiababgrogurhjnjozoiobwiatltywpmwamylcpqzuewdctdrnnrpvdieamtaaddyotadlecsdwykcsfnykasykaewkaewkaocybggdrprfaxaxaycysscshffwasisgrihkkjkjyjljtihbkjkhsiaiajlkpjtjydmjzihieioihjphejzinkoihtaaddlosaowkaxhdclaofginieiszshhfgiekgutcsjlhfldlsvooeiojkuohpgschflmhzevdwsndnykenlaahdcxgyltdwkgrodibkkogoplbztsetrkclemnlidzmbyzoaalugoiaaxmdpetkwsfydeamtaaddyotadlncsdwykaeykaeykaocybggdrprfaxaxattaaddyoeadlflawkaxaeaycyretbwkgdasisgrihkkjkjyjljtihtaaddlosaowkaxhdclaxpyimcfayqzemchndmegtsrtkgrlfntjkltpmynbsuevelswlstfdtlwykkrdgrveaahdcxrdtpytdtpetbhhgrfhyllgpaotlnamcnjywztdvagodmneuohkpkkitareuyjtdwamtaaddyotadlncsehykaeykaeykaocybggdrprfaxaxattaaddyoeadlflawkaxaeaycycfjoktspasisgrihkkjkjyjljtihtaaddlosaowkaxhdclaoidrdfwghgesffwcnstfebyqdkgplghuecphfhedayaaxgwhtyapkbenbgsenclrhaahdcxueflutchiomtahrogersfxndurghktswsbmwzmhtghcafnpajkgezersottezcrhamtaaddyotadlncsghykaeykaeykaocybggdrprfaxaxattaaddyoeadlflawkaxaeaycynejekbgrasisgrihkkjkjyjljtihtaaddlosaowkaxhdclaxvtuyjzosstckjpoxaemebbcwntsshkimqdptcfdrssckwmvywzpffdswghfwfmsbaahdcxoshdahronsgdkkrdjywlaedwfmhdlbkemswdlacspycagmfeialefeuefnlrhybdamtaaddyotadlncshfykaeykaeykaocybggdrprfaxaxattaaddyoeadlflawkaxaeaycyaalraegtasisgrihkkjkjyjljtihaxjtgrihkkjkjyjljtihcxeocxgdjpjlaaksdeidiaesiaeeiyemehecemhsihenesemieeeeoeehsiaeteceneyeoeydyihieeceoecihemememenetdyahihehdmemdmdyrlmurlad",
+      "value": {
+        "masterFingerprint": 307279548,
+        "keys": [
+          {
+            "curve": "secp256k1",
+            "keyData": "03c4ad25226a98764f7b753b6c763be112c940182e0b6698944c9def253cec4676",
+            "isPrivate": false,
+            "chainCode": "bf103cfabcab325a7463ab5c432a4042109279d6c3531c8c5ea712684cf31f37",
+            "origin": {
+              "components": "m/44'/60'/0'",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "children": {
+              "components": "m/0/?",
+              "depth": 0
+            },
+            "parentFingerprint": 1673914983,
+            "name": "Keystone",
+            "note": "account.standard"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03346d8362d8b3c348cc821abe96e79bbc005af54567d0742c9052215322eaa08a",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/0'/0",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "parentFingerprint": 1853660696,
+            "name": "Keystone",
+            "note": "account.ledger_legacy"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03de2f443b5070e839d6a209ed1afaadfd43daf7bc610a1fefef201a3aca5350ee",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/0'/0/0",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "parentFingerprint": 1989989402,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03a96bae34b46e82eee9c5beae52e446693b5c2e365714b223adea7caae47e1b7f",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/1'/0/0",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "parentFingerprint": 2576215138,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "029299ea371a1c6cdcc75b91d26322a2dbdfedb58285e33760a2af82cfee1a7a6e",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/2'/0/0",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "parentFingerprint": 3298054871,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "030f1808f972aed2b8e01d92b09b9c0d55b994592fb5599557e0d4828705204a41",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/3'/0/0",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "parentFingerprint": 136561740,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "021c885e79f19ba2658755952801366f00f5304db8597eb72a78a6886d8175037d",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/4'/0/0",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "parentFingerprint": 4014889902,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "037653d3a64a3d1fce16d5693e044e9aea644082371f4d31f6eb83096b5b84d97b",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/5'/0/0",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "parentFingerprint": 910972699,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03ded46d3bc515112c1c99b5f5b5f6c4abc76cc40d98ba4c1808c97038fe976ff6",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/6'/0/0",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "parentFingerprint": 1164401148,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "02447d94e1937819a79a0ef56cd7b7a29de7c80a45b34480ef0b593083e4185579",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/7'/0/0",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "parentFingerprint": 166945495,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03d94fb59028252ab9353ee376e868cfd59e9d0bc24ef35fe1b06310cd0e4e908b",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/8'/0/0",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "parentFingerprint": 1309242992,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "034d53b1c2630e12b853b96d70fb671363d5d4ec9406f722b4deea1f2a9eb6e764",
+            "isPrivate": false,
+            "origin": {
+              "components": "m/44'/60'/9'/0/0",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "parentFingerprint": 3289929282,
+            "name": "Keystone",
+            "note": "account.ledger_live"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "0246696468fa5c46647bdd186f568983e2a26773dc5b4c174790fee7ef9b9a7c99",
+            "isPrivate": false,
+            "chainCode": "51872c7bb8270a7655ae15d738bb21379962ff11fb048b55630395afcfef4428",
+            "origin": {
+              "components": "m/44'/0'/0'",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "children": {
+              "components": "m/?",
+              "depth": 0
+            },
+            "parentFingerprint": 3050763344,
+            "name": "Keystone"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03ab6a1908b437179b914dc3cf4b829d7387adf60fdee483e9c748d5ee79ba4be4",
+            "isPrivate": false,
+            "chainCode": "bad8f929afd65c4b3ff78db1a386062374f2d2e6552e9fdc59aa7dd9b5db6e2c",
+            "origin": {
+              "components": "m/49'/0'/0'",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "children": {
+              "components": "m/?",
+              "depth": 0
+            },
+            "parentFingerprint": 426801096,
+            "name": "Keystone"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "0262ba42544acc4223c74511b37bae54de22565f25f8034f5af8aa10a04c3621b9",
+            "isPrivate": false,
+            "chainCode": "de47dd17679605b84abf439bdf5477c6cb94ff5a541d3cb1734afebfa3d3fdb9",
+            "origin": {
+              "components": "m/84'/0'/0'",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "children": {
+              "components": "m/?",
+              "depth": 0
+            },
+            "parentFingerprint": 2674622027,
+            "name": "Keystone"
+          },
+          {
+            "curve": "secp256k1",
+            "keyData": "03e0db6ca7c71e72a40091141b9dc4596ab3a9192ac41eebe1f2b048c654423ecb",
+            "isPrivate": false,
+            "chainCode": "a75805b89c5079ba74e9002c3e587f7c97ea8018ab1d5245638a45de3c845e0b",
+            "origin": {
+              "components": "m/86'/0'/0'",
+              "sourceFingerprint": "1250b6bc",
+              "depth": 3
+            },
+            "children": {
+              "components": "m/?",
+              "depth": 0
+            },
+            "parentFingerprint": 75759693,
+            "name": "Keystone"
+          }
+        ],
+        "device": "Keystone 3 Pro",
+        "deviceId": "bc9c4f7157ae697d434ac8562320ed535e777680",
+        "version": "1.7.0"
+      },
+      "source": "asserted literal: keystone3-firmware@7da0b94135e14af9bfb60f5ca5c300e627496525 rust/apps/wallets/src/keystone_connect.rs (~line 509, version 1.7.0)"
+    }
+  ]
+}

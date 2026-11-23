@@ -26,7 +26,7 @@ const platformNeutralImports = {
 const dcborImport = {
   name: "@blockchaincommons/dcbor",
   message:
-    "dcbor is confined to src/typed and src/registry — the root transport does not import it",
+    "dcbor is confined to src/typed, src/registry and src/interop — the root transport does not import it",
 };
 
 const config: UserConfig = defineConfig({
@@ -121,8 +121,12 @@ const config: UserConfig = defineConfig({
         },
       },
       {
-        // The dcbor peer is allowed only behind the typed and registry entries.
-        files: ["packages/ur/src/typed/**", "packages/ur/src/registry/**"],
+        // The dcbor peer is allowed only behind the typed, registry and interop entries.
+        files: [
+          "packages/ur/src/typed/**",
+          "packages/ur/src/registry/**",
+          "packages/ur/src/interop/**",
+        ],
         rules: {
           "eslint/no-restricted-imports": ["error", platformNeutralImports],
         },

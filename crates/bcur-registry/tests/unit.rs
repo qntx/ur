@@ -195,8 +195,8 @@ fn curve_mapping() {
 #[test]
 fn coin_info_defaults() {
     let info = CoinInfo::default();
-    assert_eq!(info.coin_type(), CoinType::BTC);
-    assert_eq!(info.network(), Network::MAINNET);
+    assert_eq!(info.coin_type(), None);
+    assert_eq!(info.network(), None);
     assert_eq!(info, CoinInfo::BTC_MAINNET);
     // Defaults omitted on write: an all-default CoinInfo encodes as `{}`.
     assert_eq!(info.untagged_cbor().to_cbor_data(), vec![0xa0]);
@@ -205,7 +205,7 @@ fn coin_info_defaults() {
     assert_eq!(tagged_tags[0].value(), 40_305);
     assert_eq!(tagged_tags[1].value(), 305);
 
-    let eth_test = CoinInfo::new(CoinType::ETH, Network::TESTNET);
+    let eth_test = CoinInfo::new(Some(CoinType::ETH), Some(Network::TESTNET));
     let cbor = hex::encode(eth_test.untagged_cbor().to_cbor_data());
     assert_eq!(cbor, "a201183c0201");
 }
@@ -562,7 +562,7 @@ fn hdkey_digests_frozen() {
         DerivedKey::private(priv_key_data())
             .unwrap()
             .with_chain_code(chain_code())
-            .with_use_info(CoinInfo::new(CoinType::ETH, Network::TESTNET)),
+            .with_use_info(CoinInfo::new(Some(CoinType::ETH), Some(Network::TESTNET))),
     );
     assert_eq!(
         hex::encode(full.digest_source()),
@@ -726,10 +726,10 @@ fn address_validation_and_wire() {
     );
 
     // `with_info` writes a v2-tagged coin-info under key 1.
-    let with_info = bare.with_info(CoinInfo::new(CoinType::ETH, Network::MAINNET));
+    let with_info = bare.with_info(CoinInfo::new(Some(CoinType::ETH), Some(Network::MAINNET)));
     let cbor = hex::encode(with_info.untagged_cbor().to_cbor_data());
     assert!(cbor.starts_with("a201d99d71a101183c03"), "{cbor}");
-    assert_eq!(with_info.info().unwrap().coin_type(), CoinType::ETH);
+    assert_eq!(with_info.info().unwrap().coin_type(), Some(CoinType::ETH));
 
     // Wire index mapping 0/1/2.
     for (address, index) in [

@@ -1,0 +1,136 @@
+{
+  "schema": "interop-vector/v1",
+  "capability": "interop.eth-sign-request",
+  "source": {
+    "name": "interop eth-sign-request vectors: decode `inputCborHex` ?? `cborHex`, compare `value`, re-encode byte-identically to `cborHex`, emit `ur`",
+    "keystoneJs": "@keystonehq/bc-ur-registry-eth 0.23.0 / -sol 0.9.5 / -tron 0.5.0 + bc-ur-registry 0.8.1 (ISC/Apache-2.0)",
+    "keystoneRust": "ur-registry 1.0.9 (MIT) \u2014 oracle harness outside the repo",
+    "onekey": "OneKeyHQ/firmware-pro d9ad133 core/src/apps/ur_registry (read-only reference)"
+  },
+  "cases": [
+    {
+      "name": "metamask-eth-tx-full",
+      "urType": "eth-sign-request",
+      "cborHex": "d90191a701d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d0248f8aa80843b9aca000301040105d90130a3018a182cf5183cf500f500f400f4021a73c5da0a030506543e88f9a1b2c3d4e5f60718293a4b5c6d7e8f901207684d6574614d61736b",
+      "ur": "ur:eth-sign-request/osadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaofdyapklalrfrnysgaeaxadaaadahtaaddyotadlecsdwykcsfnykaeykaewkaewkaocyjksktnbkaxahamghfmloytoyprsrtyvwynatcsdtftgrhhjnkbmymhbgatisgtihjyhsgthsjkjefdpkpmhn",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "f8aa80843b9aca00",
+        "derivationPath": {
+          "components": "m/44'/60'/0'/0/0",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 5
+        },
+        "address": "3e88f9a1b2c3d4e5f60718293a4b5c6d7e8f9012",
+        "origin": "MetaMask",
+        "dataType": "transaction",
+        "chainId": 1
+      },
+      "source": "Keystone JS (bc-ur-registry-*) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "eth-typed-data",
+      "urType": "eth-sign-request",
+      "cborHex": "d90191a501d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d0244deadbeef030204188905d90130a3018a182cf5183cf500f500f400f4021a73c5da0a0305",
+      "ur": "ur:eth-sign-request/onadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaofyuepmrnwsaxaoaacsldahtaaddyotadlecsdwykcsfnykaeykaewkaewkaocyjksktnbkaxahsgctdsin",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "deadbeef",
+        "derivationPath": {
+          "components": "m/44'/60'/0'/0/0",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 5
+        },
+        "dataType": "typedData",
+        "chainId": 137
+      },
+      "source": "Keystone JS (bc-ur-registry-*) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "eth-personal-message-no-chainid",
+      "urType": "eth-sign-request",
+      "cborHex": "d90191a4024b68656c6c6f20776f726c64030305d90130a3018a182cf5183cf500f500f400f4021a73c5da0a030507655261626279",
+      "ur": "ur:eth-sign-request/oxaogrisihjzjzjlcxktjljpjzieaxaxahtaaddyotadlecsdwykcsfnykaeykaewkaewkaocyjksktnbkaxahatihgmhsididkkinrlvwuy",
+      "value": {
+        "signData": "68656c6c6f20776f726c64",
+        "derivationPath": {
+          "components": "m/44'/60'/0'/0/0",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 5
+        },
+        "origin": "Rabby",
+        "dataType": "personalMessage"
+      },
+      "source": "MetaMask keyring omits chainId for personal_sign; Keystone JS oracle bytes identical"
+    },
+    {
+      "name": "eth-typed-transaction-minimal",
+      "urType": "eth-sign-request",
+      "cborHex": "d90191a3024402f8aa01030405d90130a3018a182cf5183cf500f500f400f4021a73c5da0a0305",
+      "ur": "ur:eth-sign-request/otaofyaoyapkadaxaaahtaaddyotadlecsdwykcsfnykaeykaewkaewkaocyjksktnbkaxahylsscsol",
+      "value": {
+        "signData": "02f8aa01",
+        "derivationPath": {
+          "components": "m/44'/60'/0'/0/0",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 5
+        },
+        "dataType": "typedTransaction"
+      },
+      "source": "Keystone JS (bc-ur-registry-*) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "vendor-metamask-rlp-transaction",
+      "urType": "eth-sign-request",
+      "cborHex": "d90191a601d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02584bf849808609184e72a00082271094000000000000000000000000000000000000000080a47f74657374320000000000000000000000000000000000000000000000000000006000578080800301040105d90130a2018a182cf501f501f500f401f4021a1234567807686d6574616d61736b",
+      "ur": "ur:eth-sign-request/oladtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohdgryagalalnascsgljpnbaelfdibemwaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaelaoxlbjyihjkjyeyaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaehnaehglalalaaxadaaadahtaaddyoeadlecsdwykadykadykaewkadwkaocybgeehfksatisjnihjyhsjnhsjkjetlnndant",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "f849808609184e72a00082271094000000000000000000000000000000000000000080a47f7465737432000000000000000000000000000000000000000000000000000000600057808080",
+        "derivationPath": {
+          "components": "m/44'/1'/1'/0/1",
+          "sourceFingerprint": "12345678"
+        },
+        "origin": "metamask",
+        "dataType": "transaction",
+        "chainId": 1
+      },
+      "source": "asserted literal: keystone-sdk-base@029aeedb2602611cf85ca177320a0c92cf70a13c packages/ur-registry-eth/__tests__/EthSignRequest.test.ts (same bytes in keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/ethereum/eth_sign_request.rs)"
+    },
+    {
+      "name": "vendor-construct-eth-request-no-origin",
+      "urType": "eth-sign-request",
+      "cborHex": "d90191a501d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02584bf849808609184e72a00082271094000000000000000000000000000000000000000080a47f74657374320000000000000000000000000000000000000000000000000000006000578080800301040105d90130a2018a182cf501f501f500f401f4021a12345678",
+      "ur": "ur:eth-sign-request/onadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohdgryagalalnascsgljpnbaelfdibemwaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaelaoxlbjyihjkjyeyaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaehnaehglalalaaxadaaadahtaaddyoeadlecsdwykadykadykaewkadwkaocybgeehfkswdtklffd",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "f849808609184e72a00082271094000000000000000000000000000000000000000080a47f7465737432000000000000000000000000000000000000000000000000000000600057808080",
+        "derivationPath": {
+          "components": "m/44'/1'/1'/0/1",
+          "sourceFingerprint": "12345678"
+        },
+        "dataType": "transaction",
+        "chainId": 1
+      },
+      "source": "asserted literal: keystone-sdk-base@029aeedb2602611cf85ca177320a0c92cf70a13c packages/ur-registry-eth/__tests__/EthSignRequest.test.ts (constructETHRequest, origin absent)"
+    },
+    {
+      "name": "vendor-avax-typed-transaction",
+      "urType": "eth-sign-request",
+      "cborHex": "d90191a601d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02587702f87482a86901841dcd6500849502f9008252089446a836a6d5800dd3ab9a6b914c904ef8017b48c8880dcac353ec227a0080c001a03cebc64b4bd58567b7205897f1f68922c3f142366b3236fba169bea5ab875284a05291dae91b105ac2c0dc5479ecf1ed7890d93c2ab1e12695f1e8ecbc92a42e5a03040419a86905d90130a2018a182cf5183cf500f500f406f4021abdeee782076b636f72652077616c6c6574",
+      "ur": "ur:eth-sign-request/oladtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohdktaoyajylfpdinadlrcasnihaelrmdaoytaelfgmaymwfgpdenoltllabttepynyjemegsmhglyaadkgfdsplobtsgsrguwpcpknaelartadnbfnwmswgrgrtllpiorlcxhdmswnynldcpsrwnfwenjeeyenzooyinrnonpyltgmlrnbgmmetnwlcwbehtsartuoghkkwpwnweksmhtafndrpavydsmdwnvswprfmooxdmhtaxaaaacfpdinahtaaddyoeadlecsdwykcsfnykaeykaewkamwkaocyrywyvdlfatjeiajljpihcxkthsjzjzihjyfwkouyfp",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "02f87482a86901841dcd6500849502f9008252089446a836a6d5800dd3ab9a6b914c904ef8017b48c8880dcac353ec227a0080c001a03cebc64b4bd58567b7205897f1f68922c3f142366b3236fba169bea5ab875284a05291dae91b105ac2c0dc5479ecf1ed7890d93c2ab1e12695f1e8ecbc92a42e5a",
+        "derivationPath": {
+          "components": "m/44'/60'/0'/0/6",
+          "sourceFingerprint": "bdeee782"
+        },
+        "origin": "core wallet",
+        "dataType": "typedTransaction",
+        "chainId": 43113
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/ethereum/eth_sign_request.rs test_avax_c_chain_encode"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { expect, test } from "vite-plus/test";
 
 import * as root from "../src/index.ts";
+import * as interop from "../src/interop/index.ts";
 import * as registry from "../src/registry/index.ts";
 import * as typed from "../src/typed/index.ts";
 
@@ -24,6 +25,20 @@ export type {
   UrType,
 } from "../src/index.ts";
 export type { UrCodec } from "../src/typed/index.ts";
+export type {
+  Ed25519HdKey,
+  EthDataType,
+  EthSignRequest,
+  EthSignature,
+  MultiAccounts,
+  MultiAccountsKey,
+  SolSignRequest,
+  SolSignType,
+  SolSignature,
+  TronDataType,
+  TronSignRequest,
+  TronSignature,
+} from "../src/interop/index.ts";
 export type {
   AccountDescriptor,
   Address,
@@ -112,6 +127,12 @@ test("registry runtime exports are exactly the documented surface", () => {
       "codecMap",
       "codecUrTypes",
       "coinInfoCodec",
+      "cryptoAccountCodec",
+      "cryptoCoinInfoCodec",
+      "cryptoHdKeyCodec",
+      "cryptoKeypathCodec",
+      "cryptoOutputCodec",
+      "cryptoPsbtCodec",
       "ecKeyCodec",
       "envelopeCodec",
       "fromTagged",
@@ -130,6 +151,34 @@ test("registry runtime exports are exactly the documented surface", () => {
       "sskrCodec",
       "toTagged",
       "toUr",
+    ].toSorted(),
+  );
+});
+
+test("interop runtime exports are exactly the documented surface", () => {
+  expect(names(interop)).toStrictEqual(
+    [
+      "INTEROP_TAGS",
+      "Ur",
+      "UrError",
+      "codecMap",
+      "codecUrTypes",
+      "cryptoKeypathCodec",
+      "cryptoMultiAccountsCodec",
+      "ethSignRequestCodec",
+      "ethSignatureCodec",
+      "fromTagged",
+      "fromUr",
+      "fromUrWith",
+      "isUrType",
+      "oneKeyTronSignRequestCodec",
+      "parseUrType",
+      "solSignRequestCodec",
+      "solSignatureCodec",
+      "toTagged",
+      "toUr",
+      "tronSignRequestCodec",
+      "tronSignatureCodec",
     ].toSorted(),
   );
 });

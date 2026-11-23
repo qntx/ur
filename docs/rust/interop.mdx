@@ -1,0 +1,49 @@
+---
+title: Interop
+description: Wallet-interop types (Keystone / OneKey dialects) — bcur-registry `interop` feature.
+---
+
+The `interop` feature of `bcur-registry` adds the request/signature types that deployed wallets exchange over `ur:` — Keystone (firmware, mobile app), MetaMask/Rabby, OneKey, and compatible consumers. Wire forms, defaults, and accept/reject behavior are shared with the [TypeScript interop entry](../typescript/interop.mdx); the Rust API is idiomatic — checked constructors, `Option` fields, and `with_*` consuming builders.
+
+```toml
+bcur-registry = { version = "3", features = ["interop"] }
+```
+
+```rust
+use bcur::typed::{UrDecodable, UrEncodable};
+use bcur_registry::interop::{ChainId, EthDataType, EthSignRequest};
+use bcur_registry::Keypath;
+
+let request = EthSignRequest::new(rlp_tx, EthDataType::Transaction, path)?
+    .with_chain_id(ChainId::new(1)?)
+    .with_origin("MetaMask");
+let ur = request.to_ur()?; // ur:eth-sign-request/…
+let back = EthSignRequest::from_ur(&ur)?;
+```
+
+## Types
+
+| UR type                 | tag  | Writer type             | Notes                                    |
+| ----------------------- | ---- | ----------------------- | ---------------------------------------- |
+| `crypto-multi-accounts` | 1103 | `MultiAccounts`         | `MultiAccountsKey::{Secp256k1, Ed25519}` |
+| `eth-sign-request`      | 401  | `EthSignRequest`        | `EthDataType`, `ChainId`, `RequestId`    |
+| `eth-signature`         | 402  | `EthSignature`          |                                          |
+| `sol-sign-request`      | 1101 | `SolSignRequest`        | `SolSignType`                            |
+| `sol-signature`         | 1102 | `SolSignature`          |                                          |
+| `tron-sign-request`     | 5101 | `TronSignRequest`       | Keystone layout                          |
+| `tron-sign-request`     | 5201 | `OneKeyTronSignRequest` | OneKey layout (`TronDataType`)           |
+| `tron-signature`        | 5102 | `TronSignature`         |                                          |
+
+All maps are closed — an unknown key, wrong CBOR major type, or missing required key is a registry `Error`. `RequestId` wraps a 16-byte UUID (`#6.37`); derivation paths are `Keypath`s with at least one concrete `index` component (read accepts tag 40304 too); optional text fields normalize `""` to absent on both directions.
+
+## Per-type invariants
+
+- **EthSignRequest** — `new(sign_data, data_type, derivation_path)`, `with_request_id`, `with_chain_id(ChainId)`, `with_address([u8; 20])`, `with_origin`. `ChainId::new` rejects `0` and values above `2^53-1` (`Error::OutOfRange`) — vendors sometimes emit a non-canonical float for `2^53`, which is rejected on decode.
+- **EthSignature::new** — `signature` is `r || s || v`, 65–72 bytes.
+- **SolSignRequest** — `new(sign_data, derivation_path, sign_type)`; `sign_type` covers transaction/message plus the OneKey off-chain dialects (wire 3/4). `with_address` takes non-empty opaque bytes.
+- **SolSignature::new** — exactly 64 bytes.
+- **TronSignRequest** — writes the Keystone layout (tag 5101, numeric key 3); `TronDataType::MessageV1` is not representable there and is rejected at construction **and** on decode. `OneKeyTronSignRequest` writes tag 5201 (`requestType` key 6) and accepts all three. **Untagged bodies in either layout decode through both readers** (`from_untagged_cbor`, detected by key 3's CBOR type), while tagged conversion (`TryFrom` a tagged `CBOR`) accepts only each writer's own tag — each type owns exactly one tag.
+- **TronSignature::new** — exactly 65 bytes.
+- **MultiAccounts** — `new(Fingerprint, first_key)`, `with_key`, `with_device`, `with_device_id`, `with_version`. `MultiAccountsKey::Secp256k1` wraps a public `DerivedKey` (`TryFrom` rejects private/master); `Ed25519` wraps `Ed25519Key::new([u8; 32])`. OneKey's `4: h''` empty chain-code field reads as absent and is never written.
+
+Tags 401/402 collide numerically with BCR script-expression tags; they are UR-type tags here, never embedded in interop bodies, so `interop` registers no global tags.

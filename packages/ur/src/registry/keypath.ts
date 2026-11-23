@@ -182,3 +182,13 @@ export const keypathCodec: UrCodec<Keypath> = {
     });
   },
 };
+
+/**
+ * Deprecated v1 writer (`ur:crypto-keypath`, tag 304). The body is identical to v2; only the tag
+ * differs.
+ */
+export const cryptoKeypathCodec: UrCodec<Keypath> = {
+  tags: [TAGS["crypto-keypath"], TAGS.keypath],
+  encode: keypathCodec.encode,
+  decode: keypathCodec.decode,
+};

@@ -3,7 +3,7 @@ title: Registry
 description: Registry value types (BCR-2020-006) — bcur-registry.
 ---
 
-The registry crate maps application values to dCBOR bodies on dcbor's tagged traits. Every type's `cbor_tags()` is `[v2 tag, v1 tag]`: **v2 tags are written, v1 tags are read-only** (BCR-2020-006 `crypto-*` types are deprecated). Wire forms, defaults, and accept/reject behavior are shared with the [TypeScript registry](../typescript/registry.mdx); the Rust API is idiomatic — domain types carry invariants, constructors are checked, and optional fields are `Option`.
+The registry crate maps application values to dCBOR bodies on dcbor's tagged traits. Every type's `cbor_tags()` is `[v2 tag, v1 tag]`: the default types **write v2 and read both** (BCR-2020-006 `crypto-*` types are deprecated); the `v1` module's newtypes instead write the v1 forms — see [v1 writers](#v1-writers). Wire forms, defaults, and accept/reject behavior are shared with the [TypeScript registry](../typescript/registry.mdx); the Rust API is idiomatic — domain types carry invariants, constructors are checked, and optional fields are `Option`.
 
 ```bash
 cargo add bcur-registry
@@ -122,6 +122,30 @@ The emitted functions are exactly:
 Keys become `@0`, `@1`, … in order of appearance and are collected as `DescriptorKey` values (a v1 `307` address nested inside a script function becomes an `address` key, not an `addr()` function). A bare key expression directly inside `sh`/`wsh` — the KeystoneHQ form `sh(key)` — is read as `sh(cosigner(@0))`. Anything unconvertible — a `tr()` script tree, `sh` inside `sh` or `wsh`, `wsh` inside `wsh` — is `Error::UnsupportedScript` (surfaced through `TryFrom`) or a `dcbor::Error::Custom` at the `CBORTaggedDecodable` boundary.
 
 `crypto-account` converts the same way through `AccountDescriptor`; entries may carry the `308` tag or be bare script expressions (KeystoneHQ writes the latter). Conversion and nesting edge cases are pinned by `vectors/registry/crypto-output-conversion.json` and `vectors/registry/invalid.json`.
+
+## v1 writers
+
+The `bcur_registry::v1` module holds opt-in newtypes that write the deprecated `crypto-*` wire forms for interop with deployed v1 readers (Keystone, Keystone firmware, BlueWallet, MetaMask/Rabby, Sparrow). Each wraps the same value type, uses `cbor_tags()` `[v1 tag, v2 tag]` — reads both, writes v1 — and `to_ur()` produces `ur:crypto-*`:
+
+| v1 UR type         | v1 tag | Type                                                   |
+| ------------------ | ------ | ------------------------------------------------------ |
+| `crypto-psbt`      | 310    | `v1::CryptoPsbt(Psbt)`                                 |
+| `crypto-hdkey`     | 303    | `v1::CryptoHdKey(HdKey)`                               |
+| `crypto-keypath`   | 304    | `v1::CryptoKeypath(Keypath)`                           |
+| `crypto-coin-info` | 305    | `v1::CryptoCoinInfo(CoinInfo)`                         |
+| `crypto-output`    | 308    | `v1::CryptoOutput` (`TryFrom` an `OutputDescriptor`)   |
+| `crypto-account`   | 311    | `v1::CryptoAccount` (`TryFrom` an `AccountDescriptor`) |
+
+```rust
+use bcur::typed::UrEncodable;
+use bcur_registry::v1::CryptoHdKey;
+
+let ur = CryptoHdKey::from(hdkey).to_ur().unwrap(); // ur:crypto-hdkey/…
+```
+
+The writers are **presence-preserving** where vendors disagree on defaults: `CoinInfo::coin_type()`/`network()` are `Option` and each is written iff `Some` (`0` included, unlike the v2 writer which omits defaults), and `DerivedKey::is_private_flag()` (`public()` → `None`, `private()` → `Some(true)`, `with_explicit_public_flag()` → `Some(false)`) is written iff `Some`. Nested use-info/keypaths inside a v1 hdkey carry the v1 tags 305/304. `crypto-keypath` and `crypto-psbt` bodies are identical to v2.
+
+`CryptoOutput` renders `OutputDescriptor::source()` back into a BCR-2020-010 script-expression tree — exactly the grammar above — embedding keys under the v1 tags (303/306/307). `CryptoAccount` writes `{1: master_fingerprint, 2: [bare script trees]}`: KeystoneHQ's deployed spelling, not BCR-2020-015's tagged `308` entries (those are still read). `TryFrom` and decode both reject a `name`/`note` (v1 bodies have no such slots), a `source` outside the grammar, or `@n` placeholders outside `keys` — `Error::Invalid`/`Placeholders`/`OutOfRange`/`UnsupportedScript` — so a decoded v1 value always re-encodes as v1. Goldens: `vectors/registry/v1-writers.json` and `vectors/registry/v1-encode-invalid.json`.
 
 ## Secrets
 

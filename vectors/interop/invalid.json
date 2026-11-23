@@ -1,0 +1,328 @@
+{
+  "schema": "interop-invalid/v1",
+  "capability": "interop.* (all seven decoders)",
+  "source": {
+    "name": "malformed untagged bodies: `codec`.decode(inputCborHex) must throw `tsError` (a CborError code)"
+  },
+  "cases": [
+    {
+      "name": "unknown key",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a801d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b02430102030301040105d90130a30184182cf5183cf5021a73c5da0a03040654abababababababababababababababababababab07684d6574614d61736b0801",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "signData wrong type",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a3026474657874030105d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "empty signData",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a30240030105d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "missing signData",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a2030105d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "requestId 15 bytes",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a401d8254f000000000000000000000000000000024101030105d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "requestId 17 bytes",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a401d825510000000000000000000000000000000000024101030105d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "requestId untagged",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a401509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024101030105d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "requestId wrong tag",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a401d826509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024101030105d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongTag"
+    },
+    {
+      "name": "dataType 0",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a3024101030005d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "dataType 5",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a3024101030505d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "dataType wrong type",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a302410103617805d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "chainId 0",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a40241010301040005d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "chainId negative",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a40241010301042005d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "chainId 2^53",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a40241010301041b002000000000000005d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "chainId 2^53 as float64 (exact bytes cbor-sync emits for chainId >= 2^53)",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a4024101030104fb434000000000000005d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "NonCanonicalNumeric",
+      "source": "@keystonehq/bc-ur-registry-eth 0.23.0 emits fb-float for chainId >= 2^53; dCBOR rejects non-canonical numerics"
+    },
+    {
+      "name": "address 19 bytes",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a4024101030105d90130a30184182cf5183cf5021a73c5da0a0304065300000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "address 21 bytes",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a4024101030105d90130a30184182cf5183cf5021a73c5da0a03040655000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "missing derivationPath",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a20241010301",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "derivationPath untagged",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a3024101030105a3018200f4021a73c5da0a0302",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "derivationPath foreign tag",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a3024101030105d90131a3018200f4021a73c5da0a0302",
+      "tsError": "WrongTag"
+    },
+    {
+      "name": "derivationPath wildcard",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a3024101030105d90130a3018180021a73c5da0a0301",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "derivationPath range",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a3024101030105d90130a30182820003f4021a73c5da0a0302",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "derivationPath pair",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a3024101030105d90130a301818400f401f4021a73c5da0a0301",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "derivationPath empty",
+      "codec": "eth-sign-request",
+      "inputCborHex": "a3024101030105d90130a20180021a73c5da0a",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "signature 64 bytes",
+      "codec": "eth-signature",
+      "inputCborHex": "a102584000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "signature 73 bytes",
+      "codec": "eth-signature",
+      "inputCborHex": "a102584900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "signature missing",
+      "codec": "eth-signature",
+      "inputCborHex": "a101d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "signType 0",
+      "codec": "sol-sign-request",
+      "inputCborHex": "a302410103d90130a30184182cf5183cf5021a73c5da0a03040600",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "signType 5",
+      "codec": "sol-sign-request",
+      "inputCborHex": "a302410103d90130a30184182cf5183cf5021a73c5da0a03040605",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "missing signType",
+      "codec": "sol-sign-request",
+      "inputCborHex": "a202410103d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "empty address",
+      "codec": "sol-sign-request",
+      "inputCborHex": "a402410103d90130a30184182cf5183cf5021a73c5da0a030404400601",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "signature 63 bytes",
+      "codec": "sol-signature",
+      "inputCborHex": "a102583f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "signature 65 bytes",
+      "codec": "sol-signature",
+      "inputCborHex": "a10258410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "keystone dataType 3",
+      "codec": "tron-sign-request",
+      "inputCborHex": "a3024101030304d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "keystone dataType 0",
+      "codec": "tron-sign-request",
+      "inputCborHex": "a3024101030004d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "keystone missing path",
+      "codec": "tron-sign-request",
+      "inputCborHex": "a20241010301",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "key3 wrong type",
+      "codec": "tron-sign-request",
+      "inputCborHex": "a30241010361780601",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "onekey messageV1 rejected by keystone codec",
+      "codec": "tron-sign-request",
+      "inputCborHex": "a302410103d90130a30184182cf5183cf5021a73c5da0a03040602",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "onekey requestType 0",
+      "codec": "onekey-tron-sign-request",
+      "inputCborHex": "a302410103d90130a30184182cf5183cf5021a73c5da0a03040600",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "onekey requestType 4",
+      "codec": "onekey-tron-sign-request",
+      "inputCborHex": "a302410103d90130a30184182cf5183cf5021a73c5da0a03040604",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "onekey missing requestType",
+      "codec": "onekey-tron-sign-request",
+      "inputCborHex": "a202410103d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "empty address onekey",
+      "codec": "onekey-tron-sign-request",
+      "inputCborHex": "a402410103d90130a30184182cf5183cf5021a73c5da0a030404400601",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "signature 64 bytes",
+      "codec": "tron-signature",
+      "inputCborHex": "a102584000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "signature 66 bytes",
+      "codec": "tron-signature",
+      "inputCborHex": "a1025842000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "empty keys",
+      "codec": "crypto-multi-accounts",
+      "inputCborHex": "a2011a73c5da0a0280",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "missing keys",
+      "codec": "crypto-multi-accounts",
+      "inputCborHex": "a1011a73c5da0a",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "unknown key",
+      "codec": "crypto-multi-accounts",
+      "inputCborHex": "a3011a73c5da0a0281d9012fa10358210202020202020202020202020202020202020202020202020202020202020202020601",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "master key",
+      "codec": "crypto-multi-accounts",
+      "inputCborHex": "a2011a73c5da0a0281d9012fa301f50358210202020202020202020202020202020202020202020202020202020202020202020458200000000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "private secp256k1 key",
+      "codec": "crypto-multi-accounts",
+      "inputCborHex": "a2011a73c5da0a0281d9012fa202f503582100aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "key-data 31 bytes",
+      "codec": "crypto-multi-accounts",
+      "inputCborHex": "a2011a73c5da0a0281d9012fa103581f00000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "key tag 302",
+      "codec": "crypto-multi-accounts",
+      "inputCborHex": "a2011a73c5da0a0281d9012ea1035821020202020202020202020202020202020202020202020202020202020202020202",
+      "tsError": "WrongTag"
+    },
+    {
+      "name": "ed25519 isPrivate true",
+      "codec": "crypto-multi-accounts",
+      "inputCborHex": "a2011a73c5da0a0281d9012fa202f50358200000000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "ed25519 chain code wrong length",
+      "codec": "crypto-multi-accounts",
+      "inputCborHex": "a2011a73c5da0a0281d9012fa20358200000000000000000000000000000000000000000000000000000000000000000045000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    }
+  ]
+}

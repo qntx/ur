@@ -4,7 +4,11 @@
 //! `eckey`, `address`, `output-descriptor`, `sskr`, `psbt`,
 //! `account-descriptor`) on `dcbor`'s tagged traits. v1 `crypto-output`
 //! script expressions (BCR-2020-010) convert to [`OutputDescriptor`] on read.
-//! Every value writes the v2 tag and reads both v1 and v2; types re-encode
+//! Every value writes the v2 tag and reads both v1 and v2; the [`v1`]
+//! module's newtypes (`CryptoPsbt`, `CryptoHdKey`, `CryptoKeypath`,
+//! `CryptoCoinInfo`, `CryptoOutput`, `CryptoAccount`) instead write the
+//! deprecated `crypto-*` wire forms, presence-preserving, for interop with
+//! deployed v1 readers. Types re-encode
 //! to the recorded canonical bytes and round-trip through `ur:<type>`
 //! multi-part UR transport via `bcur`'s `typed::{UrEncodable, UrDecodable}`
 //! blanket impls (a dev-dependency of this crate, not a runtime one).
@@ -21,6 +25,12 @@
 //!
 //! CBOR diagnostic names for all 31 registry tags (v2, v1, and script
 //! expressions) can be registered via [`register_tags`].
+//!
+//! The `interop` cargo feature (default off) adds `bcur_registry::interop`:
+//! the deployed wallet-extension codecs `eth-*`, `sol-*`, `tron-*` and
+//! `crypto-multi-accounts` (Keystone, `OneKey`, ERC-4527), including both
+//! TRON dialects — `TronSignRequest` writes the Keystone layout under tag
+//! `5101`, `OneKeyTronSignRequest` the `OneKey` layout under `5201`.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -41,7 +51,10 @@ mod script;
 mod seed;
 mod sskr;
 
+#[cfg(feature = "interop")]
+pub mod interop;
 pub mod tags;
+pub mod v1;
 
 pub use account_descriptor::AccountDescriptor;
 pub use address::{Address, AddressType};

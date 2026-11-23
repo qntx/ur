@@ -1,0 +1,253 @@
+{
+  "schema": 1,
+  "capability": "registry.v1-writers",
+  "source": {
+    "name": "v1 crypto-* writer vectors: decode input (v1 or v2 body) with the v1 codec, re-encode to v1CborHex, and emit `ur` (single part)",
+    "officialRev": "e4a4fbb186e2e7625ccdf7149aec4f0a5adaf850",
+    "keystoneJs": "@keystonehq/bc-ur-registry 0.8.1 (Apache-2.0, ad02fb09)",
+    "keystoneFirmware": "keystone3-firmware 7da0b94 (MIT)",
+    "keystoneRust": "keystone-sdk-rust ur-registry 1.0.9 (MIT, 7f4d2258) oracle cross-check: firmware hdkey, coin-info, and keypath cases are byte-identical"
+  },
+  "cases": [
+    {
+      "name": "official crypto-output 1: pkh eckey",
+      "codec": "crypto-output",
+      "inputCborHex": "d90193d90132a103582102c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+      "v1CborHex": "d90193d90132a103582102c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+      "ur": "ur:crypto-output/taadmutaadeyoyaxhdclaoswaalbmwfpwekijndyfefzjtmdrtketphhktmngrlkwsfnospypsasrhhhjonnvwtsqzwljy",
+      "source": "BCR-2020-010 official vector (BlockchainCommons/bc-ur-registry fixtures, rev e4a4fbb)"
+    },
+    {
+      "name": "official crypto-output 2: sh(wpkh) eckey",
+      "codec": "crypto-output",
+      "inputCborHex": "d90190d90194d90132a103582103fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+      "v1CborHex": "d90190d90194d90132a103582103fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+      "ur": "ur:crypto-output/taadmhtaadmwtaadeyoyaxhdclaxzmytkgtlkphywyoxcxfeftbbecgmectelfynfldllpisoyludlahknbbhndtkphfhlehmust",
+      "source": "BCR-2020-010 official vector (BlockchainCommons/bc-ur-registry fixtures, rev e4a4fbb)"
+    },
+    {
+      "name": "official crypto-output 3: sh multi 2-of-2 eckey",
+      "codec": "crypto-output",
+      "inputCborHex": "d90190d90196a201020282d90132a1035821022f01e5e15cca351daff3843fb70f3c2f0a1bdd05e5af888a67784ef3e10a2a01d90132a103582103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+      "v1CborHex": "d90190d90196a201020282d90132a1035821022f01e5e15cca351daff3843fb70f3c2f0a1bdd05e5af888a67784ef3e10a2a01d90132a103582103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+      "ur": "ur:crypto-output/taadmhtaadmtoeadaoaolftaadeyoyaxhdclaodladvwvyhhsgeccapewflrfhrlbsfndlbkcwutahvwpeloleioksglwfvybkdradtaadeyoyaxhdclaxpstylrvowtstynguaspmchlenegonyryvtmsmtmsgshgvdbbsrhebybtztdisfrnpfadremh",
+      "source": "BCR-2020-010 official vector (BlockchainCommons/bc-ur-registry fixtures, rev e4a4fbb)"
+    },
+    {
+      "name": "official crypto-output 4: pkh hdkey",
+      "codec": "crypto-output",
+      "inputCborHex": "d90193d9012fa503582102d2b36900396c9282fa14628566582f206a5dd0bcc8d5e892611806cafb0301f0045820637807030d55d01f9a0cb3a7839515d796bd07706386a6eddf06cc29a65a0e2906d90130a30186182cf500f500f5021ad34db33f030407d90130a1018401f480f4081a78412e3a",
+      "v1CborHex": "d90193d9012fa503582102d2b36900396c9282fa14628566582f206a5dd0bcc8d5e892611806cafb0301f0045820637807030d55d01f9a0cb3a7839515d796bd07706386a6eddf06cc29a65a0e2906d90130a30186182cf500f500f5021ad34db33f030407d90130a1018401f480f4081a78412e3a",
+      "ur": "ur:crypto-output/taadmutaaddlonaxhdclaotdqdinaeesjzmolfzsbbidlpiyhddlcximhltirfsptlvsmohscsamsgzoaxadwtaahdcxiaksataxbtgotictnybnqdoslsmdbztsmtryatjoialnolweuramsfdtolhtbadtamtaaddyotadlncsdwykaeykaeykaocytegtqdfhaxaaattaaddyoyadlradwklawkaycyksfpdmftkiiozsfd",
+      "source": "BCR-2020-010 official vector (BlockchainCommons/bc-ur-registry fixtures, rev e4a4fbb)"
+    },
+    {
+      "name": "official crypto-output 5: wsh multi 1-of-2 hdkey",
+      "codec": "crypto-output",
+      "inputCborHex": "d90191d90196a201010282d9012fa403582103cbcaa9c98c877a26977d00825c956a238e8dddfbd322cce4f74b0b5bd6ace4a704582060499f801b896d83179a4374aeb7822aaeaceaa0db1f85ee3e904c4defbd968906d90130a20180030007d90130a1018601f400f480f4d9012fa403582102fc9e5af0ac8d9b3cecfe2a888e2117ba3d089d8585886c9c826b6b22a98d12ea045820f0909affaa7ee7abe5dd4e100598d4dc53cd709d5a5c2cac40e7412f232f7c9c06d90130a2018200f4021abd16bee507d90130a1018600f400f480f4",
+      "v1CborHex": "d90191d90196a201010282d9012fa403582103cbcaa9c98c877a26977d00825c956a238e8dddfbd322cce4f74b0b5bd6ace4a704582060499f801b896d83179a4374aeb7822aaeaceaa0db1f85ee3e904c4defbd968906d90130a20180030007d90130a1018601f400f480f4d9012fa403582102fc9e5af0ac8d9b3cecfe2a888e2117ba3d089d8585886c9c826b6b22a98d12ea045820f0909affaa7ee7abe5dd4e100598d4dc53cd709d5a5c2cac40e7412f232f7c9c06d90130a2018200f4021abd16bee507d90130a1018600f400f480f4",
+      "ur": "ur:crypto-output/taadmetaadmtoeadadaolftaaddloxaxhdclaxsbsgptsolkltkndsmskiaelfhhmdimcnmnlgutzotecpsfveylgrbdhptbpsveosaahdcxhnganelacwldjnlschnyfxjyplrllfdrplpswdnbuyctlpwyfmmhgsgtwsrymtldamtaaddyoeadlaaxaeattaaddyoyadlnadwkaewklawktaaddloxaxhdclaoztnnhtwtpslgndfnwpzedrlomnclchrdfsayntlplplojznslfjejecpptlgbgwdaahdcxwtmhnyzmpkkbvdpyvwutglbeahmktyuogusnjonththhdwpsfzvdfpdlcndlkensamtaaddyoeadlfaewkaocyrycmrnvwattaaddyoyadlnaewkaewklawktdbsfttn",
+      "source": "BCR-2020-010 official vector (BlockchainCommons/bc-ur-registry fixtures, rev e4a4fbb)"
+    },
+    {
+      "name": "official crypto-account 1: BIP39 'shield group\u2026' account, 7 v1 descriptors",
+      "codec": "crypto-account",
+      "inputCborHex": "a2011a37b5eed40287d90134d90193d9012fa403582103eb3e2863911826374de86c231a4b76f0b89dfa174afb78d7f478199884d9dd320458206456a5df2db0f6d9af72b2a1af4b25f45200ed6fcc29c3440b311d4796b70b5b06d90130a20186182cf500f500f5021a37b5eed4081a99f9cdf7d90134d90190d90194d9012fa403582102c7e4823730f6ee2cf864e2c352060a88e60b51a84e89e4c8c75ec22590ad6b690458209d2f86043276f9251a4a4f577166a5abeb16b6ec61e226b5b8fa11038bfda42d06d90130a201861831f500f500f5021a37b5eed4081aa80f7cdbd90134d90194d9012fa403582103fd433450b6924b4f7efdd5d1ed017d364be95ab2b592dc8bddb3b00c1c24f63f04582072ede7334d5acf91c6fda622c205199c595a31f9218ed30792d301d5ee9e3a8806d90130a201861854f500f500f5021a37b5eed4081a0d5de1d7d90134d90190d9019ad9012fa4035821035ccd58b63a2cdc23d0812710603592e7457573211880cb59b1ef012e168e059a04582088d3299b448f87215d96b0c226235afc027f9e7dc700284f3e912a34daeb1a2306d90130a20182182df5021a37b5eed4081a37b5eed4d90134d90190d90191d9019ad9012fa4035821032c78ebfcabdac6d735a0820ef8732f2821b4fb84cd5d6b26526938f90c0507110458207953efe16a73e5d3f9f2d4c6e49bd88e22093bbd85be5a7e862a4b98a16e0ab606d90130a201881830f500f500f501f5021a37b5eed4081a59b69b2ad90134d90191d9019ad9012fa40358210260563ee80c26844621b06b74070baf0e23fb76ce439d0237e87502ebbd3ca3460458202fa0e41c9dc43dc4518659bfcef935ba8101b57dbc0812805dd983bc1d34b81306d90130a201881830f500f500f502f5021a37b5eed4081a59b69b2ad90134d90199d9012fa403582102bbb97cf9efa176b738efd6ee1d4d0fa391a973394fbc16e4c5e78e536cd14d2d0458204b4693e1f794206ed1355b838da24949a92b63d02e58910bf3bd3d9c242281e606d90130a201861856f500f500f5021a37b5eed4081acec7070c",
+      "v1CborHex": "a2011a37b5eed40287d90193d9012fa403582103eb3e2863911826374de86c231a4b76f0b89dfa174afb78d7f478199884d9dd320458206456a5df2db0f6d9af72b2a1af4b25f45200ed6fcc29c3440b311d4796b70b5b06d90130a20186182cf500f500f5021a37b5eed4081a99f9cdf7d90190d90194d9012fa403582102c7e4823730f6ee2cf864e2c352060a88e60b51a84e89e4c8c75ec22590ad6b690458209d2f86043276f9251a4a4f577166a5abeb16b6ec61e226b5b8fa11038bfda42d06d90130a201861831f500f500f5021a37b5eed4081aa80f7cdbd90194d9012fa403582103fd433450b6924b4f7efdd5d1ed017d364be95ab2b592dc8bddb3b00c1c24f63f04582072ede7334d5acf91c6fda622c205199c595a31f9218ed30792d301d5ee9e3a8806d90130a201861854f500f500f5021a37b5eed4081a0d5de1d7d90190d9012fa4035821035ccd58b63a2cdc23d0812710603592e7457573211880cb59b1ef012e168e059a04582088d3299b448f87215d96b0c226235afc027f9e7dc700284f3e912a34daeb1a2306d90130a20182182df5021a37b5eed4081a37b5eed4d90190d90191d9012fa4035821032c78ebfcabdac6d735a0820ef8732f2821b4fb84cd5d6b26526938f90c0507110458207953efe16a73e5d3f9f2d4c6e49bd88e22093bbd85be5a7e862a4b98a16e0ab606d90130a201881830f500f500f501f5021a37b5eed4081a59b69b2ad90191d9012fa40358210260563ee80c26844621b06b74070baf0e23fb76ce439d0237e87502ebbd3ca3460458202fa0e41c9dc43dc4518659bfcef935ba8101b57dbc0812805dd983bc1d34b81306d90130a201881830f500f500f502f5021a37b5eed4081a59b69b2ad90199d9012fa403582102bbb97cf9efa176b738efd6ee1d4d0fa391a973394fbc16e4c5e78e536cd14d2d0458204b4693e1f794206ed1355b838da24949a92b63d02e58910bf3bd3d9c242281e606d90130a201861856f500f500f5021a37b5eed4081acec7070c",
+      "ur": "ur:crypto-account/oeadcyemrewytyaolttaadmutaaddloxaxhdclaxwmfmdeiamecsdsemgtvsjzcncygrkowtrontzschgezokstswkkscfmklrtauteyaahdcxiehfonurdppfyntapejpproypegrdawkgmaewejlsfdtsrfybdehcaflmtrlbdhpamtaaddyoeadlncsdwykaeykaeykaocyemrewytyaycynlytsnyltaadmhtaadmwtaaddloxaxhdclaostvelfemdyynwydwyaievosrgmambklovabdgypdglldvespsthysadamhpmjeinaahdcxntdllnaaeykoytdacygegwhgjsiyonpywmcmrpwphsvodsrerozsbyaxluzcoxdpamtaaddyoeadlncsehykaeykaeykaocyemrewytyaycypdbskeuytaadmwtaaddloxaxhdclaxzcfxeegdrpmogrgwkbzctlttweadkiengrwlhtprremouoluutqdpfbncedkynfhaahdcxjpwevdeogthttkmeswzcolcpsaahcfnshkhtehytclmnteatmoteadtlwynnftloamtaaddyoeadlncsghykaeykaeykaocyemrewytyaycybthlvytstaadmhtaaddloxaxhdclaxhhsnhdrpftdwuocntilydibehnecmovdfekpjkclcslasbhkpawsaddmcmmnahnyaahdcxlotedtndfymyltclhlmtpfsadscnhtztaolbnnkistaedegwfmmedreetnwmcycnamtaaddyoeadlfcsdpykaocyemrewytyaycyemrewytytaadmhtaadmetaaddloxaxhdclaxdwkswmztpytnswtsecnblfbayajkdldeclqzzolrsnhljedsgminetytbnahatbyaahdcxkkguwsvyimjkvwteytwztyswvendtpmncpasfrrylprnhtkblndrgrmkoyjtbkrpamtaaddyoeadlocsdyykaeykaeykadykaocyemrewytyaycyhkrpnddrtaadmetaaddloxaxhdclaohnhffmvsbndslrfgclpfjejyatbdpebacnzokotofxntaoemvskpaowmryfnotfgaahdcxdlnbvecentssfsssgylnhkrstoytecrdlyadrekirfaybglahltalsrfcaeerobwamtaaddyoeadlocsdyykaeykaeykaoykaocyemrewytyaycyhkrpnddrtaadnltaaddloxaxhdclaorkrhkeytwsoykorletwstbwycagtbsotmeptjkesgwrfcmveskvdmngujzttgtdpaahdcxgrfgmuvyylmwcxjtttechplslgoegagaptdniatidmhdmebdwfryfsnsdkcplyvaamtaaddyoeadlncshfykaeykaeykaocyemrewytyaycytostatbnynsbuecp",
+      "source": "BCR-2020-015 official vector (308-wrapped entries -> bare trees, cosigner normalized)"
+    },
+    {
+      "name": "keystone crypto-output 0",
+      "codec": "crypto-output",
+      "inputCborHex": "d90193d90132a103582102c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+      "v1CborHex": "d90193d90132a103582102c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+      "ur": "ur:crypto-output/taadmutaadeyoyaxhdclaoswaalbmwfpwekijndyfefzjtmdrtketphhktmngrlkwsfnospypsasrhhhjonnvwtsqzwljy",
+      "source": "KeystoneJS @keystonehq/bc-ur-registry 0.8.1 __tests__/CryptoOutput.test.ts"
+    },
+    {
+      "name": "keystone crypto-output 1",
+      "codec": "crypto-output",
+      "inputCborHex": "d90190d90194d90132a103582103fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+      "v1CborHex": "d90190d90194d90132a103582103fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+      "ur": "ur:crypto-output/taadmhtaadmwtaadeyoyaxhdclaxzmytkgtlkphywyoxcxfeftbbecgmectelfynfldllpisoyludlahknbbhndtkphfhlehmust",
+      "source": "KeystoneJS @keystonehq/bc-ur-registry 0.8.1 __tests__/CryptoOutput.test.ts"
+    },
+    {
+      "name": "keystone crypto-output 2",
+      "codec": "crypto-output",
+      "inputCborHex": "d90190d90196a201020282d90132a1035821022f01e5e15cca351daff3843fb70f3c2f0a1bdd05e5af888a67784ef3e10a2a01d90132a103582103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+      "v1CborHex": "d90190d90196a201020282d90132a1035821022f01e5e15cca351daff3843fb70f3c2f0a1bdd05e5af888a67784ef3e10a2a01d90132a103582103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+      "ur": "ur:crypto-output/taadmhtaadmtoeadaoaolftaadeyoyaxhdclaodladvwvyhhsgeccapewflrfhrlbsfndlbkcwutahvwpeloleioksglwfvybkdradtaadeyoyaxhdclaxpstylrvowtstynguaspmchlenegonyryvtmsmtmsgshgvdbbsrhebybtztdisfrnpfadremh",
+      "source": "KeystoneJS @keystonehq/bc-ur-registry 0.8.1 __tests__/CryptoOutput.test.ts"
+    },
+    {
+      "name": "keystone crypto-output 3",
+      "codec": "crypto-output",
+      "inputCborHex": "d90193d9012fa503582102d2b36900396c9282fa14628566582f206a5dd0bcc8d5e892611806cafb0301f0045820637807030d55d01f9a0cb3a7839515d796bd07706386a6eddf06cc29a65a0e2906d90130a20186182cf500f500f5021ad34db33f07d90130a1018401f480f4081a78412e3a",
+      "v1CborHex": "d90193d9012fa503582102d2b36900396c9282fa14628566582f206a5dd0bcc8d5e892611806cafb0301f0045820637807030d55d01f9a0cb3a7839515d796bd07706386a6eddf06cc29a65a0e2906d90130a20186182cf500f500f5021ad34db33f07d90130a1018401f480f4081a78412e3a",
+      "ur": "ur:crypto-output/taadmutaaddlonaxhdclaotdqdinaeesjzmolfzsbbidlpiyhddlcximhltirfsptlvsmohscsamsgzoaxadwtaahdcxiaksataxbtgotictnybnqdoslsmdbztsmtryatjoialnolweuramsfdtolhtbadtamtaaddyoeadlncsdwykaeykaeykaocytegtqdfhattaaddyoyadlradwklawkaycyksfpdmftpyaaeelb",
+      "source": "KeystoneJS @keystonehq/bc-ur-registry 0.8.1 __tests__/CryptoOutput.test.ts"
+    },
+    {
+      "name": "keystone crypto-output 4",
+      "codec": "crypto-output",
+      "inputCborHex": "d90191d90196a201010282d9012fa403582103cbcaa9c98c877a26977d00825c956a238e8dddfbd322cce4f74b0b5bd6ace4a704582060499f801b896d83179a4374aeb7822aaeaceaa0db1f85ee3e904c4defbd968906d90130a20180030007d90130a1018601f400f480f4d9012fa403582102fc9e5af0ac8d9b3cecfe2a888e2117ba3d089d8585886c9c826b6b22a98d12ea045820f0909affaa7ee7abe5dd4e100598d4dc53cd709d5a5c2cac40e7412f232f7c9c06d90130a2018200f4021abd16bee507d90130a1018600f400f480f4",
+      "v1CborHex": "d90191d90196a201010282d9012fa403582103cbcaa9c98c877a26977d00825c956a238e8dddfbd322cce4f74b0b5bd6ace4a704582060499f801b896d83179a4374aeb7822aaeaceaa0db1f85ee3e904c4defbd968906d90130a20180030007d90130a1018601f400f480f4d9012fa403582102fc9e5af0ac8d9b3cecfe2a888e2117ba3d089d8585886c9c826b6b22a98d12ea045820f0909affaa7ee7abe5dd4e100598d4dc53cd709d5a5c2cac40e7412f232f7c9c06d90130a2018200f4021abd16bee507d90130a1018600f400f480f4",
+      "ur": "ur:crypto-output/taadmetaadmtoeadadaolftaaddloxaxhdclaxsbsgptsolkltkndsmskiaelfhhmdimcnmnlgutzotecpsfveylgrbdhptbpsveosaahdcxhnganelacwldjnlschnyfxjyplrllfdrplpswdnbuyctlpwyfmmhgsgtwsrymtldamtaaddyoeadlaaxaeattaaddyoyadlnadwkaewklawktaaddloxaxhdclaoztnnhtwtpslgndfnwpzedrlomnclchrdfsayntlplplojznslfjejecpptlgbgwdaahdcxwtmhnyzmpkkbvdpyvwutglbeahmktyuogusnjonththhdwpsfzvdfpdlcndlkensamtaaddyoeadlfaewkaocyrycmrnvwattaaddyoyadlnaewkaewklawktdbsfttn",
+      "source": "KeystoneJS @keystonehq/bc-ur-registry 0.8.1 __tests__/CryptoOutput.test.ts"
+    },
+    {
+      "name": "keystone crypto-account 0",
+      "codec": "crypto-account",
+      "inputCborHex": "a2011a37b5eed40286d90193d9012fa403582103eb3e2863911826374de86c231a4b76f0b89dfa174afb78d7f478199884d9dd320458206456a5df2db0f6d9af72b2a1af4b25f45200ed6fcc29c3440b311d4796b70b5b06d90130a10186182cf500f500f5081a99f9cdf7d90190d90194d9012fa403582102c7e4823730f6ee2cf864e2c352060a88e60b51a84e89e4c8c75ec22590ad6b690458209d2f86043276f9251a4a4f577166a5abeb16b6ec61e226b5b8fa11038bfda42d06d90130a101861831f500f500f5081aa80f7cdbd90194d9012fa403582103fd433450b6924b4f7efdd5d1ed017d364be95ab2b592dc8bddb3b00c1c24f63f04582072ede7334d5acf91c6fda622c205199c595a31f9218ed30792d301d5ee9e3a8806d90130a101861854f500f500f5081a0d5de1d7d90190d9012fa4035821035ccd58b63a2cdc23d0812710603592e7457573211880cb59b1ef012e168e059a04582088d3299b448f87215d96b0c226235afc027f9e7dc700284f3e912a34daeb1a2306d90130a10182182df5081a37b5eed4d90190d90191d9012fa4035821032c78ebfcabdac6d735a0820ef8732f2821b4fb84cd5d6b26526938f90c0507110458207953efe16a73e5d3f9f2d4c6e49bd88e22093bbd85be5a7e862a4b98a16e0ab606d90130a101881830f500f500f501f5081a59b69b2ad90191d9012fa40358210260563ee80c26844621b06b74070baf0e23fb76ce439d0237e87502ebbd3ca3460458202fa0e41c9dc43dc4518659bfcef935ba8101b57dbc0812805dd983bc1d34b81306d90130a101881830f500f500f502f5081a59b69b2a",
+      "v1CborHex": "a2011a37b5eed40286d90193d9012fa403582103eb3e2863911826374de86c231a4b76f0b89dfa174afb78d7f478199884d9dd320458206456a5df2db0f6d9af72b2a1af4b25f45200ed6fcc29c3440b311d4796b70b5b06d90130a10186182cf500f500f5081a99f9cdf7d90190d90194d9012fa403582102c7e4823730f6ee2cf864e2c352060a88e60b51a84e89e4c8c75ec22590ad6b690458209d2f86043276f9251a4a4f577166a5abeb16b6ec61e226b5b8fa11038bfda42d06d90130a101861831f500f500f5081aa80f7cdbd90194d9012fa403582103fd433450b6924b4f7efdd5d1ed017d364be95ab2b592dc8bddb3b00c1c24f63f04582072ede7334d5acf91c6fda622c205199c595a31f9218ed30792d301d5ee9e3a8806d90130a101861854f500f500f5081a0d5de1d7d90190d9012fa4035821035ccd58b63a2cdc23d0812710603592e7457573211880cb59b1ef012e168e059a04582088d3299b448f87215d96b0c226235afc027f9e7dc700284f3e912a34daeb1a2306d90130a10182182df5081a37b5eed4d90190d90191d9012fa4035821032c78ebfcabdac6d735a0820ef8732f2821b4fb84cd5d6b26526938f90c0507110458207953efe16a73e5d3f9f2d4c6e49bd88e22093bbd85be5a7e862a4b98a16e0ab606d90130a101881830f500f500f501f5081a59b69b2ad90191d9012fa40358210260563ee80c26844621b06b74070baf0e23fb76ce439d0237e87502ebbd3ca3460458202fa0e41c9dc43dc4518659bfcef935ba8101b57dbc0812805dd983bc1d34b81306d90130a101881830f500f500f502f5081a59b69b2a",
+      "ur": "ur:crypto-account/oeadcyemrewytyaolntaadmutaaddloxaxhdclaxwmfmdeiamecsdsemgtvsjzcncygrkowtrontzschgezokstswkkscfmklrtauteyaahdcxiehfonurdppfyntapejpproypegrdawkgmaewejlsfdtsrfybdehcaflmtrlbdhpamtaaddyoyadlncsdwykaeykaeykaycynlytsnyltaadmhtaadmwtaaddloxaxhdclaostvelfemdyynwydwyaievosrgmambklovabdgypdglldvespsthysadamhpmjeinaahdcxntdllnaaeykoytdacygegwhgjsiyonpywmcmrpwphsvodsrerozsbyaxluzcoxdpamtaaddyoyadlncsehykaeykaeykaycypdbskeuytaadmwtaaddloxaxhdclaxzcfxeegdrpmogrgwkbzctlttweadkiengrwlhtprremouoluutqdpfbncedkynfhaahdcxjpwevdeogthttkmeswzcolcpsaahcfnshkhtehytclmnteatmoteadtlwynnftloamtaaddyoyadlncsghykaeykaeykaycybthlvytstaadmhtaaddloxaxhdclaxhhsnhdrpftdwuocntilydibehnecmovdfekpjkclcslasbhkpawsaddmcmmnahnyaahdcxlotedtndfymyltclhlmtpfsadscnhtztaolbnnkistaedegwfmmedreetnwmcycnamtaaddyoyadlfcsdpykaycyemrewytytaadmhtaadmetaaddloxaxhdclaxdwkswmztpytnswtsecnblfbayajkdldeclqzzolrsnhljedsgminetytbnahatbyaahdcxkkguwsvyimjkvwteytwztyswvendtpmncpasfrrylprnhtkblndrgrmkoyjtbkrpamtaaddyoyadlocsdyykaeykaeykadykaycyhkrpnddrtaadmetaaddloxaxhdclaohnhffmvsbndslrfgclpfjejyatbdpebacnzokotofxntaoemvskpaowmryfnotfgaahdcxdlnbvecentssfsssgylnhkrstoytecrdlyadrekirfaybglahltalsrfcaeerobwamtaaddyoyadlocsdyykaeykaeykaoykaycyhkrpnddrgdaogykb",
+      "source": "KeystoneJS @keystonehq/bc-ur-registry 0.8.1 __tests__/CryptoAccount.test.ts"
+    },
+    {
+      "name": "keystone crypto-account 1",
+      "codec": "crypto-account",
+      "inputCborHex": "a2011a73c5da0a0281d90191d9012fa4035821021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29045820bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d576306d90130a301881830f500f500f502f5021a73c5da0a0304081a1cf29716",
+      "v1CborHex": "a2011a73c5da0a0281d90191d9012fa4035821021a3bf5fbf737d0f36993fd46dc4913093beb532d654fe0dfd98bd27585dc9f29045820bba0c7ca160a870efeb940ab90d0f4284fea1b5e0d2117677e823fc37e2d576306d90130a301881830f500f500f502f5021a73c5da0a0304081a1cf29716",
+      "ur": "ur:crypto-account/oeadcyjksktnbkaolytaadmetaaddloxaxhdclaocyfrykzoylemtiwfinmuzcfguogabwasfrwmgudpihgwvturtalutdkplpuonedtaahdcxrknbstsgcmbkltbazerhfzpymhtiwkdegwwdcwhybtclchiokblffhsrkbdphgiaamtaaddyotadlocsdyykaeykaeykaoykaocyjksktnbkaxaaaycycewzmscmvlaabkzs",
+      "source": "KeystoneJS @keystonehq/bc-ur-registry 0.8.1 __tests__/CryptoAccount.test.ts"
+    },
+    {
+      "name": "official hdkey 1 -> v1: BIP32 master (vector 1)",
+      "codec": "crypto-hdkey",
+      "inputCborHex": "a301f503582100e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35045820873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508",
+      "v1CborHex": "a301f503582100e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35045820873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508",
+      "ur": "ur:crypto-hdkey/otadykaxhdclaevswfdmjpfswpwkahcywspsmndwmusoskprbbehetchsnpfcybbmwrhchspfxjeecaahdcxltfszmlyrtdlgmhfcnzcctvwcmkbpsftgonbgauefsehgrqzdmvodizmweemtlaybakiylat",
+      "source": "BCR-2020-007 official hdkey vector (v2 body; v1 writer re-tags nested keypaths 40304->304)"
+    },
+    {
+      "name": "official hdkey 2 -> v1: testnet derived m/44'/1'/1'/0/1 (vector 2)",
+      "codec": "crypto-hdkey",
+      "inputCborHex": "a5035821026fe2355745bb2db3630bbc80ef5d58951c963c841f54170ba6e5c12be7fc12a6045820ced155c72456255881793514edc5bd9447e7f74abb88c6d6b6480fd016ee8c8505d99d71a1020106d99d70a1018a182cf501f501f500f401f4081ae9181cf3",
+      "v1CborHex": "a5035821026fe2355745bb2db3630bbc80ef5d58951c963c841f54170ba6e5c12be7fc12a6045820ced155c72456255881793514edc5bd9447e7f74abb88c6d6b6480fd016ee8c8505d90131a1020106d90130a1018a182cf501f501f500f401f4081ae9181cf3",
+      "ur": "ur:crypto-hdkey/onaxhdclaojlvoechgferkdpqdiabdrflawshlhdmdcemtfnlrctghchbdolvwsednvdztbgolaahdcxtottgostdkhfdahdlykkecbbweskrymwflvdylgerkloswtbrpfdbsticmwylklpahtaadehoyaoadamtaaddyoyadlecsdwykadykadykaewkadwkaycywlcscewfihbdaehn",
+      "source": "BCR-2020-007 official hdkey vector (v2 body; v1 writer re-tags nested keypaths 40304->304)"
+    },
+    {
+      "name": "coin-info {} -> {}",
+      "codec": "crypto-coin-info",
+      "inputCborHex": "a0",
+      "v1CborHex": "a0",
+      "ur": "ur:crypto-coin-info/nbaatygsih",
+      "source": "project-owned presence-preserving vector (presence-preserving; confirmed vs ur-registry 1.0.9)"
+    },
+    {
+      "name": "coin-info {1:60} eth mainnet",
+      "codec": "crypto-coin-info",
+      "inputCborHex": "a101183c",
+      "v1CborHex": "a101183c",
+      "ur": "ur:crypto-coin-info/oyadcsfnksdadlmd",
+      "source": "project-owned presence-preserving vector (presence-preserving; confirmed vs ur-registry 1.0.9)"
+    },
+    {
+      "name": "coin-info {1:60, 2:0} explicit mainnet zero",
+      "codec": "crypto-coin-info",
+      "inputCborHex": "a201183c0200",
+      "v1CborHex": "a201183c0200",
+      "ur": "ur:crypto-coin-info/oeadcsfnaoaegmnseswt",
+      "source": "project-owned presence-preserving vector (presence-preserving; confirmed vs ur-registry 1.0.9)"
+    },
+    {
+      "name": "coin-info {1:0, 2:0} explicit btc zeros",
+      "codec": "crypto-coin-info",
+      "inputCborHex": "a201000200",
+      "v1CborHex": "a201000200",
+      "ur": "ur:crypto-coin-info/oeadaeaoaefggwfmbn",
+      "source": "project-owned presence-preserving vector (presence-preserving; confirmed vs ur-registry 1.0.9)"
+    },
+    {
+      "name": "coin-info {1:0, 2:1} testnet with btc coin",
+      "codec": "crypto-coin-info",
+      "inputCborHex": "a201000201",
+      "v1CborHex": "a201000201",
+      "ur": "ur:crypto-coin-info/oeadaeaoadehfdbany",
+      "source": "project-owned presence-preserving vector (presence-preserving; confirmed vs ur-registry 1.0.9)"
+    },
+    {
+      "name": "coin-info {2:-2} negative network",
+      "codec": "crypto-coin-info",
+      "inputCborHex": "a10221",
+      "v1CborHex": "a10221",
+      "ur": "ur:crypto-coin-info/oyaoclhkoxnsnl",
+      "source": "project-owned presence-preserving vector (presence-preserving; confirmed vs ur-registry 1.0.9)"
+    },
+    {
+      "name": "keypath m/44'/0'/0' + fp + depth",
+      "codec": "crypto-keypath",
+      "inputCborHex": "a30186182cf500f500f5021ad34db33f0304",
+      "v1CborHex": "a30186182cf500f500f5021ad34db33f0304",
+      "ur": "ur:crypto-keypath/otadlncsdwykaeykaeykaocytegtqdfhaxaaaerpztbn",
+      "source": "project-owned v1 tag swap vector (presence-preserving; confirmed vs ur-registry 1.0.9)"
+    },
+    {
+      "name": "keypath components only m/0/*",
+      "codec": "crypto-keypath",
+      "inputCborHex": "a1018400f480f4",
+      "v1CborHex": "a1018400f480f4",
+      "ur": "ur:crypto-keypath/oyadlraewklawkrtbbrlby",
+      "source": "project-owned v1 tag swap vector (presence-preserving; confirmed vs ur-registry 1.0.9)"
+    },
+    {
+      "name": "keypath pair component + fp",
+      "codec": "crypto-keypath",
+      "inputCborHex": "a201818401f400f4021a12345678",
+      "v1CborHex": "a201818401f400f4021a12345678",
+      "ur": "ur:crypto-keypath/oeadlylradwkaewkaocybgeehfksdieymnld",
+      "source": "project-owned v1 tag swap vector (presence-preserving; confirmed vs ur-registry 1.0.9)"
+    },
+    {
+      "name": "hdkey derived is-private: false preserved",
+      "codec": "crypto-hdkey",
+      "inputCborHex": "a202f403582102abababababababababababababababababababababababababababababababab",
+      "v1CborHex": "a202f403582102abababababababababababababababababababababababababababababababab",
+      "ur": "ur:crypto-hdkey/oeaowkaxhdclaopypypypypypypypypypypypypypypypypypypypypypypypypypypypypypypypyatwzfyia",
+      "source": "project-owned presence-preserving vector (v2 drops the flag, v1 keeps it)"
+    },
+    {
+      "name": "hdkey derived is-private: true private",
+      "codec": "crypto-hdkey",
+      "inputCborHex": "a202f5035821000101010101010101010101010101010101010101010101010101010101010101",
+      "v1CborHex": "a202f5035821000101010101010101010101010101010101010101010101010101010101010101",
+      "ur": "ur:crypto-hdkey/oeaoykaxhdclaeadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadgyhhdshy",
+      "source": "project-owned presence-preserving vector"
+    },
+    {
+      "name": "firmware metamask-standard hdkey (is-private:false, use-info {1:60,2:0})",
+      "codec": "crypto-hdkey",
+      "inputCborHex": "a902f40358210326bd25d39a5eeb0217c4508bc5c50d28087121372daa5d2e48b30a8f3345998604582039349e46681f962ce1a230dd94e254e4bb4b51ac655d41faf350382a27d915f905d90131a201183c020006d90130a30186182cf5183cf500f5021a757e6fc9030307d90130a2018400f480f40300081a42324f7409684b657973746f6e650a706163636f756e742e7374616e64617264",
+      "v1CborHex": "a902f40358210326bd25d39a5eeb0217c4508bc5c50d28087121372daa5d2e48b30a8f3345998604582039349e46681f962ce1a230dd94e254e4bb4b51ac655d41faf350382a27d915f905d90131a201183c020006d90130a30186182cf5183cf500f5021a757e6fc9030307d90130a2018400f480f40300081a42324f7409684b657973746f6e650a706163636f756e742e7374616e64617264",
+      "ur": "ur:crypto-hdkey/ptaowkaxhdclaxdsrydatenyhywmaochssgdluskskbtdeayjsclemdppkhldmfdqdbkmyeofenllnaahdcxeseennfgisctmtdwvyoedyutmwvoghverkgrgypsihhlfpzswfgdetdrditabzytahtaadehoeadcsfnaoaeamtaaddyotadlncsdwykcsfnykaeykaocykpkbjlsoaxaxattaaddyoeadlraewklawkaxaeaycyfweygwjyasisgrihkkjkjyjljtihbkjohsiaiajlkpjtjydmjkjyhsjtiehsjpiesgutflon",
+      "source": "keystone3-firmware apps/wallets/src/metamask.rs generate_standard_legacy_hd_key Bip44Standard (MIT); byte-identical to ur-registry 1.0.9 encoder output"
+    },
+    {
+      "name": "official psbt 1: psbt example",
+      "codec": "crypto-psbt",
+      "inputCborHex": "58a770736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000",
+      "v1CborHex": "58a770736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000",
+      "ur": "ur:crypto-psbt/hdosjojkidjyzmadaenyaoaeaeaeaohdvsknclrejnpebncnrnmnjojofejzeojlkerdonspkpkkdkykfelokgprpyutkpaeaeaeaeaezmzmzmzmlslgaaditiwpihbkispkfgrkbdaslewdfycprtjsprsgksecdratkkhktikewdcaadaeaeaeaezmzmzmzmaojopkwtayaeaeaeaecmaebbtphhdnjstiambdassoloimwmlyhygdnlcatnbggtaevyykahaeaeaeaecmaebbaeplptoevwwtyakoonlourgofgvsjydpcaltaemyaeaeaeaeaeaeaeaeaebkgdcarh",
+      "source": "BCR-2020-006 official vector (v2 body identical under the v1 tag)"
+    },
+    {
+      "name": "BIP-174 psbt with partial signatures (P2PKH + P2SH-P2WPKH inputs)",
+      "codec": "crypto-psbt",
+      "inputCborHex": "5902a670736274ff0100a40200000002c7308b2f00cb96b8628df03521acf0d419142dce671bee073d5c26d631bbc8b60000000000feffffff02d083ca0000000000160014d432b72b9d2d2ab108ebc2b73109af92c793b68d602e0400000000001976a914e71f7e044836380ef92fec23a5a7ef9298f0c108ab2229002322020273c1a51aff289f9ce3a8bdafe204fe68154c0b2b2262195c068655968255c5e44841453270aa4120c5b2db3101040000002202039b18d7a9a32790a2ca913eb9a0392bc428369dc696642df27f90edb78ecebde92105352733be4be67b1f48072f4e44160014d432b72b9d2d2ab108ebc2b73109af92c793b68d220203168a32904661453a99e55e542a36b3345aa8d474741a4f07f4466760914b814d174842c0ccdb6797ce08788cfb0bfaefb58ad2800040220203d0851406db61bbc2f271ee6e31055e1b5b46580f1be41d006b8d6b0197c6ba43172c1660d2a66044dc547b1259ab9f0e63b06d0a75ef2cfabd0e04160014d58044b560c53d610fcc262fb486cfa48d8484410b3007697a5a6b801a3d2b480001012bd83e0500000000001976a914e8bccbaee09e349cbc4f437e480107e1abc62c30872b0b2b033e4b69be4a9b03a8c7350000220203f9d52446d330009f354d70f0246b5d7e524bd7efeb9b369d4d696cf159572d2a41145ce04baefec5eb03d36ead49941050ba002b75d143ca6a8b003656f61c060001012202030899510faa85e7fd3d1866b4af24931dfbd54471475755ee1a13bec593ca8719c841451102c8df5efe73594131f4131b750ba418a6f9430f42a7d8450ef5a1640b2a012b0b2b033e4b69be4a9b03a8c7350000220203587cf0e7d8df2071629d854518e1396ac826483b87c6bdb38462fd45e1c47b6120487cb2bdecfbd7d0b2c554b2141e37d31e790d198ef05d46d4f370f18f0600",
+      "v1CborHex": "5902a670736274ff0100a40200000002c7308b2f00cb96b8628df03521acf0d419142dce671bee073d5c26d631bbc8b60000000000feffffff02d083ca0000000000160014d432b72b9d2d2ab108ebc2b73109af92c793b68d602e0400000000001976a914e71f7e044836380ef92fec23a5a7ef9298f0c108ab2229002322020273c1a51aff289f9ce3a8bdafe204fe68154c0b2b2262195c068655968255c5e44841453270aa4120c5b2db3101040000002202039b18d7a9a32790a2ca913eb9a0392bc428369dc696642df27f90edb78ecebde92105352733be4be67b1f48072f4e44160014d432b72b9d2d2ab108ebc2b73109af92c793b68d220203168a32904661453a99e55e542a36b3345aa8d474741a4f07f4466760914b814d174842c0ccdb6797ce08788cfb0bfaefb58ad2800040220203d0851406db61bbc2f271ee6e31055e1b5b46580f1be41d006b8d6b0197c6ba43172c1660d2a66044dc547b1259ab9f0e63b06d0a75ef2cfabd0e04160014d58044b560c53d610fcc262fb486cfa48d8484410b3007697a5a6b801a3d2b480001012bd83e0500000000001976a914e8bccbaee09e349cbc4f437e480107e1abc62c30872b0b2b033e4b69be4a9b03a8c7350000220203f9d52446d330009f354d70f0246b5d7e524bd7efeb9b369d4d696cf159572d2a41145ce04baefec5eb03d36ead49941050ba002b75d143ca6a8b003656f61c060001012202030899510faa85e7fd3d1866b4af24931dfbd54471475755ee1a13bec593ca8719c841451102c8df5efe73594131f4131b750ba418a6f9430f42a7d8450ef5a1640b2a012b0b2b033e4b69be4a9b03a8c7350000220203587cf0e7d8df2071629d854518e1396ac826483b87c6bdb38462fd45e1c47b6120487cb2bdecfbd7d0b2c554b2141e37d31e790d198ef05d46d4f370f18f0600",
+      "ur": "ur:crypto-psbt/hkaooljojkidjyzmadaeoxaoaeaeaeaostdyludlaesbmtroidlgwtecclpswttycfbbdptoiocwwyatfshhdstbehrksprpaeaeaeaeaezezmzmzmaotilssgaeaeaeaeaecmaebbtyeyrldnntdpdrpaaywmsarlehaspemostmurplghndmaaaeaeaeaeaecfkoptbbvdctkbaafdenetbaytdlwpcnonoswsmomkwtseaypycpdtaecncpaoaojkseoncyzmdenensvlpdrypevoaazeisbzgsbddncpidcfhhamlngomtlfgoskvefdfpfeeyjopkfpcxskpruyehadaaaeaeaecpaoaxndcstsptotdimhoesgmefmrhnbesdnssdeenntswmtiedpwzlbmhwerlmntorywlclahecdieorngrvakgctfdatdlglfycmaebbtyeyrldnntdpdrpaaywmsarlehaspemostmurplgcpaoaxcmleeymhfghsfeftnlvwhyghdrenqdeehtpdtyjyjycygwatwkfgiohnmegrlygtchfdfwrtsfuyiomstoaykslkzobdzswsreletdlaaefzcpaoaxtilpbbamuyhsrksawzjswyjtehahhycwhpfghdbscwvecaaejelgjeadmsswrdfxchdwcmhntdolhnfyuoghkgbghkpynebaiapfjnbkkpwsdwzsrybaaacmaebbtllafyrehnskfshsbssfdsdlqzlntkoxlglrlrfpbddyatinknhtjelacyfsdnfdaeadaddntpfmahaeaeaeaeaecfkoptbbvsrfsbplvtnneensrfgwfxkbfdadatvypyswdwdyltdnbddnaxfmgrinrngendaxpdstecaeaecpaoaxyttldkfgtedyaeneecgtjowtdkjehlkbgmgrtswswmndenntgtinjzwnhkhgdpdrfpbbhhvtgrplzeskwmaxtejtpmgamwbegdrdaednkpttfxsgimluaeenhfynceamaeadadcpaoaxaynlgybspklpvdzcfscsiyqzpedkmucazotlfyjsflhggowycybwrnskmusgltcfspfpfebyaospurhyzejkhkfpehwkbwcwkpbdoxcsolytfxbsfwostpfebaykoyiebddraddnbddnaxfmgrinrngendaxpdstecaeaecpaoaxhdkewtvdtpurcxjsidntlpfecsvyesimspdsfdfrltswryqdlridzcfevysskghscxfdkeprrywpzotstiprskghprbbckemteckkkbtcfmnwthlfgtywfjownmyamaeksfrssds",
+      "source": "BIP-174 test vector 'PSBT with one P2PKH input and one P2SH-P2WPKH input both with partial signatures'"
+    },
+    {
+      "name": "keystone-js CryptoHDKey literal",
+      "codec": "crypto-hdkey",
+      "inputCborHex": "a403582102eae4b876a8696134b868f88cc2f51f715f2dbedb7446b8e6edf3d4541c4eb67b045820d882718b7a42806803eeb17f7483f20620611adb88fc943c898dc5aba94c281906d90130a20186182cf5183cf500f5021ae9181cf3081ad32e4508",
+      "v1CborHex": "a403582102eae4b876a8696134b868f88cc2f51f715f2dbedb7446b8e6edf3d4541c4eb67b045820d882718b7a42806803eeb17f7483f20620611adb88fc943c898dc5aba94c281906d90130a20186182cf5183cf500f5021ae9181cf3081ad32e4508",
+      "ur": "ur:crypto-hdkey/oxaxhdclaowdverokopdinhseeroisyalksaykctjshedprnuyjyfgrovawewftyghceglrpkgaahdcxtplfjsluknfwlaisaxwypalbjylswzamcxhscyuyloztmwfnldlgskpyptgsdecfamtaaddyoeadlncsdwykcsfnykaeykaocywlcscewfaycytedmfeayghlptnin",
+      "source": "asserted literal: keystone-sdk-base@029aeedb2602611cf85ca177320a0c92cf70a13c packages/ur-registry-eth/__tests__/CryptoHDKey.test.ts"
+    }
+  ]
+}

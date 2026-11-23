@@ -1,7 +1,7 @@
 {
   "name": "@qntx/ur",
   "version": "3.0.0",
-  "description": "Uniform Resources (UR) for TypeScript: Bytewords, fountain codes, multi-part UR, typed dCBOR, and BCR-2020-006 registry types.",
+  "description": "Uniform Resources (UR) for TypeScript: Bytewords, fountain codes, multi-part UR, typed dCBOR, BCR-2020-006 registry types, and wallet-interop (Keystone/OneKey) codecs.",
   "keywords": [
     "blockchain-commons",
     "bytewords",
@@ -34,6 +34,11 @@
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
     },
+    "./interop": {
+      "types": "./dist/interop.d.mts",
+      "import": "./dist/interop.mjs",
+      "default": "./dist/interop.mjs"
+    },
     "./registry": {
       "types": "./dist/registry.d.mts",
       "import": "./dist/registry.mjs",
@@ -64,7 +69,11 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
-    "@blockchaincommons/dcbor": "1.0.0-beta.3",
+    "@blockchaincommons/dcbor": "1.0.0-beta.5",
+    "@keystonehq/bc-ur-registry": "0.8.1",
+    "@keystonehq/bc-ur-registry-eth": "0.23.0",
+    "@keystonehq/bc-ur-registry-sol": "0.9.5",
+    "@keystonehq/bc-ur-registry-tron": "0.5.0",
     "@qntx/tsconfig": "1.0.1",
     "@types/node": "26.6.3",
     "publint": "0.3.24",
@@ -72,7 +81,7 @@
     "vite-plus": "1.0.0"
   },
   "peerDependencies": {
-    "@blockchaincommons/dcbor": "1.0.0-beta.3"
+    "@blockchaincommons/dcbor": "1.0.0-beta.5"
   },
   "peerDependenciesMeta": {
     "@blockchaincommons/dcbor": {

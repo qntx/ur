@@ -1,0 +1,34 @@
+{
+  "schema": "interop-vector/v1",
+  "capability": "interop.tron-signature",
+  "source": {
+    "name": "interop tron-signature vectors: decode `inputCborHex` ?? `cborHex`, compare `value`, re-encode byte-identically to `cborHex`, emit `ur`",
+    "keystoneJs": "@keystonehq/bc-ur-registry-eth 0.23.0 / -sol 0.9.5 / -tron 0.5.0 + bc-ur-registry 0.8.1 (ISC/Apache-2.0)",
+    "keystoneRust": "ur-registry 1.0.9 (MIT) \u2014 oracle harness outside the repo",
+    "onekey": "OneKeyHQ/firmware-pro d9ad133 core/src/apps/ur_registry (read-only reference)"
+  },
+  "cases": [
+    {
+      "name": "tron-signature",
+      "urType": "tron-signature",
+      "cborHex": "d913eea201d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d025841bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "ur": "ur:tron-signature/oeadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohdfprkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkrkonlolgfr",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signature": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "source": "Keystone JS (bc-ur-registry-*) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "vendor-tron-signature",
+      "urType": "tron-signature",
+      "cborHex": "d913eea201d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02584147b1f77b3e30cfbbfa41d795dd34475865240617dd1c5a7bad526f5fd89e52cd057c80b665cc2431efab53520e2b1b92a0425033baee915df858ca1c588b0a1800",
+      "ur": "ur:tron-signature/oeadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohdfpflpaylkgfmdytkrkzsfptsmduteeflhdihdkamchutcehtkgpmgmjlhetpnngmsnahkelarpihsfdkehwspygugmbadncwmonbfwgdeordwymehlyahdsgcehdlubkcsaebbckfpwy",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signature": "47b1f77b3e30cfbbfa41d795dd34475865240617dd1c5a7bad526f5fd89e52cd057c80b665cc2431efab53520e2b1b92a0425033baee915df858ca1c588b0a1800"
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/tron/tron_signature.rs"
+    }
+  ]
+}

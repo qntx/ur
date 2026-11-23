@@ -165,17 +165,36 @@ impl CBORTagged for Address {
     }
 }
 
-impl CBORTaggedEncodable for Address {
-    fn untagged_cbor(&self) -> CBOR {
+impl Address {
+    /// The body written inside a v1 `crypto-output` key expression: the
+    /// nested coin-info carries the v1 tag (305) with v1 rules.
+    pub(crate) fn untagged_cbor_v1(&self) -> CBOR {
+        self.body(true)
+    }
+
+    fn body(&self, v1: bool) -> CBOR {
         let mut map = Map::new();
         if let Some(info) = self.info {
-            map.insert(1, info.tagged_cbor());
+            map.insert(
+                1,
+                if v1 {
+                    CBOR::to_tagged_value(tags::CRYPTO_COIN_INFO, info.untagged_cbor_v1())
+                } else {
+                    info.tagged_cbor()
+                },
+            );
         }
         if let Some(address_type) = self.address_type {
             map.insert(2, address_type.wire());
         }
         map.insert(3, ByteString::from(self.data()));
         map.into()
+    }
+}
+
+impl CBORTaggedEncodable for Address {
+    fn untagged_cbor(&self) -> CBOR {
+        self.body(false)
     }
 }
 

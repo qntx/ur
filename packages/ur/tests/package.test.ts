@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -29,6 +29,7 @@ test("package exports resolve to packed files, not source", () => {
   expect(exportTarget(pkg.exports["."])).toBe("./dist/index.mjs");
   expect(exportTarget(pkg.exports["./typed"])).toBe("./dist/typed.mjs");
   expect(exportTarget(pkg.exports["./registry"])).toBe("./dist/registry.mjs");
+  expect(exportTarget(pkg.exports["./interop"])).toBe("./dist/interop.mjs");
   expect(pkg.publishConfig?.exports).toBeUndefined();
 });
 
@@ -37,10 +38,15 @@ test("packed index.mjs does not mention dcbor", () => {
   expect(src).not.toContain("@blockchaincommons/dcbor");
 });
 
-test("packed registry.mjs imports dcbor as external", () => {
-  const registry = readFileSync(resolve(root, "dist/registry.mjs"), "utf8");
-  expect(registry).toContain("@blockchaincommons/dcbor");
-  expect(/from\s*["']@blockchaincommons\/dcbor["']/.test(registry)).toBe(true);
+test("packed registry/interop entries import dcbor as external", () => {
+  const dir = resolve(root, "dist");
+  const chunks = readdirSync(dir)
+    .filter((f) => f.endsWith(".mjs"))
+    .map((f) => readFileSync(resolve(dir, f), "utf8"))
+    .join("\n");
+  // The bundler splits dcbor use into shared chunks; it stays external.
+  expect(chunks).toContain("@blockchaincommons/dcbor");
+  expect(/from\s*["']@blockchaincommons\/dcbor["']/.test(chunks)).toBe(true);
 });
 
 test("packed UrError is one class across entries", async () => {
@@ -63,6 +69,11 @@ test("packed UrError is one class across entries", async () => {
     codecMap: unknown;
     fromUrWith: unknown;
   };
+  const interop = (await import(dist("interop.mjs"))) as {
+    UrError: unknown;
+    ethSignRequestCodec: unknown;
+    cryptoMultiAccountsCodec: unknown;
+  };
   expect(index.UrError).toBe(typed.UrError);
   expect(index.UrError).toBe(registry.UrError);
   expect(registry.seedCodec).toBeDefined();
@@ -79,4 +90,7 @@ test("packed UrError is one class across entries", async () => {
   expect(registry.ENVELOPE_MAX_DEPTH).toBe(64);
   expect(registry.codecMap).toBeTypeOf("function");
   expect(registry.fromUrWith).toBeTypeOf("function");
+  expect(index.UrError).toBe(interop.UrError);
+  expect(interop.ethSignRequestCodec).toBeDefined();
+  expect(interop.cryptoMultiAccountsCodec).toBeDefined();
 });

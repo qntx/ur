@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "capability": "registry.v1-writers",
+  "source": {
+    "name": "v1 crypto-* encode-invalid vectors: bodies the v1 codec must reject on decode or encode; tsError is the TypeScript-side UrError code (TS-only assertion metadata)"
+  },
+  "cases": [
+    {
+      "name": "crypto-output descriptor with name",
+      "codec": "crypto-output",
+      "inputCborHex": "a3016877706b68284030290281d99d72a103582102abababababababababababababababababababababababababababababababab03686b6579206e616d65",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output descriptor with note",
+      "codec": "crypto-output",
+      "inputCborHex": "a3016877706b68284030290281d99d72a103582102abababababababababababababababababababababababababababababababab046661206e6f7465",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output unsupported addr() text",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016861646472284030290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output wsh outside top/sh: wsh(sh(@0))",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016b77736828736828403029290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output nested sh: sh(sh(@0))",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016a736828736828403029290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output wsh inside wsh: wsh(wsh(@0))",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016c7773682877736828403029290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output sh inside combo: combo(sh(@0))",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016d636f6d626f28736828403029290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output multi threshold 0",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016b6d756c746928302c4030290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "crypto-output multi threshold over keys",
+      "codec": "crypto-output",
+      "inputCborHex": "a20171736f727465646d756c746928322c4030290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "crypto-output multi empty args",
+      "codec": "crypto-output",
+      "inputCborHex": "a101686d756c7469283129",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output whitespace in source",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016a77706b682820403020290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output uppercase raw hex",
+      "codec": "crypto-output",
+      "inputCborHex": "a1016d72617728444541444245454629",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output odd-length raw hex",
+      "codec": "crypto-output",
+      "inputCborHex": "a101687261772861626329",
+      "tsError": "Custom"
+    },
+    {
+      "name": "crypto-output unknown function",
+      "codec": "crypto-output",
+      "inputCborHex": "a20169666f6f666e284030290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output trailing junk",
+      "codec": "crypto-output",
+      "inputCborHex": "a20168706b6828403029780281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output tr with two args",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016974722840302c4030290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output missing placeholder close",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016777706b682840300281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-account entry with name",
+      "codec": "crypto-account",
+      "inputCborHex": "a2011a73c5da0a0281d99d6ca3016877706b68284030290281d99d72a103582102abababababababababababababababababababababababababababababababab036961636374206e616d65",
+      "tsError": "CborType"
+    },
+    {
+      "name": "crypto-output tr over script tree",
+      "codec": "crypto-output",
+      "inputCborHex": "d90199d90196a201020282d90132a103582102ababababababababababababababababababababababababababababababababd90132a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "firmware ledger-live crypto-account: bare #6.303 entries are not script trees",
+      "codec": "crypto-account",
+      "inputCborHex": "a2011a757e6fc9028ad9012fa502f40358210326bd25d39a5eeb0217c4508bc5c50d28087121372daa5d2e48b30a8f3345998606d90130a3018a182cf5183cf500f500f400f4021a757e6fc9030309684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa502f4035821030b235be63214e20961295fb82ff3fe365c21e3c5c203bc7a995b5f31fa10a86506d90130a3018a182cf5183cf501f500f400f4021a757e6fc9030309684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa502f4035821020a48e423f5991eba82dc251aa4b7191bb4bf72838ff61e761fe1e08f374968e706d90130a3018a182cf5183cf502f500f400f4021a757e6fc9030309684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa502f403582103c2d7cb8f289f4211064258c63c86a57d22eb4e2565fa1c9b203797251a1fad9d06d90130a3018a182cf5183cf503f500f400f4021a757e6fc9030309684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa502f403582103435a76cc11055f740187fbfe68a7a1f0180fe43f6835bd52797bb50c6e567a2506d90130a3018a182cf5183cf504f500f400f4021a757e6fc9030309684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa502f403582102f41789edb56ce2786392d4fb040565ac767be3e43355610a91853e65212a02a106d90130a3018a182cf5183cf505f500f400f4021a757e6fc9030309684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa502f4035821038f4e60d5035d28a76d1b9a64dd7867b11fb652a56605a0e51923b4f49e23522a06d90130a3018a182cf5183cf506f500f400f4021a757e6fc9030309684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa502f403582102765303723f047bac13ff1a9617c0891fd23ebcf7c7053d4c2d1dc49f24c9e0d906d90130a3018a182cf5183cf507f500f400f4021a757e6fc9030309684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa502f403582103ac7982290292097e2d072b5520911a4c94af713ae49cdd8ab6fcd1895c194ef306d90130a3018a182cf5183cf508f500f400f4021a757e6fc9030309684b657973746f6e650a736163636f756e742e6c65646765725f6c697665d9012fa502f4035821039fcc0a270027ee3d8ad2b41f172d03aa8f5353a9876301e0799f845bda6f1f3506d90130a3018a182cf5183cf509f500f400f4021a757e6fc9030309684b657973746f6e650a736163636f756e742e6c65646765725f6c697665",
+      "tsError": "CborType",
+      "source": "keystone3-firmware@7da0b94135e14af9bfb60f5ca5c300e627496525 rust/apps/wallets/src/metamask.rs test_ledger_live golden"
+    }
+  ]
+}

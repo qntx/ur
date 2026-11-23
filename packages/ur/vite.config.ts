@@ -28,6 +28,7 @@ const config: UserConfig = defineConfig({
       index: "src/index.ts",
       typed: "src/typed/index.ts",
       registry: "src/registry/index.ts",
+      interop: "src/interop/index.ts",
     },
     // optional peer is not auto-externalized
     deps: {
