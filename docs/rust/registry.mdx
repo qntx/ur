@@ -127,14 +127,14 @@ Keys become `@0`, `@1`, … in order of appearance and are collected as `Descrip
 
 The `bcur_registry::v1` module holds opt-in newtypes that write the deprecated `crypto-*` wire forms for interop with deployed v1 readers (Keystone, Keystone firmware, BlueWallet, MetaMask/Rabby, Sparrow). Each wraps the same value type, uses `cbor_tags()` `[v1 tag, v2 tag]` — reads both, writes v1 — and `to_ur()` produces `ur:crypto-*`:
 
-| v1 UR type         | v1 tag | Type                                               |
-| ------------------ | ------ | -------------------------------------------------- |
-| `crypto-psbt`      | 310    | `v1::CryptoPsbt(Psbt)`                             |
-| `crypto-hdkey`     | 303    | `v1::CryptoHdKey(HdKey)`                           |
-| `crypto-keypath`   | 304    | `v1::CryptoKeypath(Keypath)`                       |
-| `crypto-coin-info` | 305    | `v1::CryptoCoinInfo(CoinInfo)`                     |
-| `crypto-output`    | 308    | `v1::CryptoOutput` (`TryFrom<OutputDescriptor>`)   |
-| `crypto-account`   | 311    | `v1::CryptoAccount` (`TryFrom<AccountDescriptor>`) |
+| v1 UR type         | v1 tag | Type                                                   |
+| ------------------ | ------ | ------------------------------------------------------ |
+| `crypto-psbt`      | 310    | `v1::CryptoPsbt(Psbt)`                                 |
+| `crypto-hdkey`     | 303    | `v1::CryptoHdKey(HdKey)`                               |
+| `crypto-keypath`   | 304    | `v1::CryptoKeypath(Keypath)`                           |
+| `crypto-coin-info` | 305    | `v1::CryptoCoinInfo(CoinInfo)`                         |
+| `crypto-output`    | 308    | `v1::CryptoOutput` (`TryFrom` an `OutputDescriptor`)   |
+| `crypto-account`   | 311    | `v1::CryptoAccount` (`TryFrom` an `AccountDescriptor`) |
 
 ```rust
 use bcur::typed::UrEncodable;
