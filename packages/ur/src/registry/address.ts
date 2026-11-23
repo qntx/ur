@@ -1,4 +1,5 @@
 import { CborError, CborMap, cbor } from "@blockchaincommons/dcbor";
+import type { Cbor } from "@blockchaincommons/dcbor";
 
 import type { UrCodec } from "../typed/codec.ts";
 import { fromTagged, toTagged } from "../typed/index.ts";
@@ -32,23 +33,29 @@ function assertDataLen(type: AddressType | undefined, data: Uint8Array): void {
   }
 }
 
+// `coinInfo` is the codec written for the nested info field; v1 address keys
+// (inside a crypto-output script tree) embed the v1 tag 305 with v1 rules.
+export function encodeAddressBody(address: Address, coinInfo: UrCodec<CoinInfo>): Cbor {
+  assertDataLen(address.type, address.data);
+  const map = new CborMap();
+  if (address.info !== undefined) {
+    map.set(1, toTagged(address.info, coinInfo));
+  }
+  if (address.type !== undefined) {
+    const index = ADDRESS_TYPES.indexOf(address.type);
+    if (index === -1) {
+      throw CborError.wrongType();
+    }
+    map.set(2, index);
+  }
+  map.set(3, cbor(copyBuf(address.data)));
+  return cbor(map);
+}
+
 export const addressCodec: UrCodec<Address> = {
   tags: [TAGS.address, TAGS["crypto-address"]],
   encode(address) {
-    assertDataLen(address.type, address.data);
-    const map = new CborMap();
-    if (address.info !== undefined) {
-      map.set(1, toTagged(address.info, coinInfoCodec));
-    }
-    if (address.type !== undefined) {
-      const index = ADDRESS_TYPES.indexOf(address.type);
-      if (index === -1) {
-        throw CborError.wrongType();
-      }
-      map.set(2, index);
-    }
-    map.set(3, cbor(copyBuf(address.data)));
-    return cbor(map);
+    return encodeAddressBody(address, coinInfoCodec);
   },
   decode(value) {
     const map = expectClosedIntMap(value, ADDRESS_KEYS);

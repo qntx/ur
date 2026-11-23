@@ -325,8 +325,10 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
   - `vectors/keystone/crypto-output.json` — `ur:crypto-output` literals and CBOR from `__tests__/CryptoOutput.test.ts`
   - `vectors/keystone/crypto-account.json` — `ur:crypto-account` literals and CBOR from `__tests__/CryptoAccount.test.ts`
   - `packages/ur/tests/vectors/registry.test.ts` — decodes the adopted literals as a second source for the v1 descriptor forms
+  - `vectors/registry/v1-writers.json` — re-encode expectations for the adopted literals
+  - `packages/ur/tests/registry/v1-keystone-differential.test.ts` — byte-exact differential oracle via the `@keystonehq/bc-ur-registry` 0.8.1 devDependency
 
-Only test-vector data is adopted; no source modules are vendored.
+Only test-vector data is adopted; no source modules are vendored. The npm package is a devDependency used as a test oracle, not a runtime dependency.
 
 ```text
                                  Apache License
@@ -530,4 +532,61 @@ Only test-vector data is adopted; no source modules are vendored.
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+```
+
+## KeystoneHQ keystone-sdk-rust (ur-registry)
+
+- Repository: <https://github.com/KeystoneHQ/keystone-sdk-rust>
+- Commit: `7f4d2258c9e79770e9c105ee49d5849b6be1c206` (crate `ur-registry` 1.0.9)
+- License: MIT
+- Used by:
+  - `vectors/registry/v1-writers.json` — reference for the v1 `crypto-hdkey` presence rules the writers reproduce
+
+Only test-vector data is adopted; no source modules are vendored.
+
+```text
+MIT License
+
+Copyright (c) 2023 Keystone
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+## Keystone3 firmware
+
+- Repository: <https://github.com/KeystoneHQ/keystone3-firmware>
+- Commit: `7da0b94135e14af9bfb60f5ca5c300e627496525`
+- License: MIT
+- Used by:
+  - `vectors/registry/v1-writers.json` — the firmware `metamask.rs` `generate_standard_legacy_hd_key` shape (explicit `is-private: false`, use-info `{1: 60, 2: 0}`) pinned as a `crypto-hdkey` writer case
+
+Only test-vector data is adopted; no source modules are vendored.
+
+```text
+MIT License
+
+Copyright (c) Year YANSSIE HK LIMITED.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this
+software and associated documentation files (the "Software"), to deal in the Software
+without restriction, including without limitation the rights to use, copy, modify,
+merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Software: All Keystone associated files.
+License: MIT
+Licensor: YANSSIE HK LIMITED.
 ```

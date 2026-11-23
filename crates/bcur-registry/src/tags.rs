@@ -1,8 +1,9 @@
 //! BCR-2020-006/010 CBOR tag constants.
 //!
 //! `SEED`–`ACCOUNT_DESCRIPTOR` are the v2 tags (40300–40311); `CRYPTO_*` are
-//! the deprecated v1 tags (300–311, read-only); `SH`–`COSIGNER` are the
-//! BCR-2020-010 script-expression tags (400–410) embedded inside v1
+//! the deprecated v1 tags (300–311) — the six with writers are the
+//! [`crate::v1`] newtypes, the rest stay read-only; `SH`–`COSIGNER` are
+//! the BCR-2020-010 script-expression tags (400–410) embedded inside v1
 //! `crypto-output` bodies. `envelope` (200) is not part of this crate.
 //!
 //! Constants are not registered anywhere implicitly; call [`register_tags`]
@@ -33,24 +34,25 @@ pub const ACCOUNT_DESCRIPTOR: Tag = Tag::with_static_name(40_311, "account-descr
 
 /// `crypto-seed` (v1, read-only).
 pub const CRYPTO_SEED: Tag = Tag::with_static_name(300, "crypto-seed");
-/// `crypto-hdkey` (v1, read-only).
+/// `crypto-hdkey` (v1; written by [`crate::v1::CryptoHdKey`]).
 pub const CRYPTO_HDKEY: Tag = Tag::with_static_name(303, "crypto-hdkey");
-/// `crypto-keypath` (v1, read-only).
+/// `crypto-keypath` (v1; written by [`crate::v1::CryptoKeypath`]).
 pub const CRYPTO_KEYPATH: Tag = Tag::with_static_name(304, "crypto-keypath");
-/// `crypto-coin-info` (v1, read-only).
+/// `crypto-coin-info` (v1; written by [`crate::v1::CryptoCoinInfo`]).
 pub const CRYPTO_COIN_INFO: Tag = Tag::with_static_name(305, "crypto-coin-info");
-/// `crypto-eckey` (v1, read-only).
+/// `crypto-eckey` (v1; written inside v1 script expressions).
 pub const CRYPTO_ECKEY: Tag = Tag::with_static_name(306, "crypto-eckey");
-/// `crypto-address` (v1, read-only; BCR-2020-006 assigns 307 to
+/// `crypto-address` (v1, written inside v1 script expressions;
+/// BCR-2020-006 assigns 307 to
 /// `crypto-address`, not `crypto-output` — `bc-tags` mislabels it).
 pub const CRYPTO_ADDRESS: Tag = Tag::with_static_name(307, "crypto-address");
-/// `crypto-output` (v1, read-only).
+/// `crypto-output` (v1; written by [`crate::v1::CryptoOutput`]).
 pub const CRYPTO_OUTPUT: Tag = Tag::with_static_name(308, "crypto-output");
 /// `crypto-sskr` (v1, read-only).
 pub const CRYPTO_SSKR: Tag = Tag::with_static_name(309, "crypto-sskr");
-/// `crypto-psbt` (v1, read-only).
+/// `crypto-psbt` (v1; written by [`crate::v1::CryptoPsbt`]).
 pub const CRYPTO_PSBT: Tag = Tag::with_static_name(310, "crypto-psbt");
-/// `crypto-account` (v1, read-only).
+/// `crypto-account` (v1; written by [`crate::v1::CryptoAccount`]).
 pub const CRYPTO_ACCOUNT: Tag = Tag::with_static_name(311, "crypto-account");
 
 /// `sh` script expression (BCR-2020-010).

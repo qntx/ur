@@ -65,6 +65,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@blockchaincommons/dcbor": "1.0.0-beta.3",
+    "@keystonehq/bc-ur-registry": "0.8.1",
     "@qntx/tsconfig": "1.0.1",
     "@types/node": "26.6.3",
     "publint": "0.3.24",

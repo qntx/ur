@@ -521,6 +521,24 @@
       ]
     },
     {
+      "id": "registry.v1-writers",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R4",
+      "ts": {
+        "module": "packages/ur/src/registry/index.ts",
+        "tests": [
+          "packages/ur/tests/registry/v1-writers.test.ts",
+          "packages/ur/tests/registry/v1-keystone-differential.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur-registry/src/v1.rs",
+        "tests": ["crates/bcur-registry/tests/v1.rs"]
+      },
+      "vectors": ["vectors/registry/v1-writers.json", "vectors/registry/v1-encode-invalid.json"]
+    },
+    {
       "id": "bytewords.identifier",
       "tier": "A",
       "status": "stable",

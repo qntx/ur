@@ -41,8 +41,9 @@ export const TAG_COSIGNER = 410;
 
 /**
  * Codecs that exist in this version. The `crypto-*` entries are the deprecated v1 tags
- * (BCR-2020-006): read-only, never written. `SCRIPT_TAGS` are the BCR-2020-010 script-expression
- * tags embedded inside v1 crypto-output bodies.
+ * (BCR-2020-006); the v2 codecs accept them on read, and the separate `crypto*Codec` writers emit
+ * them. `SCRIPT_TAGS` are the BCR-2020-010 script-expression tags embedded inside v1 crypto-output
+ * bodies.
  */
 export const TAGS: Readonly<{
   envelope: Tag;

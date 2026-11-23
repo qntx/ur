@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- `@qntx/ur`: opt-in v1 writer codecs `cryptoPsbtCodec`, `cryptoHdKeyCodec`, `cryptoKeypathCodec`, `cryptoCoinInfoCodec`, `cryptoOutputCodec`, and `cryptoAccountCodec` emit the deprecated BCR-2020-006 `crypto-*` wire forms while the default codecs keep writing v2. Writes are presence-preserving (`coin-info` `type`/`network` and derived-`hdkey` `is-private` are written iff set, `0`/`false` included), nested use-info/keypaths carry the v1 tags 305/304, `crypto-output` renders a BCR-2020-010 script-expression tree, and `crypto-account` writes `{1: mfp, 2: [bare script trees]}` — the KeystoneHQ spelling. `name`/`note` and sources outside the write grammar are rejected on encode and decode.
+- `bcur-registry`: matching `v1` module newtypes `CryptoPsbt`, `CryptoHdKey`, `CryptoKeypath`, `CryptoCoinInfo`, `CryptoOutput`, and `CryptoAccount` (validated via `TryFrom`) with the same wire rules.
+
+### Breaking
+
+- `bcur-registry`: `CoinInfo` fields are now `Option` — `CoinInfo::new(Option<CoinType>, Option<Network>)`, `coin_type()`/`network()` return `Option`, and `BTC_MAINNET` is `new(None, None)` — so the v1 writer can preserve explicit zeros. `DerivedKey::is_private` is likewise `Option<bool>`: `public()` produces `None`, `private()` `Some(true)`, new `with_explicit_public_flag()` sets `Some(false)`, and `is_private_flag()` returns the flag's presence; `is_private()` is unchanged.
+
 ## 3.0.0 - 2026-10-10
 
 ### Breaking

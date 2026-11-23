@@ -32,3 +32,13 @@ export const psbtCodec: UrCodec<Psbt> = {
     return Object.freeze({ bytes: copyPsbt(copyBytes(value)) });
   },
 };
+
+/**
+ * Deprecated v1 writer (`ur:crypto-psbt`, tag 310). The body is identical to v2; only the tag
+ * differs.
+ */
+export const cryptoPsbtCodec: UrCodec<Psbt> = {
+  tags: [TAGS["crypto-psbt"], TAGS.psbt],
+  encode: psbtCodec.encode,
+  decode: psbtCodec.decode,
+};

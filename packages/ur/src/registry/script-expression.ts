@@ -1,20 +1,29 @@
 import {
   CborError,
+  CborMap,
   MajorType,
   bytesToHex,
+  cbor,
   expectArray,
   extractTaggedContent,
+  hexToBytes,
+  taggedValue,
 } from "@blockchaincommons/dcbor";
-import type { Cbor, CborMap } from "@blockchaincommons/dcbor";
+import type { Cbor } from "@blockchaincommons/dcbor";
 
-import { addressCodec } from "./address.ts";
+import type { UrCodec } from "../typed/codec.ts";
+import { toTagged } from "../typed/index.ts";
+import { addressCodec, encodeAddressBody } from "./address.ts";
 import type { Address } from "./address.ts";
+import { cryptoCoinInfoCodec } from "./coin-info.ts";
 import { ecKeyCodec } from "./eckey.ts";
 import type { EcKey } from "./eckey.ts";
-import { hdKeyCodec } from "./hdkey.ts";
+import { cryptoHdKeyCodec, hdKeyCodec } from "./hdkey.ts";
 import type { HdKey } from "./hdkey.ts";
 import { expectUint31 } from "./map.ts";
 import {
+  SCRIPT_TAGS,
+  TAGS,
   TAG_ADDRESS,
   TAG_ADDRESS_V1,
   TAG_COSIGNER,
@@ -191,4 +200,179 @@ export function scriptExpressionToDescriptor(cbor: Cbor): {
 } {
   const out = scriptExp(cbor);
   return Object.freeze({ source: out.text, keys: Object.freeze(out.keys) });
+}
+
+// v1 keyExp write side: descriptor keys tagged 303/306/307 with v1 bodies —
+// the embedded hdkey carries presence-preserving `is-private` plus nested
+// 305/304 tags, the embedded address a v1 (305) coin-info.
+const ecKeyV1Codec: UrCodec<EcKey> = {
+  tags: [TAGS["crypto-eckey"], TAGS.eckey],
+  encode: ecKeyCodec.encode,
+  decode: ecKeyCodec.decode,
+};
+
+const addressV1Codec: UrCodec<Address> = {
+  tags: [TAGS["crypto-address"], TAGS.address],
+  encode(address) {
+    return encodeAddressBody(address, cryptoCoinInfoCodec);
+  },
+  decode: addressCodec.decode,
+};
+
+function keyExpV1(key: DescriptorKey): Cbor {
+  if (key.kind === "hdkey") {
+    return toTagged(key.key, cryptoHdKeyCodec);
+  }
+  if (key.kind === "eckey") {
+    return toTagged(key.key, ecKeyV1Codec);
+  }
+  return toTagged(key.address, addressV1Codec);
+}
+
+type Cursor = { pos: number };
+
+function takeName(source: string, cur: Cursor): string {
+  const start = cur.pos;
+  while (cur.pos < source.length) {
+    const code = source.codePointAt(cur.pos) ?? -1;
+    if (code < 0x61 || code > 0x7a) {
+      break;
+    }
+    cur.pos += 1;
+  }
+  if (cur.pos === start) {
+    throw CborError.wrongType();
+  }
+  return source.slice(start, cur.pos);
+}
+
+function takeChar(source: string, cur: Cursor, ch: string): void {
+  if (source[cur.pos] !== ch) {
+    throw CborError.wrongType();
+  }
+  cur.pos += 1;
+}
+
+function takeUint(source: string, cur: Cursor): number {
+  const start = cur.pos;
+  while (cur.pos < source.length) {
+    const code = source.codePointAt(cur.pos) ?? -1;
+    if (code < 0x30 || code > 0x39) {
+      break;
+    }
+    cur.pos += 1;
+  }
+  if (cur.pos === start) {
+    throw CborError.wrongType();
+  }
+  const n = Number(source.slice(start, cur.pos));
+  if (!Number.isSafeInteger(n)) {
+    throw CborError.outOfRange();
+  }
+  return n;
+}
+
+function takeKey(source: string, cur: Cursor, keys: ReadonlyArray<DescriptorKey>): Cbor {
+  takeChar(source, cur, "@");
+  const n = takeUint(source, cur);
+  const key = keys[n];
+  if (key === undefined) {
+    throw CborError.outOfRange();
+  }
+  return keyExpV1(key);
+}
+
+const KEY_FN_TAGS: Readonly<Record<string, (typeof SCRIPT_TAGS)[keyof typeof SCRIPT_TAGS]>> = {
+  pk: SCRIPT_TAGS.pk,
+  pkh: SCRIPT_TAGS.pkh,
+  wpkh: SCRIPT_TAGS.wpkh,
+  combo: SCRIPT_TAGS.combo,
+  tr: SCRIPT_TAGS.tr,
+};
+
+type Parent = "top" | "sh" | "wsh";
+
+// The write grammar is exactly the reader's output language: single-key
+// functions `pk|pkh|wpkh|combo|cosigner|tr(@n)`, `sh` top-level only, `wsh`
+// top-level or directly inside `sh`, `multi|sortedmulti(k,@a,…)`,
+// `raw(<lowercase even-length hex>)`. No whitespace.
+function parseExp(
+  source: string,
+  cur: Cursor,
+  parent: Parent,
+  keys: ReadonlyArray<DescriptorKey>,
+): Cbor {
+  const name = takeName(source, cur);
+  takeChar(source, cur, "(");
+  if (name === "cosigner") {
+    const key = takeKey(source, cur, keys);
+    takeChar(source, cur, ")");
+    // Keystone's multisig-cosigner spelling: bare key_exp inside sh/wsh
+    // (Keystone JS cannot read tag 410 there); top level keeps 410.
+    return parent === "top" ? taggedValue(SCRIPT_TAGS.cosigner, key) : key;
+  }
+  const keyTag = KEY_FN_TAGS[name];
+  if (keyTag !== undefined) {
+    const key = takeKey(source, cur, keys);
+    takeChar(source, cur, ")");
+    return taggedValue(keyTag, key);
+  }
+  if (name === "sh" || name === "wsh") {
+    // sh() is top-level only; wsh() is top-level or directly inside sh().
+    if (name === "sh" ? parent !== "top" : parent === "wsh") {
+      throw CborError.wrongType();
+    }
+    const inner = parseExp(source, cur, name, keys);
+    takeChar(source, cur, ")");
+    return taggedValue(name === "sh" ? SCRIPT_TAGS.sh : SCRIPT_TAGS.wsh, inner);
+  }
+  if (name === "multi" || name === "sortedmulti") {
+    const threshold = takeUint(source, cur);
+    const list: Cbor[] = [];
+    do {
+      takeChar(source, cur, ",");
+      list.push(takeKey(source, cur, keys));
+    } while (source[cur.pos] === ",");
+    takeChar(source, cur, ")");
+    if (threshold < 1 || threshold > list.length) {
+      throw CborError.outOfRange();
+    }
+    const map = new CborMap();
+    map.set(1, threshold);
+    map.set(2, list);
+    return taggedValue(name === "multi" ? SCRIPT_TAGS.multi : SCRIPT_TAGS.sortedmulti, cbor(map));
+  }
+  if (name === "raw") {
+    const start = cur.pos;
+    while (cur.pos < source.length) {
+      const code = source.codePointAt(cur.pos) ?? -1;
+      const hexDigit = (code >= 0x30 && code <= 0x39) || (code >= 0x61 && code <= 0x66);
+      if (!hexDigit) {
+        break;
+      }
+      cur.pos += 1;
+    }
+    const hex = source.slice(start, cur.pos);
+    takeChar(source, cur, ")");
+    return taggedValue(SCRIPT_TAGS.raw, cbor(hexToBytes(hex)));
+  }
+  throw CborError.wrongType();
+}
+
+/**
+ * Inverse of {@link scriptExpressionToDescriptor}: render `source` (restricted to the reader's
+ * output grammar) back into a BCR-2020-010 script-expression tree, embedding `keys` with the v1
+ * tags. Anything outside the grammar throws `CborError` — surfaced as `CborType` by the codec
+ * layer.
+ */
+export function descriptorToScriptExpression(
+  source: string,
+  keys: ReadonlyArray<DescriptorKey>,
+): Cbor {
+  const cur = { pos: 0 };
+  const tree = parseExp(source, cur, "top", keys);
+  if (cur.pos !== source.length) {
+    throw CborError.wrongType();
+  }
+  return tree;
 }

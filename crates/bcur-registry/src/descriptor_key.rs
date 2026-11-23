@@ -34,6 +34,18 @@ impl DescriptorKey {
             Self::Address(address) => address.tagged_cbor(),
         }
     }
+
+    /// The v1-tagged `keyExp` written inside `crypto-output` script trees
+    /// (303/306/307, with v1 nested bodies).
+    pub(crate) fn tagged_cbor_v1(&self) -> CBOR {
+        match self {
+            Self::HdKey(key) => CBOR::to_tagged_value(tags::CRYPTO_HDKEY, key.untagged_cbor_v1()),
+            Self::EcKey(key) => CBOR::to_tagged_value(tags::CRYPTO_ECKEY, key.untagged_cbor()),
+            Self::Address(address) => {
+                CBOR::to_tagged_value(tags::CRYPTO_ADDRESS, address.untagged_cbor_v1())
+            }
+        }
+    }
 }
 
 /// Tag pairs (v2, v1) of the three key kinds; also the script-expression

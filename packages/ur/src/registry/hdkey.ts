@@ -4,9 +4,9 @@ import type { Cbor } from "@blockchaincommons/dcbor";
 import type { UrCodec } from "../typed/codec.ts";
 import { fromTagged, toTagged } from "../typed/index.ts";
 import { copyBuf, copyBytes } from "./bytes.ts";
-import { coinInfoCodec } from "./coin-info.ts";
+import { coinInfoCodec, cryptoCoinInfoCodec } from "./coin-info.ts";
 import type { CoinInfo } from "./coin-info.ts";
-import { keypathCodec } from "./keypath.ts";
+import { cryptoKeypathCodec, keypathCodec } from "./keypath.ts";
 import type { Keypath } from "./keypath.ts";
 import { assertText, expectBool, expectClosedIntMap, expectUint32Ne0 } from "./map.ts";
 import { TAGS } from "./tags.ts";
@@ -67,44 +67,60 @@ function assertUint32Ne0(n: number): number {
   return n;
 }
 
+// The tagged codecs written for the nested use-info / keypath fields; v1
+// bodies embed the v1 tags (305/304) with v1 (presence-preserving) rules.
+type Nested = Readonly<{
+  coinInfo: UrCodec<CoinInfo>;
+  keypath: UrCodec<Keypath>;
+}>;
+
+function encodeBody(key: HdKey, nested: Nested, v1: boolean): Cbor {
+  const map = new CborMap();
+  if (key.kind === "master") {
+    map.set(1, true);
+    assertKeyData(true, key.keyData);
+    map.set(3, cbor(copyBuf(key.keyData)));
+    map.set(4, cbor(copyLen(key.chainCode, CHAIN_CODE_LEN)));
+    return cbor(map);
+  }
+  // v2 writes `2: true` for private keys only; v1 preserves presence
+  // (`is-private` iff the field is present, `false` included).
+  if (v1 ? key.isPrivate !== undefined : key.isPrivate === true) {
+    map.set(2, key.isPrivate === true);
+  }
+  assertKeyData(key.isPrivate === true, key.keyData);
+  map.set(3, cbor(copyBuf(key.keyData)));
+  if (key.chainCode !== undefined) {
+    map.set(4, cbor(copyLen(key.chainCode, CHAIN_CODE_LEN)));
+  }
+  if (key.useInfo !== undefined) {
+    map.set(5, toTagged(key.useInfo, nested.coinInfo));
+  }
+  if (key.origin !== undefined) {
+    map.set(6, toTagged(key.origin, nested.keypath));
+  }
+  if (key.children !== undefined) {
+    map.set(7, toTagged(key.children, nested.keypath));
+  }
+  if (key.parentFingerprint !== undefined) {
+    map.set(8, assertUint32Ne0(key.parentFingerprint));
+  }
+  if (key.name !== undefined && key.name !== "") {
+    map.set(9, assertText(key.name));
+  }
+  if (key.note !== undefined && key.note !== "") {
+    map.set(10, assertText(key.note));
+  }
+  return cbor(map);
+}
+
+const V2_NESTED: Nested = { coinInfo: coinInfoCodec, keypath: keypathCodec };
+const V1_NESTED: Nested = { coinInfo: cryptoCoinInfoCodec, keypath: cryptoKeypathCodec };
+
 export const hdKeyCodec: UrCodec<HdKey> = {
   tags: [TAGS.hdkey, TAGS["crypto-hdkey"]],
   encode(key) {
-    const map = new CborMap();
-    if (key.kind === "master") {
-      map.set(1, true);
-      assertKeyData(true, key.keyData);
-      map.set(3, cbor(copyBuf(key.keyData)));
-      map.set(4, cbor(copyLen(key.chainCode, CHAIN_CODE_LEN)));
-      return cbor(map);
-    }
-    if (key.isPrivate === true) {
-      map.set(2, true);
-    }
-    assertKeyData(key.isPrivate === true, key.keyData);
-    map.set(3, cbor(copyBuf(key.keyData)));
-    if (key.chainCode !== undefined) {
-      map.set(4, cbor(copyLen(key.chainCode, CHAIN_CODE_LEN)));
-    }
-    if (key.useInfo !== undefined) {
-      map.set(5, toTagged(key.useInfo, coinInfoCodec));
-    }
-    if (key.origin !== undefined) {
-      map.set(6, toTagged(key.origin, keypathCodec));
-    }
-    if (key.children !== undefined) {
-      map.set(7, toTagged(key.children, keypathCodec));
-    }
-    if (key.parentFingerprint !== undefined) {
-      map.set(8, assertUint32Ne0(key.parentFingerprint));
-    }
-    if (key.name !== undefined && key.name !== "") {
-      map.set(9, assertText(key.name));
-    }
-    if (key.note !== undefined && key.note !== "") {
-      map.set(10, assertText(key.note));
-    }
-    return cbor(map);
+    return encodeBody(key, V2_NESTED, false);
   },
   decode(value) {
     const peek = expectMap(value);
@@ -150,4 +166,17 @@ export const hdKeyCodec: UrCodec<HdKey> = {
       ...(note === undefined ? {} : { note: expectText(note) }),
     });
   },
+};
+
+/**
+ * Deprecated v1 writer (`ur:crypto-hdkey`, tag 303). Presence-preserving: `is-private` is written
+ * iff `isPrivate` is present (`false` included), and the nested use-info / origin / children values
+ * carry the v1 tags (305/304) with v1 rules. Every other field matches v2.
+ */
+export const cryptoHdKeyCodec: UrCodec<HdKey> = {
+  tags: [TAGS["crypto-hdkey"], TAGS.hdkey],
+  encode(key) {
+    return encodeBody(key, V1_NESTED, true);
+  },
+  decode: hdKeyCodec.decode,
 };

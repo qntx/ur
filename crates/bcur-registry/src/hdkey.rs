@@ -42,10 +42,14 @@ pub struct MasterKey {
 
 /// A derived HD key: public (33-byte compressed key data) or private
 /// (`0x00`-prefixed key data), with optional derivation metadata.
+///
+/// `is_private` records wire presence (`None` = absent) so the deprecated v1
+/// `crypto-hdkey` writer ([`crate::v1::CryptoHdKey`]) can preserve it; the v2
+/// writer only ever writes `2: true`.
 #[derive(Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct DerivedKey {
     #[zeroize(skip)]
-    is_private: bool,
+    is_private: Option<bool>,
     key_data: [u8; KEY_DATA_LEN],
     chain_code: Option<[u8; CHAIN_CODE_LEN]>,
     #[zeroize(skip)]
@@ -73,12 +77,12 @@ impl fmt::Debug for MasterKey {
 
 impl fmt::Debug for DerivedKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let key_data: &dyn fmt::Debug = if self.is_private {
+        let key_data: &dyn fmt::Debug = if self.is_private() {
             &"[REDACTED]"
         } else {
             &self.key_data
         };
-        let chain_code: &dyn fmt::Debug = if self.is_private {
+        let chain_code: &dyn fmt::Debug = if self.is_private() {
             &"[REDACTED]"
         } else {
             &self.chain_code
@@ -140,11 +144,12 @@ impl MasterKey {
 }
 
 impl DerivedKey {
-    /// Creates a public derived key (33-byte compressed key data).
+    /// Creates a public derived key (33-byte compressed key data); the
+    /// `is-private` flag is absent — see [`Self::with_explicit_public_flag`].
     #[must_use]
     pub const fn public(key_data: [u8; KEY_DATA_LEN]) -> Self {
         Self {
-            is_private: false,
+            is_private: None,
             key_data,
             chain_code: None,
             use_info: None,
@@ -166,7 +171,7 @@ impl DerivedKey {
             return Err(Error::OutOfRange { field: "key_data" });
         }
         Ok(Self {
-            is_private: true,
+            is_private: Some(true),
             key_data,
             chain_code: None,
             use_info: None,
@@ -235,9 +240,25 @@ impl DerivedKey {
         self
     }
 
+    /// Sets the explicit `is-private: false` flag the v1 `crypto-hdkey`
+    /// writer preserves (Keystone writes it). No-op on a private key.
+    #[must_use]
+    pub const fn with_explicit_public_flag(mut self) -> Self {
+        if !matches!(self.is_private, Some(true)) {
+            self.is_private = Some(false);
+        }
+        self
+    }
+
     /// Whether this is a private key.
     #[must_use]
     pub const fn is_private(&self) -> bool {
+        matches!(self.is_private, Some(true))
+    }
+
+    /// The `is-private` flag as present (`Some`) or absent (`None`).
+    #[must_use]
+    pub const fn is_private_flag(&self) -> Option<bool> {
         self.is_private
     }
 
@@ -392,8 +413,10 @@ impl HdKey {
             Self::Derived(key) => (
                 key.key_data().as_slice(),
                 key.chain_code().map(<[u8; CHAIN_CODE_LEN]>::as_slice),
-                key.use_info().map_or(0, |i| i.coin_type().get()),
-                key.use_info().map_or(0, |i| i.network().get()),
+                key.use_info()
+                    .map_or(0, |i| i.coin_type().unwrap_or_default().get()),
+                key.use_info()
+                    .map_or(0, |i| i.network().unwrap_or_default().get()),
             ),
         };
         let chain_item =
@@ -414,9 +437,15 @@ impl HdKey {
     }
 }
 
-fn encode_derived(key: &DerivedKey) -> CBOR {
+fn encode_derived(key: &DerivedKey, v1: bool) -> CBOR {
     let mut map = Map::new();
-    if key.is_private {
+    // v2 writes `2: true` for private keys only; v1 preserves presence
+    // (`is-private` iff the flag is present, `false` included).
+    if v1 {
+        if let Some(is_private) = key.is_private {
+            map.insert(2, is_private);
+        }
+    } else if key.is_private() {
         map.insert(2, true);
     }
     map.insert(3, ByteString::from(key.key_data.as_slice()));
@@ -424,13 +453,34 @@ fn encode_derived(key: &DerivedKey) -> CBOR {
         map.insert(4, ByteString::from(chain_code.as_slice()));
     }
     if let Some(use_info) = key.use_info {
-        map.insert(5, use_info.tagged_cbor());
+        map.insert(
+            5,
+            if v1 {
+                CBOR::to_tagged_value(tags::CRYPTO_COIN_INFO, use_info.untagged_cbor_v1())
+            } else {
+                use_info.tagged_cbor()
+            },
+        );
     }
     if let Some(origin) = &key.origin {
-        map.insert(6, origin.tagged_cbor());
+        map.insert(
+            6,
+            if v1 {
+                CBOR::to_tagged_value(tags::CRYPTO_KEYPATH, origin.untagged_cbor())
+            } else {
+                origin.tagged_cbor()
+            },
+        );
     }
     if let Some(children) = &key.children {
-        map.insert(7, children.tagged_cbor());
+        map.insert(
+            7,
+            if v1 {
+                CBOR::to_tagged_value(tags::CRYPTO_KEYPATH, children.untagged_cbor())
+            } else {
+                children.tagged_cbor()
+            },
+        );
     }
     if let Some(fingerprint) = key.parent_fingerprint {
         map.insert(8, u32::from_be_bytes(fingerprint.to_bytes()));
@@ -459,12 +509,9 @@ impl HdKey {
             return Ok(Self::Master(MasterKey::new(key_data, chain_code)?));
         }
         let map = MapReader::closed(cbor, DERIVED_KEYS)?;
-        let is_private = match map.optional(2) {
-            Some(value) => boolean(&value)?,
-            None => false,
-        };
+        let is_private = map.optional(2).map(|v| boolean(&v)).transpose()?;
         let key_data = bytes_fixed::<KEY_DATA_LEN>(&map.required(3)?, "key_data")?;
-        if is_private && key_data[0] != 0 {
+        if is_private == Some(true) && key_data[0] != 0 {
             return Err(Error::OutOfRange { field: "key_data" });
         }
         let chain_code = map
@@ -510,8 +557,14 @@ impl CBORTagged for HdKey {
     }
 }
 
-impl CBORTaggedEncodable for HdKey {
-    fn untagged_cbor(&self) -> CBOR {
+impl HdKey {
+    /// The v1 `crypto-hdkey` body: `is-private` written iff present and the
+    /// nested use-info/origin/children carry the v1 tags (305/304).
+    pub(crate) fn untagged_cbor_v1(&self) -> CBOR {
+        self.body(true)
+    }
+
+    fn body(&self, v1: bool) -> CBOR {
         match self {
             Self::Master(key) => {
                 let mut map = Map::new();
@@ -520,8 +573,14 @@ impl CBORTaggedEncodable for HdKey {
                 map.insert(4, ByteString::from(key.chain_code.as_slice()));
                 map.into()
             }
-            Self::Derived(key) => encode_derived(key),
+            Self::Derived(key) => encode_derived(key, v1),
         }
+    }
+}
+
+impl CBORTaggedEncodable for HdKey {
+    fn untagged_cbor(&self) -> CBOR {
+        self.body(false)
     }
 }
 

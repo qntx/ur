@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "capability": "registry.v1-writers",
+  "source": {
+    "name": "v1 crypto-* encode-invalid vectors: bodies the v1 codec must reject on decode or encode; tsError is the TypeScript-side UrError code (TS-only assertion metadata)"
+  },
+  "cases": [
+    {
+      "name": "crypto-output descriptor with name",
+      "codec": "crypto-output",
+      "inputCborHex": "a3016877706b68284030290281d99d72a103582102abababababababababababababababababababababababababababababababab03686b6579206e616d65",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output descriptor with note",
+      "codec": "crypto-output",
+      "inputCborHex": "a3016877706b68284030290281d99d72a103582102abababababababababababababababababababababababababababababababab046661206e6f7465",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output unsupported addr() text",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016861646472284030290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output wsh outside top/sh: wsh(sh(@0))",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016b77736828736828403029290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output nested sh: sh(sh(@0))",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016a736828736828403029290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output wsh inside wsh: wsh(wsh(@0))",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016c7773682877736828403029290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output sh inside combo: combo(sh(@0))",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016d636f6d626f28736828403029290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output multi threshold 0",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016b6d756c746928302c4030290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "crypto-output multi threshold over keys",
+      "codec": "crypto-output",
+      "inputCborHex": "a20171736f727465646d756c746928322c4030290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "crypto-output multi empty args",
+      "codec": "crypto-output",
+      "inputCborHex": "a101686d756c7469283129",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output whitespace in source",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016a77706b682820403020290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output uppercase raw hex",
+      "codec": "crypto-output",
+      "inputCborHex": "a1016d72617728444541444245454629",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output odd-length raw hex",
+      "codec": "crypto-output",
+      "inputCborHex": "a101687261772861626329",
+      "tsError": "Custom"
+    },
+    {
+      "name": "crypto-output unknown function",
+      "codec": "crypto-output",
+      "inputCborHex": "a20169666f6f666e284030290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output trailing junk",
+      "codec": "crypto-output",
+      "inputCborHex": "a20168706b6828403029780281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output tr with two args",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016974722840302c4030290281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-output missing placeholder close",
+      "codec": "crypto-output",
+      "inputCborHex": "a2016777706b682840300281d99d72a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "crypto-account entry with name",
+      "codec": "crypto-account",
+      "inputCborHex": "a2011a73c5da0a0281d99d6ca3016877706b68284030290281d99d72a103582102abababababababababababababababababababababababababababababababab036961636374206e616d65",
+      "tsError": "CborType"
+    },
+    {
+      "name": "crypto-output tr over script tree",
+      "codec": "crypto-output",
+      "inputCborHex": "d90199d90196a201020282d90132a103582102ababababababababababababababababababababababababababababababababd90132a103582102abababababababababababababababababababababababababababababababab",
+      "tsError": "WrongType"
+    }
+  ]
+}
