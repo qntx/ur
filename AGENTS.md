@@ -11,7 +11,7 @@
 ## Architecture invariants
 
 - `packages/ur/src` is platform-neutral and Hermes V1-safe (no Node/browser-only globals, no `node:*` imports, no ES2023+ array methods).
-- Only `packages/ur/src/typed` and `packages/ur/src/registry` may import `@blockchaincommons/dcbor`; the root transport never does.
+- Only `packages/ur/src/typed`, `packages/ur/src/registry` and `packages/ur/src/interop` may import `@blockchaincommons/dcbor`; the root transport never does.
 - `bcur` is `no_std` + `alloc` and must build for `wasm32-unknown-unknown` and `thumbv7m-none-eabi` with `--no-default-features`; `getrandom` must not appear in that dependency tree.
 - No panics and no `unwrap`/`expect` in library code.
 - No third-party types in public APIs, except `dcbor` types in the typed layer.

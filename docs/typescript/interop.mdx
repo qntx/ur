@@ -1,0 +1,56 @@
+---
+title: Interop
+description: Wallet-interop codecs (Keystone / OneKey dialects) — @qntx/ur/interop.
+---
+
+Interop codecs encode the request/signature forms that deployed wallets exchange over `ur:` — Keystone (firmware, mobile app), MetaMask/Rabby, OneKey, and compatible consumers. Every codec is an `UrCodec` (see [typed](./typed.mdx)); the tags are not BCR-2020-006 `crypto-*` types but vendor UR-type tags. All codecs write their own dialect and read both dialects where two exist. The Rust counterpart is `bcur-registry`'s `interop` feature — see [interop](../rust/interop.mdx).
+
+```ts
+import { ethSignRequestCodec, toUr, fromUr, Ur } from "@qntx/ur/interop";
+
+const request = {
+  signData: rlpTx,
+  dataType: "transaction",
+  chainId: 1,
+  derivationPath: path, // Keypath — concrete, non-empty
+  origin: "MetaMask",
+};
+const ur = toUr(request, ethSignRequestCodec); // ur:eth-sign-request/…
+const back = fromUr(Ur.parse(ur.toString()), ethSignRequestCodec);
+```
+
+## Types
+
+| UR type                 | tag  | Codec                        | Value                        |
+| ----------------------- | ---- | ---------------------------- | ---------------------------- |
+| `crypto-multi-accounts` | 1103 | `cryptoMultiAccountsCodec`   | `MultiAccounts`              |
+| `eth-sign-request`      | 401  | `ethSignRequestCodec`        | `EthSignRequest`             |
+| `eth-signature`         | 402  | `ethSignatureCodec`          | `EthSignature`               |
+| `sol-sign-request`      | 1101 | `solSignRequestCodec`        | `SolSignRequest`             |
+| `sol-signature`         | 1102 | `solSignatureCodec`          | `SolSignature`               |
+| `tron-sign-request`     | 5101 | `tronSignRequestCodec`       | `TronSignRequest` (Keystone) |
+| `tron-sign-request`     | 5201 | `oneKeyTronSignRequestCodec` | `TronSignRequest` (OneKey)   |
+| `tron-signature`        | 5102 | `tronSignatureCodec`         | `TronSignature`              |
+
+All maps are closed — an unknown key is `CborType`. Request ids are `#6.37` UUIDs of exactly 16 bytes; derivation paths are `#6.304` keypaths with at least one component and only concrete `index` steps (read accepts tag 40304 too). `signData`/`signature` are non-empty; optional `address`, `origin`, `device`, `deviceId`, `version` normalize empty/`""` to absent on both directions.
+
+## Per-type invariants
+
+- **eth-sign-request** — `{1 uuid?, 2 signData, 3 dataType, 4 chainId?, 5 path, 6 address?, 7 origin?}`. `dataType` is `"transaction" | "typedData" | "personalMessage" | "typedTransaction"` (wire 1–4). `chainId` is an integer `1..=2^53-1` — zero, negative, non-integer, and larger values are rejected (`OutOfRange`), even though some vendor encoders emit a float for `2^53`. `address` is exactly 20 bytes.
+- **eth-signature** — `{1 uuid?, 2 signature, 3 origin?}`; `signature` is `r || s || v`, 65–72 bytes.
+- **sol-sign-request** — `{1 uuid?, 2 signData, 3 path, 4 address?, 5 origin?, 6 signType}`. `signType` is `"transaction" | "message" | "offchainMessageLegacy" | "offchainMessageStandard"` (wire 1–4; 3/4 are the OneKey off-chain message dialect). `address` is non-empty opaque bytes.
+- **sol-signature** — `{1 uuid?, 2 signature}`; `signature` is exactly 64 bytes.
+- **tron-sign-request** — two dialects under the same UR type name. `tronSignRequestCodec` writes the Keystone layout (tag 5101, key 3 = numeric `dataType`: transaction → 1, messageV2 → 2; `messageV1` is not representable and is rejected on encode **and** decode). `oneKeyTronSignRequestCodec` writes the OneKey `BaseSignRequest` layout (tag 5201, key 3 = tagged keypath, key 6 = `requestType`: transaction → 1, messageV1 → 2, messageV2 → 3) and accepts all three data types. **Both readers decode both layouts at the body level** — URs carry untagged bodies, detected by key 3's CBOR type (unsigned ⇒ Keystone, tagged ⇒ OneKey, anything else ⇒ `WrongType`) — while `fromTagged` accepts only each codec's own tag. Each codec owns exactly one tag so `codecMap` maps UR types unambiguously; because both tron codecs claim the `tron-sign-request` name they go in separate maps.
+- **tron-signature** — `{1 uuid?, 2 signature}`; `signature` is exactly 65 bytes.
+- **crypto-multi-accounts** — `{1 masterFingerprint (uint32, 0 allowed), 2 [#6.303 key]+, 3 device?, 4 deviceId?, 5 version?}`. A 33-byte `keyData` yields a secp256k1 `DerivedHdKey` encoded with the v1 presence rules (explicit `is-private: false`, nested 305/304 tags); a 32-byte `keyData` yields an `Ed25519HdKey`. A master key, a private key (`is-private: true`), or any other key length is `OutOfRange`. OneKey writes `4: h''` for the empty ed25519 chain code — read as absent, never written.
+
+## Counterpart compatibility
+
+| Counterpart                  | What it writes / reads                                                                              |
+| ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| Keystone firmware / app      | Keystone layouts everywhere; `tron-sign-request` tag 5101                                           |
+| MetaMask, Rabby              | `eth-sign-request` / `eth-signature` (chainId present for tx)                                       |
+| OneKey                       | Same layouts but `tron-sign-request` tag 5201 + `requestType`; SOL `signType` 3/4; ed25519 `4: h''` |
+| Rabby / OKX (OneKey connect) | read `crypto-multi-accounts` account exports                                                        |
+
+Note: tags 401/402 numerically collide with BCR script-expression tags; they are UR-type tags here and are never embedded inside interop bodies, so no global tag registration is added.

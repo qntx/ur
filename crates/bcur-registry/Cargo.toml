@@ -18,6 +18,10 @@ include = ["src/**/*", "README.md"]
 [package.metadata.docs.rs]
 all-features = true
 
+[features]
+# Vendor-interop codecs (`eth-*`, `sol-*`, `tron-*`, `crypto-multi-accounts`).
+interop = []
+
 [dependencies]
 # Must stay on the same dcbor release line as bcur's `dcbor` dependency —
 # otherwise bcur's `UrEncodable`/`UrDecodable` blanket impls do not apply to

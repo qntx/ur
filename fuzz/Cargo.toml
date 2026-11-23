@@ -13,6 +13,13 @@ libfuzzer-sys = "0.4"
 [dependencies.bcur]
 path = "../crates/bcur"
 
+[dependencies.bcur-registry]
+path     = "../crates/bcur-registry"
+features = ["interop"]
+
+[dependencies.dcbor]
+version = "0.25"
+
 # Isolated from the parent workspace so thumbv7m / just quality never see libFuzzer.
 [workspace]
 members = ["."]
@@ -48,6 +55,62 @@ bench = false
 [[bin]]
 name  = "fountain_decoder"
 path  = "fuzz_targets/fountain_decoder.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "registry_v1"
+path  = "fuzz_targets/registry_v1.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "interop_multi_accounts"
+path  = "fuzz_targets/interop_multi_accounts.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "interop_eth_sign_request"
+path  = "fuzz_targets/interop_eth_sign_request.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "interop_eth_signature"
+path  = "fuzz_targets/interop_eth_signature.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "interop_sol_sign_request"
+path  = "fuzz_targets/interop_sol_sign_request.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "interop_sol_signature"
+path  = "fuzz_targets/interop_sol_signature.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "interop_tron_sign_request"
+path  = "fuzz_targets/interop_tron_sign_request.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "interop_tron_signature"
+path  = "fuzz_targets/interop_tron_signature.rs"
 test  = false
 doc   = false
 bench = false

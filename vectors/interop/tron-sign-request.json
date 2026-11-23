@@ -1,0 +1,123 @@
+{
+  "schema": "interop-vector/v1",
+  "capability": "interop.tron-sign-request",
+  "source": {
+    "name": "interop tron-sign-request vectors: decode `inputCborHex` ?? `cborHex`, compare `value`, re-encode byte-identically to `cborHex`, emit `ur`",
+    "keystoneJs": "@keystonehq/bc-ur-registry-eth 0.23.0 / -sol 0.9.5 / -tron 0.5.0 + bc-ur-registry 0.8.1 (ISC/Apache-2.0)",
+    "keystoneRust": "ur-registry 1.0.9 (MIT) \u2014 oracle harness outside the repo",
+    "onekey": "OneKeyHQ/firmware-pro d9ad133 core/src/apps/ur_registry (read-only reference)"
+  },
+  "cases": [
+    {
+      "name": "tron-transaction-keystone",
+      "urType": "tron-sign-request",
+      "cborHex": "d913eda601d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02460a020db22208030104d90130a3018a182cf518c3f500f500f400f4021a73c5da0a03050555a1b2c3d4e5f6071829304142a3b4c5d6e7f8091a2b066854726f6e4c696e6b",
+      "codec": "tron-sign-request",
+      "ur": "ur:tron-sign-request/oladtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaofgbkaobtprcpayaxadaataaddyotadlecsdwykcssrykaeykaewkaewkaocyjksktnbkaxahahgooyprsrtyvwynatcsdtdyfpfwotqzsktbvdyaascydnamisghjpjljtgsinjtjedecheosa",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "0a020db22208",
+        "derivationPath": {
+          "components": "m/44'/195'/0'/0/0",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 5
+        },
+        "address": "a1b2c3d4e5f6071829304142a3b4c5d6e7f8091a2b",
+        "origin": "TronLink",
+        "dataType": "transaction"
+      },
+      "source": "Keystone JS (bc-ur-registry-*) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "tron-message-v2-keystone",
+      "urType": "tron-sign-request",
+      "cborHex": "d913eda3024c74726f6e206d657373616765030204d90130a3018a182cf518c3f500f500f400f4021a73c5da0a0305",
+      "codec": "tron-sign-request",
+      "ur": "ur:tron-sign-request/otaogsjyjpjljtcxjnihjkjkhsioihaxaoaataaddyotadlecsdwykcssrykaeykaewkaewkaocyjksktnbkaxahgtketlfr",
+      "value": {
+        "signData": "74726f6e206d657373616765",
+        "derivationPath": {
+          "components": "m/44'/195'/0'/0/0",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 5
+        },
+        "dataType": "messageV2"
+      },
+      "source": "Keystone JS (bc-ur-registry-*) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "tron-transaction-onekey",
+      "urType": "tron-sign-request",
+      "cborHex": "d91451a601d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02460a020db2220803d90130a3018a182cf518c3f500f500f400f4021a73c5da0a03050455a1b2c3d4e5f6071829304142a3b4c5d6e7f8091a2b05664f6e654b65790601",
+      "codec": "onekey-tron-sign-request",
+      "ur": "ur:tron-sign-request/oladtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaofgbkaobtprcpayaxtaaddyotadlecsdwykcssrykaeykaewkaewkaocyjksktnbkaxahaagooyprsrtyvwynatcsdtdyfpfwotqzsktbvdyaascydnahiygwjtihgrihkkamadfzsbidbw",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "0a020db22208",
+        "derivationPath": {
+          "components": "m/44'/195'/0'/0/0",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 5
+        },
+        "address": "a1b2c3d4e5f6071829304142a3b4c5d6e7f8091a2b",
+        "origin": "OneKey",
+        "dataType": "transaction"
+      },
+      "source": "verified against OneKey firmware-pro d9ad133 encoder (harness outside the repo, nothing vendored)"
+    },
+    {
+      "name": "tron-message-v1-onekey",
+      "urType": "tron-sign-request",
+      "cborHex": "d91451a401d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02466d736720763103d90130a3018a182cf518c3f500f500f400f4021a73c5da0a03050602",
+      "codec": "onekey-tron-sign-request",
+      "ur": "ur:tron-sign-request/oxadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaofgjnjkiocxkoehaxtaaddyotadlecsdwykcssrykaeykaewkaewkaocyjksktnbkaxahamaouototify",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "6d7367207631",
+        "derivationPath": {
+          "components": "m/44'/195'/0'/0/0",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 5
+        },
+        "dataType": "messageV1"
+      },
+      "source": "verified against OneKey firmware-pro d9ad133 encoder (harness outside the repo, nothing vendored)"
+    },
+    {
+      "name": "tron-message-v2-onekey",
+      "urType": "tron-sign-request",
+      "cborHex": "d91451a401d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02466d736720763203d90130a3018a182cf518c3f500f500f400f4021a73c5da0a03050603",
+      "codec": "onekey-tron-sign-request",
+      "ur": "ur:tron-sign-request/oxadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaofgjnjkiocxkoeyaxtaaddyotadlecsdwykcssrykaeykaewkaewkaocyjksktnbkaxahamaxwsissksg",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "6d7367207632",
+        "derivationPath": {
+          "components": "m/44'/195'/0'/0/0",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 5
+        },
+        "dataType": "messageV2"
+      },
+      "source": "verified against OneKey firmware-pro d9ad133 encoder (harness outside the repo, nothing vendored)"
+    },
+    {
+      "name": "vendor-tron-wallet-transaction",
+      "urType": "tron-sign-request",
+      "cborHex": "d913eda501d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d0258d40a0207902208e1b9de559665c6714080c49789bb2c5aae01081f12a9010a31747970652e676f6f676c65617069732e636f6d2f70726f746f636f6c2e54726967676572536d617274436f6e747261637412740a1541c79f045e4d48ad8dae00e6a6714dae1e000adfcd1215410d292c98a5eca06c2085fff993996423cf66c93b2244a9059cbb0000000000000000000000009bbce520d984c3b95ad10cb4e32a9294e6338da300000000000000000000000000000000000000000000000000000000000f424070c0b6e087bb2c90018094ebdc03030104d90130a2018a182cf518c3f500f500f400f4021a12121212066b74726f6e2077616c6c6574",
+      "codec": "tron-sign-request",
+      "ur": "ur:tron-sign-request/onadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohdtybkaoatmhcpayvyrhuegomtihswjsfzlassmsldrkdwhtpladayctbgptadbkehjykkjoihdmiojljliojzihhsjoinjkdmiajljndljojpjljyjliajljzdmghjpinioioihjpgujnhsjpjyfxjljtjyjphsiajybgjybkbzfpstneaahygtfdpmlgplaevaoljsgtplckaebkursnbgbzfpbtdtdwmkonwpnbjzcxlpzmytmunliecntkiysofrcpfyptahnsrkaeaeaeaeaeaeaeaeaeaeaeaendrfvwcxtalrsrrhhtttbnqzvldrmomwvaeolgotaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaebsfwfzjortrpvtltrkdwmhadlamwwmuoaxaxadaataaddyoeadlecsdwykcssrykaeykaewkaewkaocybgbgbgbgamjejyjpjljtcxkthsjzjzihjyrtlbluhd",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "0a0207902208e1b9de559665c6714080c49789bb2c5aae01081f12a9010a31747970652e676f6f676c65617069732e636f6d2f70726f746f636f6c2e54726967676572536d617274436f6e747261637412740a1541c79f045e4d48ad8dae00e6a6714dae1e000adfcd1215410d292c98a5eca06c2085fff993996423cf66c93b2244a9059cbb0000000000000000000000009bbce520d984c3b95ad10cb4e32a9294e6338da300000000000000000000000000000000000000000000000000000000000f424070c0b6e087bb2c90018094ebdc03",
+        "derivationPath": {
+          "components": "m/44'/195'/0'/0/0",
+          "sourceFingerprint": "12121212"
+        },
+        "origin": "tron wallet",
+        "dataType": "transaction"
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/tron/tron_sign_request.rs test_encode_binary"
+    }
+  ]
+}

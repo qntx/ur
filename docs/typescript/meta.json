@@ -1,4 +1,4 @@
 {
   "title": "TypeScript",
-  "pages": ["install", "transport", "typed", "registry"]
+  "pages": ["install", "transport", "typed", "registry", "interop"]
 }

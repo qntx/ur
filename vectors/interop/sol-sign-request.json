@@ -1,0 +1,132 @@
+{
+  "schema": "interop-vector/v1",
+  "capability": "interop.sol-sign-request",
+  "source": {
+    "name": "interop sol-sign-request vectors: decode `inputCborHex` ?? `cborHex`, compare `value`, re-encode byte-identically to `cborHex`, emit `ur`",
+    "keystoneJs": "@keystonehq/bc-ur-registry-eth 0.23.0 / -sol 0.9.5 / -tron 0.5.0 + bc-ur-registry 0.8.1 (ISC/Apache-2.0)",
+    "keystoneRust": "ur-registry 1.0.9 (MIT) \u2014 oracle harness outside the repo",
+    "onekey": "OneKeyHQ/firmware-pro d9ad133 core/src/apps/ur_registry (read-only reference)"
+  },
+  "cases": [
+    {
+      "name": "sol-transaction",
+      "urType": "sol-sign-request",
+      "cborHex": "d9044da601d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d0248010203040506070803d90130a30188182cf51901f5f500f500f5021a73c5da0a030404581fa1b2c3d4e5f6071829304142a3b4c5d6e7f8091a2b3c4d5e6f70819203a4b505684261636b7061636b0601",
+      "ur": "ur:sol-sign-request/oladtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaofdadaoaxaaahamatayaxtaaddyotadlocsdwykcfadykykaeykaeykaocyjksktnbkaxaaaahdctoyprsrtyvwynatcsdtdyfpfwotqzsktbvdyaascydnfngthyjljolymoaxoxreahisfwhsiajejohsiajeamadfdrtptrk",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "0102030405060708",
+        "derivationPath": {
+          "components": "m/44'/501'/0'/0'",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 4
+        },
+        "address": "a1b2c3d4e5f6071829304142a3b4c5d6e7f8091a2b3c4d5e6f70819203a4b5",
+        "origin": "Backpack",
+        "signType": "transaction"
+      },
+      "source": "Keystone JS (bc-ur-registry-*) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "sol-message",
+      "urType": "sol-sign-request",
+      "cborHex": "d9044da3024b736f6c206d65737361676503d90130a30188182cf51901f5f500f500f5021a73c5da0a03040602",
+      "ur": "ur:sol-sign-request/otaogrjkjljzcxjnihjkjkhsioihaxtaaddyotadlocsdwykcfadykykaeykaeykaocyjksktnbkaxaaamaoolvosgse",
+      "value": {
+        "signData": "736f6c206d657373616765",
+        "derivationPath": {
+          "components": "m/44'/501'/0'/0'",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 4
+        },
+        "signType": "message"
+      },
+      "source": "Keystone JS (bc-ur-registry-*) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "sol-offchain-legacy-onekey",
+      "urType": "sol-sign-request",
+      "cborHex": "d9044da401d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02486f6666636861696e03d90130a30188182cf51901f5f500f500f5021a73c5da0a03040603",
+      "ur": "ur:sol-sign-request/oxadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaofdjliyiyiaishsinjtaxtaaddyotadlocsdwykcfadykykaeykaeykaocyjksktnbkaxaaamaxioytynnb",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "6f6666636861696e",
+        "derivationPath": {
+          "components": "m/44'/501'/0'/0'",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 4
+        },
+        "signType": "offchainMessageLegacy"
+      },
+      "source": "verified against OneKey firmware-pro d9ad133 encoder (harness outside the repo, nothing vendored)"
+    },
+    {
+      "name": "sol-offchain-standard-onekey",
+      "urType": "sol-sign-request",
+      "cborHex": "d9044da401d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d024b6f6666636861696e20763203d90130a30188182cf51901f5f500f500f5021a73c5da0a03040604",
+      "ur": "ur:sol-sign-request/oxadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaogrjliyiyiaishsinjtcxkoeyaxtaaddyotadlocsdwykcfadykykaeykaeykaocyjksktnbkaxaaamaaahwzdkrn",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "6f6666636861696e207632",
+        "derivationPath": {
+          "components": "m/44'/501'/0'/0'",
+          "sourceFingerprint": "73c5da0a",
+          "depth": 4
+        },
+        "signType": "offchainMessageStandard"
+      },
+      "source": "verified against OneKey firmware-pro d9ad133 encoder (harness outside the repo, nothing vendored)"
+    },
+    {
+      "name": "vendor-solflare-transaction",
+      "urType": "sol-sign-request",
+      "cborHex": "d9044da501d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02589601000103c8d842a2f17fd7aab608ce2ea535a6e958dffa20caf669b347b911c4171965530f957620b228bae2b94c82ddd4c093983a67365555b737ec7ddc1117e61c72e0000000000000000000000000000000000000000000000000000000000000000010295cc2f1f39f3604718496ea00676d6a72ec66ad09d926e3ece34f565f18d201020200010c0200000000e1f5050000000003d90130a20188182cf51901f5f500f500f5021a123456780568736f6c666c6172650601",
+      "ur": "ur:sol-sign-request/onadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohdmtadaeadaxsptpfwoewnlbtspkrpaytodmonecolwlhdurzscxsgyninqdflrhbysschcfihgubsmdkocxprderdvorhgslfuttyrtmumkftioengogorlemwpkiuobychvacejpvtaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaebedthhsawnwfneenaajslrmtwdaeiojnimjpwpiypmastadsvlwpvlgwhfhecstdadaoaoaeadbnaoaeaeaeaevyykahaeaeaeaeaxtaaddyoeadlocsdwykcfadykykaeykaeykaocybgeehfksahisjkjljziyjzhsjpihamadkkgseofg",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "01000103c8d842a2f17fd7aab608ce2ea535a6e958dffa20caf669b347b911c4171965530f957620b228bae2b94c82ddd4c093983a67365555b737ec7ddc1117e61c72e0000000000000000000000000000000000000000000000000000000000000000010295cc2f1f39f3604718496ea00676d6a72ec66ad09d926e3ece34f565f18d201020200010c0200000000e1f50500000000",
+        "derivationPath": {
+          "components": "m/44'/501'/0'/0'",
+          "sourceFingerprint": "12345678"
+        },
+        "origin": "solflare",
+        "signType": "transaction"
+      },
+      "source": "asserted literal: keystone-sdk-base@029aeedb2602611cf85ca177320a0c92cf70a13c packages/ur-registry-sol/__tests__/SolSignRequest.test.ts"
+    },
+    {
+      "name": "vendor-solflare-message",
+      "urType": "sol-sign-request",
+      "cborHex": "d9044da501d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02589601000103c8d842a2f17fd7aab608ce2ea535a6e958dffa20caf669b347b911c4171965530f957620b228bae2b94c82ddd4c093983a67365555b737ec7ddc1117e61c72e0000000000000000000000000000000000000000000000000000000000000000010295cc2f1f39f3604718496ea00676d6a72ec66ad09d926e3ece34f565f18d201020200010c0200000000e1f5050000000003d90130a20188182cf51901f5f500f500f5021a123456780568736f6c666c6172650602",
+      "ur": "ur:sol-sign-request/onadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohdmtadaeadaxsptpfwoewnlbtspkrpaytodmonecolwlhdurzscxsgyninqdflrhbysschcfihgubsmdkocxprderdvorhgslfuttyrtmumkftioengogorlemwpkiuobychvacejpvtaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaebedthhsawnwfneenaajslrmtwdaeiojnimjpwpiypmastadsvlwpvlgwhfhecstdadaoaoaeadbnaoaeaeaeaevyykahaeaeaeaeaxtaaddyoeadlocsdwykcfadykykaeykaeykaocybgeehfksahisjkjljziyjzhsjpihamaovtfeidzt",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "01000103c8d842a2f17fd7aab608ce2ea535a6e958dffa20caf669b347b911c4171965530f957620b228bae2b94c82ddd4c093983a67365555b737ec7ddc1117e61c72e0000000000000000000000000000000000000000000000000000000000000000010295cc2f1f39f3604718496ea00676d6a72ec66ad09d926e3ece34f565f18d201020200010c0200000000e1f50500000000",
+        "derivationPath": {
+          "components": "m/44'/501'/0'/0'",
+          "sourceFingerprint": "12345678"
+        },
+        "origin": "solflare",
+        "signType": "message"
+      },
+      "source": "asserted literal: keystone-sdk-base@029aeedb2602611cf85ca177320a0c92cf70a13c packages/ur-registry-sol/__tests__/SolSignRequest.test.ts"
+    },
+    {
+      "name": "vendor-fp-12121212-transaction",
+      "urType": "sol-sign-request",
+      "cborHex": "d9044da501d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02589601000103c8d842a2f17fd7aab608ce2ea535a6e958dffa20caf669b347b911c4171965530f957620b228bae2b94c82ddd4c093983a67365555b737ec7ddc1117e61c72e0000000000000000000000000000000000000000000000000000000000000000010295cc2f1f39f3604718496ea00676d6a72ec66ad09d926e3ece34f565f18d201020200010c0200000000e1f5050000000003d90130a20188182cf51901f5f500f500f5021a121212120568736f6c666c6172650601",
+      "ur": "ur:sol-sign-request/onadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohdmtadaeadaxsptpfwoewnlbtspkrpaytodmonecolwlhdurzscxsgyninqdflrhbysschcfihgubsmdkocxprderdvorhgslfuttyrtmumkftioengogorlemwpkiuobychvacejpvtaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaebedthhsawnwfneenaajslrmtwdaeiojnimjpwpiypmastadsvlwpvlgwhfhecstdadaoaoaeadbnaoaeaeaeaevyykahaeaeaeaeaxtaaddyoeadlocsdwykcfadykykaeykaeykaocybgbgbgbgahisjkjljziyjzhsjpihamadrssgcaro",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "01000103c8d842a2f17fd7aab608ce2ea535a6e958dffa20caf669b347b911c4171965530f957620b228bae2b94c82ddd4c093983a67365555b737ec7ddc1117e61c72e0000000000000000000000000000000000000000000000000000000000000000010295cc2f1f39f3604718496ea00676d6a72ec66ad09d926e3ece34f565f18d201020200010c0200000000e1f50500000000",
+        "derivationPath": {
+          "components": "m/44'/501'/0'/0'",
+          "sourceFingerprint": "12121212"
+        },
+        "origin": "solflare",
+        "signType": "transaction"
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/solana/sol_sign_request.rs"
+    }
+  ]
+}

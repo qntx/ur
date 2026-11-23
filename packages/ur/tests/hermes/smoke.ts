@@ -7,6 +7,8 @@ import {
   parseUr,
   parseUrType,
 } from "../../src/index.ts";
+import { cryptoMultiAccountsCodec, ethSignRequestCodec } from "../../src/interop/index.ts";
+import type { Keypath } from "../../src/registry/index.ts";
 import {
   Ur,
   fromUr,
@@ -147,4 +149,48 @@ export function main(): void {
   eq(od.source, "pkh(@0)", "output-descriptor source");
   eq(od.keys.length, 1, "output-descriptor key count");
   eq(od.name, "hermes od", "output-descriptor name text decode");
+
+  // Interop path: eth-sign-request round trip with an origin text field.
+  const signData = hexToBytes("f8aa80843b9aca00");
+  const ethPath: Keypath = {
+    components: [
+      { kind: "index", index: 44, hardened: true },
+      { kind: "index", index: 60, hardened: true },
+      { kind: "index", index: 0, hardened: true },
+      { kind: "index", index: 0, hardened: false },
+      { kind: "index", index: 0, hardened: false },
+    ],
+    sourceFingerprint: 0x73c5da0a,
+    depth: 5,
+  };
+  const ethUri = toUr(
+    {
+      requestId: hexToBytes("9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"),
+      signData,
+      dataType: "transaction",
+      chainId: 1,
+      derivationPath: ethPath,
+      origin: "MetaMask",
+    },
+    ethSignRequestCodec,
+  ).toString();
+  assert(ethUri.startsWith("ur:eth-sign-request/"), "eth-sign-request ur type");
+  const ethReq = fromUr(Ur.parse(ethUri), ethSignRequestCodec);
+  eq(ethReq.dataType, "transaction", "eth dataType");
+  eq(ethReq.chainId, 1, "eth chainId");
+  eq(ethReq.origin, "MetaMask", "eth origin text decode");
+  eq(bytesToHex(ethReq.signData), bytesToHex(signData), "eth signData round trip");
+
+  // Interop path: multi-accounts decode with an ed25519 key (32-byte key
+  // data, `4: h''` empty chain-code field — the OneKey quirk, read as absent).
+  const ma = fromUr(
+    Ur.parse(
+      "ur:crypto-multi-accounts/otadcyjksktnbkaolytaaddlonaowkaxhdcxsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfsfahtaadehoeadcfadykaoaeamtaaddyoeadlocsdwykcfadykykaeykaeykaxaaasisgrihkkjkjyjljtihaximgwjtihgrihkkcxgdjpjlmhfmmwhd",
+    ),
+    cryptoMultiAccountsCodec,
+  );
+  eq(ma.keys.length, 1, "multi-accounts key count");
+  const maKey = must(ma.keys[0]);
+  eq(maKey.curve, "ed25519", "multi-accounts ed25519 curve");
+  eq(maKey.key.keyData.length, 32, "multi-accounts ed25519 key length");
 }

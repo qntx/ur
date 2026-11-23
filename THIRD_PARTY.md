@@ -541,6 +541,7 @@ Only test-vector data is adopted; no source modules are vendored. The npm packag
 - License: MIT
 - Used by:
   - `vectors/registry/v1-writers.json` — reference for the v1 `crypto-hdkey` presence rules the writers reproduce
+  - `vectors/interop/*.json` — `vendor-*` cases adopted from `libs/ur-registry` in-source test literals (ethereum/solana/tron/extend modules)
 
 Only test-vector data is adopted; no source modules are vendored.
 
@@ -556,6 +557,48 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+## KeystoneHQ keystone-sdk-base (bc-ur-registry-* chain packages)
+
+- Repository: <https://github.com/KeystoneHQ/keystone-sdk-base>
+- npm packages used as dev-oracles: `@keystonehq/bc-ur-registry-eth` 0.23.0, `@keystonehq/bc-ur-registry-sol` 0.9.5, `@keystonehq/bc-ur-registry-tron` 0.5.0
+- License: ISC
+- Used by:
+  - `vectors/interop/*.json` — per-case `source` fields mark cases whose bytes equal the packages' `toCBOR()` output; `vendor-*` cases also adopt the packages' `__tests__` asserted UR literals
+  - `vectors/registry/v1-writers.json` — the `CryptoHDKey.test.ts` literal pinned as a `crypto-hdkey` case
+  - `packages/ur/tests/interop/keystone-differential.test.ts` — byte-exact differential oracle and MetaMask signer-flow cross-check
+  - `packages/ur/scripts/vectors/generate-interop.ts` — generator-side byte-equality check
+
+The packages are devDependencies used as test oracles, not runtime dependencies; no source modules are vendored.
+
+```text
+ISC License
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+```
+
+## OneKey firmware-pro
+
+- Repository: <https://github.com/OneKeyHQ/firmware-pro>
+- Commit: `d9ad133c9ffe8502ba72459bc764e4e1e5acc3a2`
+- Used by:
+  - `vectors/interop/*.json` — the `sol-offchain-*`, `tron-*-onekey` and
+    `onekey-ed25519-empty-chaincode` cases were verified byte-identical against
+    the deployed MicroPython encoders (`core/src/apps/ur_registry/`) via an
+    external harness living outside this repository
+
+No source code is vendored; the OneKey checkout is read only as an external
+encoder oracle.
+
 ## Keystone3 firmware
 
 - Repository: <https://github.com/KeystoneHQ/keystone3-firmware>
@@ -563,6 +606,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - License: MIT
 - Used by:
   - `vectors/registry/v1-writers.json` — the firmware `metamask.rs` `generate_standard_legacy_hd_key` shape (explicit `is-private: false`, use-info `{1: 60, 2: 0}`) pinned as a `crypto-hdkey` writer case
+  - `vectors/interop/multi-accounts.json` — the `keystone_connect.rs` 14-key (v1.1.0) and 16-key (v1.7.0) `crypto-multi-accounts` goldens
+  - `vectors/registry/invalid.json` + `vectors/registry/v1-encode-invalid.json` — the `metamask.rs` `test_ledger_live` crypto-account golden (bare `#6.303` entries) pinned as a rejection case
 
 Only test-vector data is adopted; no source modules are vendored.
 

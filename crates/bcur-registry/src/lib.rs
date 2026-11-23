@@ -25,6 +25,12 @@
 //!
 //! CBOR diagnostic names for all 31 registry tags (v2, v1, and script
 //! expressions) can be registered via [`register_tags`].
+//!
+//! The `interop` cargo feature (default off) adds `bcur_registry::interop`:
+//! the deployed wallet-extension codecs `eth-*`, `sol-*`, `tron-*` and
+//! `crypto-multi-accounts` (Keystone, `OneKey`, ERC-4527), including both
+//! TRON dialects — `TronSignRequest` writes the Keystone layout under tag
+//! `5101`, `OneKeyTronSignRequest` the `OneKey` layout under `5201`.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -45,6 +51,8 @@ mod script;
 mod seed;
 mod sskr;
 
+#[cfg(feature = "interop")]
+pub mod interop;
 pub mod tags;
 pub mod v1;
 

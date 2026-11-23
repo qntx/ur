@@ -6,6 +6,12 @@
 
 - `@qntx/ur`: opt-in v1 writer codecs `cryptoPsbtCodec`, `cryptoHdKeyCodec`, `cryptoKeypathCodec`, `cryptoCoinInfoCodec`, `cryptoOutputCodec`, and `cryptoAccountCodec` emit the deprecated BCR-2020-006 `crypto-*` wire forms while the default codecs keep writing v2. Writes are presence-preserving (`coin-info` `type`/`network` and derived-`hdkey` `is-private` are written iff set, `0`/`false` included), nested use-info/keypaths carry the v1 tags 305/304, `crypto-output` renders a BCR-2020-010 script-expression tree, and `crypto-account` writes `{1: mfp, 2: [bare script trees]}` — the KeystoneHQ spelling. `name`/`note` and sources outside the write grammar are rejected on encode and decode.
 - `bcur-registry`: matching `v1` module newtypes `CryptoPsbt`, `CryptoHdKey`, `CryptoKeypath`, `CryptoCoinInfo`, `CryptoOutput`, and `CryptoAccount` (validated via `TryFrom`) with the same wire rules.
+- `@qntx/ur`: new `@qntx/ur/interop` subpath with the wallet-interop codecs deployed consumers exchange: `ethSignRequestCodec`/`ethSignatureCodec`, `solSignRequestCodec`/`solSignatureCodec`, `tronSignRequestCodec`/`tronSignatureCodec` plus `oneKeyTronSignRequestCodec` for the OneKey `tron-sign-request` dialect (both readers decode both layouts), and `cryptoMultiAccountsCodec` for `ur:crypto-multi-accounts` with secp256k1 and ed25519 keys. Validated byte-identically against Keystone JS (`bc-ur-registry-eth`/`sol`/`tron`), the Keystone Rust `ur-registry` crate, and the OneKey firmware encoders.
+- `bcur-registry`: matching `interop` cargo feature (default off) with `EthSignRequest`/`EthSignature`, `SolSignRequest`/`SolSignature`, `TronSignRequest`/`OneKeyTronSignRequest`/`TronSignature`, `MultiAccounts`/`MultiAccountsKey`/`Ed25519Key`, and the small validated value types `RequestId`/`ChainId`/`EthDataType`/`SolSignType`/`TronDataType`.
+
+### Changed
+
+- `@qntx/ur`: the `@blockchaincommons/dcbor` peer/dev pin moves from `1.0.0-beta.3` to `1.0.0-beta.5` — beta.3's published `postinstall` script required Bun in consumer installs; beta.5 moved it to `prepare`. Runtime dist is unchanged.
 
 ### Breaking
 

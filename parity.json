@@ -539,6 +539,139 @@
       "vectors": ["vectors/registry/v1-writers.json", "vectors/registry/v1-encode-invalid.json"]
     },
     {
+      "id": "interop.multi-accounts",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R5",
+      "ts": {
+        "module": "packages/ur/src/interop/index.ts",
+        "tests": [
+          "packages/ur/tests/interop/vectors.test.ts",
+          "packages/ur/tests/interop/invalid.test.ts",
+          "packages/ur/tests/interop/keystone-differential.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur-registry/src/interop/mod.rs",
+        "tests": ["crates/bcur-registry/tests/interop.rs"]
+      },
+      "vectors": ["vectors/interop/multi-accounts.json", "vectors/interop/invalid.json"]
+    },
+    {
+      "id": "interop.eth-sign-request",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R5",
+      "ts": {
+        "module": "packages/ur/src/interop/index.ts",
+        "tests": [
+          "packages/ur/tests/interop/vectors.test.ts",
+          "packages/ur/tests/interop/invalid.test.ts",
+          "packages/ur/tests/interop/keystone-differential.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur-registry/src/interop/mod.rs",
+        "tests": ["crates/bcur-registry/tests/interop.rs"]
+      },
+      "vectors": ["vectors/interop/eth-sign-request.json", "vectors/interop/invalid.json"]
+    },
+    {
+      "id": "interop.eth-signature",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R5",
+      "ts": {
+        "module": "packages/ur/src/interop/index.ts",
+        "tests": [
+          "packages/ur/tests/interop/vectors.test.ts",
+          "packages/ur/tests/interop/invalid.test.ts",
+          "packages/ur/tests/interop/keystone-differential.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur-registry/src/interop/mod.rs",
+        "tests": ["crates/bcur-registry/tests/interop.rs"]
+      },
+      "vectors": ["vectors/interop/eth-signature.json", "vectors/interop/invalid.json"]
+    },
+    {
+      "id": "interop.sol-sign-request",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R5",
+      "ts": {
+        "module": "packages/ur/src/interop/index.ts",
+        "tests": [
+          "packages/ur/tests/interop/vectors.test.ts",
+          "packages/ur/tests/interop/invalid.test.ts",
+          "packages/ur/tests/interop/keystone-differential.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur-registry/src/interop/mod.rs",
+        "tests": ["crates/bcur-registry/tests/interop.rs"]
+      },
+      "vectors": ["vectors/interop/sol-sign-request.json", "vectors/interop/invalid.json"]
+    },
+    {
+      "id": "interop.sol-signature",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R5",
+      "ts": {
+        "module": "packages/ur/src/interop/index.ts",
+        "tests": [
+          "packages/ur/tests/interop/vectors.test.ts",
+          "packages/ur/tests/interop/invalid.test.ts",
+          "packages/ur/tests/interop/keystone-differential.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur-registry/src/interop/mod.rs",
+        "tests": ["crates/bcur-registry/tests/interop.rs"]
+      },
+      "vectors": ["vectors/interop/sol-signature.json", "vectors/interop/invalid.json"]
+    },
+    {
+      "id": "interop.tron-sign-request",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R5",
+      "ts": {
+        "module": "packages/ur/src/interop/index.ts",
+        "tests": [
+          "packages/ur/tests/interop/vectors.test.ts",
+          "packages/ur/tests/interop/invalid.test.ts",
+          "packages/ur/tests/interop/keystone-differential.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur-registry/src/interop/mod.rs",
+        "tests": ["crates/bcur-registry/tests/interop.rs"]
+      },
+      "vectors": ["vectors/interop/tron-sign-request.json", "vectors/interop/invalid.json"]
+    },
+    {
+      "id": "interop.tron-signature",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R5",
+      "ts": {
+        "module": "packages/ur/src/interop/index.ts",
+        "tests": [
+          "packages/ur/tests/interop/vectors.test.ts",
+          "packages/ur/tests/interop/invalid.test.ts",
+          "packages/ur/tests/interop/keystone-differential.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur-registry/src/interop/mod.rs",
+        "tests": ["crates/bcur-registry/tests/interop.rs"]
+      },
+      "vectors": ["vectors/interop/tron-signature.json", "vectors/interop/invalid.json"]
+    },
+    {
       "id": "bytewords.identifier",
       "tier": "A",
       "status": "stable",
