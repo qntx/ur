@@ -24,6 +24,9 @@ const back = fromUr(Ur.parse(ur.toString()), ethSignRequestCodec);
 | UR type                 | tag  | Codec                        | Value                        |
 | ----------------------- | ---- | ---------------------------- | ---------------------------- |
 | `crypto-multi-accounts` | 1103 | `cryptoMultiAccountsCodec`   | `MultiAccounts`              |
+| `btc-sign-request`      | 8101 | `btcSignRequestCodec`        | `BtcSignRequest`             |
+| `btc-signature`         | 8102 | `btcSignatureCodec`          | `BtcSignature`               |
+| `qr-hardware-call`      | 1201 | `qrHardwareCallCodec`        | `QrHardwareCall`             |
 | `eth-sign-request`      | 401  | `ethSignRequestCodec`        | `EthSignRequest`             |
 | `eth-signature`         | 402  | `ethSignatureCodec`          | `EthSignature`               |
 | `sol-sign-request`      | 1101 | `solSignRequestCodec`        | `SolSignRequest`             |
@@ -36,6 +39,9 @@ All maps are closed — an unknown key is `CborType`. Request ids are `#6.37` UU
 
 ## Per-type invariants
 
+- **btc-sign-request** — `{1 uuid, 2 signData, 3 dataType, 4 paths+, 5 addresses?, 6 origin?}`. Unlike the rest of the family, `requestId` is **required** — both vendor encoders always write it and the JS reader dereferences key 1 unconditionally. `dataType` is `"message"` (wire 1). `signData` and `derivationPaths` are non-empty; `addresses`, when present, is a non-empty array of non-empty text.
+- **btc-signature** — `{1 uuid, 2 signature, 3 publicKey}`; `requestId` is required. `signature` is exactly 65 bytes (compressed header ‖ r ‖ s) and `publicKey` exactly 33 bytes — the lengths are checked, the header/prefix semantics are not.
+- **qr-hardware-call** — `{1 callType, 2 params, 3 origin?, 4 version?}`. Only `callType` 0 (`keyDerivation`, params `#6.1301` `{1: [#6.1302 schema]+}`) is representable; call type 1 (derive-context-hash, params `#6.1303`) is rejected. A schema is `{1 keyPath, 2 curve?, 3 algorithm?, 4 chainType?}` with `curve` `"secp256k1" | "ed25519"` (wire 0/1) and `algorithm` `"slip10" | "bip32Ed25519"` (wire 0/1). `version` (0/1), `curve`, and `algorithm` are **presence-preserving** — absent on the wire decodes to `undefined`, not a default (the JS dialect omits `version` unless V1; the Rust dialect always writes it).
 - **eth-sign-request** — `{1 uuid?, 2 signData, 3 dataType, 4 chainId?, 5 path, 6 address?, 7 origin?}`. `dataType` is `"transaction" | "typedData" | "personalMessage" | "typedTransaction"` (wire 1–4). `chainId` is an integer `1..=2^53-1` — zero, negative, non-integer, and larger values are rejected (`OutOfRange`), even though some vendor encoders emit a float for `2^53`. `address` is exactly 20 bytes.
 - **eth-signature** — `{1 uuid?, 2 signature, 3 origin?}`; `signature` is `r || s || v`, 65–72 bytes.
 - **sol-sign-request** — `{1 uuid?, 2 signData, 3 path, 4 address?, 5 origin?, 6 signType}`. `signType` is `"transaction" | "message" | "offchainMessageLegacy" | "offchainMessageStandard"` (wire 1–4; 3/4 are the OneKey off-chain message dialect). `address` is non-empty opaque bytes.
@@ -49,8 +55,11 @@ All maps are closed — an unknown key is `CborType`. Request ids are `#6.37` UU
 | Counterpart                  | What it writes / reads                                                                              |
 | ---------------------------- | --------------------------------------------------------------------------------------------------- |
 | Keystone firmware / app      | Keystone layouts everywhere; `tron-sign-request` tag 5101                                           |
+| Keystone 3 Pro firmware      | `btc-sign-request`/`btc-signature`, `qr-hardware-call`; see the firmware note below                 |
 | MetaMask, Rabby              | `eth-sign-request` / `eth-signature` (chainId present for tx)                                       |
 | OneKey                       | Same layouts but `tron-sign-request` tag 5201 + `requestType`; SOL `signType` 3/4; ed25519 `4: h''` |
 | Rabby / OKX (OneKey connect) | read `crypto-multi-accounts` account exports                                                        |
 
 Note: tags 401/402 numerically collide with BCR script-expression tags; they are UR-type tags here and are never embedded inside interop bodies, so no global tag registration is added.
+
+Keystone 3 Pro firmware applies two policies **on top of** the wire form (the codecs do not enforce them): it signs/displays only `derivationPaths[0]` of a `btc-sign-request` and requires that path's source fingerprint to equal the device master fingerprint, and it accepts at most 24 `qr-hardware-call` schemas whose paths must start with `m/44'/0'`, `m/49'`, `m/84'`, `m/86'`, or one of a fixed list of `m/44'/coin-type'` prefixes (`rust/rust_c/src/wallet/mod.rs`).

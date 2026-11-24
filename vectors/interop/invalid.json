@@ -1,6 +1,6 @@
 {
   "schema": "interop-invalid/v1",
-  "capability": "interop.* (all seven decoders)",
+  "capability": "interop.* (all ten decoders)",
   "source": {
     "name": "malformed untagged bodies: `codec`.decode(inputCborHex) must throw `tsError` (a CborError code)"
   },
@@ -323,6 +323,344 @@
       "codec": "crypto-multi-accounts",
       "inputCborHex": "a2011a73c5da0a0281d9012fa20358200000000000000000000000000000000000000000000000000000000000000000045000000000000000000000000000000000",
       "tsError": "OutOfRange"
+    },
+    {
+      "name": "unknown key",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a501d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a30184182cf5183cf5021a73c5da0a03040700",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "text key",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a501d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a30184182cf5183cf5021a73c5da0a0304617800",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "missing requestId",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a3024301020303010481d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "requestId untagged",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "requestId tag 38",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d826509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongTag"
+    },
+    {
+      "name": "requestId 15 bytes",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d8254f000000000000000000000000000000024301020303010481d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "empty signData",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024003010481d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "signData text",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b02617803010481d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "missing signData",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a301d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b03010481d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "dataType 0",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303000481d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "dataType 2",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303020481d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "missing dataType",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a301d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b02430102030481d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "derivationPaths empty",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010480",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "derivationPaths not array",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b0243010203030104d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "derivationPath untagged",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481a3018200f4021a73c5da0a0302",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "derivationPath tag 303",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d9012fa3018200f4021a73c5da0a0302",
+      "tsError": "WrongTag"
+    },
+    {
+      "name": "derivationPath wildcard",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a3018180021a73c5da0a0301",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "derivationPath wildcard component",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a3018280f4021a73c5da0a0302",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "derivationPath range",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a30182820003f4021a73c5da0a0302",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "derivationPath pair",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a301818400f401f4021a73c5da0a0301",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "derivationPath zero components",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a20180021a73c5da0a",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "addresses empty",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a501d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a30184182cf5183cf5021a73c5da0a03040580",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "addresses empty string",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a501d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a30184182cf5183cf5021a73c5da0a0304058160",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "addresses bytes",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a501d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a30184182cf5183cf5021a73c5da0a030405814101",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "addresses text",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a501d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a30184182cf5183cf5021a73c5da0a0304056178",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "origin uint",
+      "codec": "btc-sign-request",
+      "inputCborHex": "a501d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b024301020303010481d90130a30184182cf5183cf5021a73c5da0a03040600",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "missing requestId",
+      "codec": "btc-signature",
+      "inputCborHex": "a20258411f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f035821020202020202020202020202020202020202020202020202020202020202020202",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "missing signature",
+      "codec": "btc-signature",
+      "inputCborHex": "a201d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b035821020202020202020202020202020202020202020202020202020202020202020202",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "missing publicKey",
+      "codec": "btc-signature",
+      "inputCborHex": "a201d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b0258411f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "signature 64 bytes",
+      "codec": "btc-signature",
+      "inputCborHex": "a301d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b02584000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000035821020202020202020202020202020202020202020202020202020202020202020202",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "signature 66 bytes",
+      "codec": "btc-signature",
+      "inputCborHex": "a301d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b025842000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000035821020202020202020202020202020202020202020202020202020202020202020202",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "publicKey 32 bytes",
+      "codec": "btc-signature",
+      "inputCborHex": "a301d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b0258411f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f0358200000000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "publicKey 65 bytes",
+      "codec": "btc-signature",
+      "inputCborHex": "a301d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b0258411f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f0358410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "unknown key",
+      "codec": "btc-signature",
+      "inputCborHex": "a401d825509b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b0258411f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f0358210202020202020202020202020202020202020202020202020202020202020202020400",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "vendor 64-byte signature and 32-byte publicKey",
+      "codec": "btc-signature",
+      "inputCborHex": "a301d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02584047e7b510784406dfa14d9fd13c3834128b49c56ddfc28edb02c5047219779adeed12017e2f9f116e83762e86f805c7311ea88fb403ff21900e069142b1fb310e0358208e53e7b10656816de70824e3016fc1a277e77825e12825dc4f239f418ab2e04e",
+      "tsError": "OutOfRange",
+      "source": "asserted literal: keystone-sdk-base@029aeedb2602611cf85ca177320a0c92cf70a13c packages/ur-registry-btc/__test__/BtcSignature.test.ts (vendor signs 64B sig / 32B key; our contract requires 65B / 33B)"
+    },
+    {
+      "name": "missing callType",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a102d90515a10181d90516a101d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "callType derive-context-hash",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a4010102d90517a40171626162796c6f6e2d6274632d7661756c74026f626974636f696e2d6d61696e6e657403d90130a1018a182cf500f500f500f400f4046864656164626565660367626162796c6f6e0401",
+      "tsError": "OutOfRange",
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/extend/qr_hardware_call.rs test_derive_context_hash_call_roundtrip (call type 1 is out of scope)"
+    },
+    {
+      "name": "callType 2",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010202d90515a10181d90516a101d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "params tag 1303",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90517a10181d90516a101d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongTag"
+    },
+    {
+      "name": "params untagged",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002a10181d90516a101d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "missing params",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a10100",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "version 2",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a3010002d90515a10181d90516a101d90130a30184182cf5183cf5021a73c5da0a03040402",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "unknown key",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a3010002d90515a10181d90516a101d90130a30184182cf5183cf5021a73c5da0a03040500",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "origin uint",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a3010002d90515a10181d90516a101d90130a30184182cf5183cf5021a73c5da0a03040300",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "call unknown key",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a20181d90516a101d90130a30184182cf5183cf5021a73c5da0a03040200",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "schemas empty",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a10180",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "schemas missing",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a0",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "schema untagged",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a10181a101d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "schema tag 1301",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a10181d90515a101d90130a30184182cf5183cf5021a73c5da0a0304",
+      "tsError": "WrongTag"
+    },
+    {
+      "name": "schema missing keyPath",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a10181d90516a10200",
+      "tsError": "MissingMapKey"
+    },
+    {
+      "name": "curve 2",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a10181d90516a201d90130a30184182cf5183cf5021a73c5da0a03040202",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "algorithm 2",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a10181d90516a201d90130a30184182cf5183cf5021a73c5da0a03040302",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "schema unknown key",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a10181d90516a201d90130a30184182cf5183cf5021a73c5da0a03040500",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "schema wildcard path",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a10181d90516a101d90130a3018180021a73c5da0a0301",
+      "tsError": "WrongType"
+    },
+    {
+      "name": "schema wildcard-component path",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a10181d90516a101d90130a3018280f4021a73c5da0a0302",
+      "tsError": "OutOfRange"
+    },
+    {
+      "name": "chainType uint",
+      "codec": "qr-hardware-call",
+      "inputCborHex": "a2010002d90515a10181d90516a201d90130a30184182cf5183cf5021a73c5da0a03040400",
+      "tsError": "WrongType"
     }
   ]
 }

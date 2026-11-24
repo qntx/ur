@@ -1,0 +1,425 @@
+{
+  "schema": "interop-vector/v1",
+  "capability": "interop.qr-hardware-call",
+  "source": {
+    "name": "interop qr-hardware-call vectors: decode `inputCborHex` ?? `cborHex`, compare `value`, re-encode byte-identically to `cborHex`, emit `ur`",
+    "keystoneJs": "@keystonehq/bc-ur-registry 0.8.1",
+    "keystoneRust": "ur-registry 1.0.9 (MIT) — oracle harness outside the repo"
+  },
+  "cases": [
+    {
+      "name": "keystone-js-default-schemas",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a2010002d90515a10182d90516a301d90130a10186182cf500f500f502000300d90516a301d90130a1018a182cf51901f5f500f500f500f502010300",
+      "ur": "ur:qr-hardware-call/oeadaeaotaahbzoyadlftaahcmotadtaaddyoyadlncsdwykaeykaeykaoaeaxaetaahcmotadtaaddyoyadlecsdwykcfadykykaeykaeykaeykaoadaxaeckahjksa",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/44'/0'/0'"
+              },
+              "curve": "secp256k1",
+              "algorithm": "slip10"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'/0'/0'"
+              },
+              "curve": "ed25519",
+              "algorithm": "slip10"
+            }
+          ]
+        }
+      },
+      "source": "Keystone JS (@keystonehq/bc-ur-registry 0.8.1) oracle bytes identical"
+    },
+    {
+      "name": "wallet-connect-btc-eth-sol",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a3010002d90515a10183d90516a301d90130a201861854f500f500f5021a73c5da0a02000300d90516a301d90130a20186182cf5183cf500f5021a73c5da0a02000300d90516a301d90130a20186182cf51901f5f500f5021a73c5da0a02010300036b514e54582057616c6c6574",
+      "ur": "ur:qr-hardware-call/otadaeaotaahbzoyadlstaahcmotadtaaddyoeadlncsghykaeykaeykaocyjksktnbkaoaeaxaetaahcmotadtaaddyoeadlncsdwykcsfnykaeykaocyjksktnbkaoaeaxaetaahcmotadtaaddyoeadlncsdwykcfadykykaeykaocyjksktnbkaoadaxaeaxjegyglghhdcxhghsjzjzihjyfgiypmkb",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/84'/0'/0'",
+                "sourceFingerprint": "73c5da0a"
+              },
+              "curve": "secp256k1",
+              "algorithm": "slip10"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/60'/0'",
+                "sourceFingerprint": "73c5da0a"
+              },
+              "curve": "secp256k1",
+              "algorithm": "slip10"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'",
+                "sourceFingerprint": "73c5da0a"
+              },
+              "curve": "ed25519",
+              "algorithm": "slip10"
+            }
+          ]
+        },
+        "origin": "QNTX Wallet"
+      },
+      "source": "Keystone JS (@keystonehq/bc-ur-registry 0.8.1) oracle bytes identical"
+    },
+    {
+      "name": "cardano-bip32-ed25519",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a2010002d90515a10181d90516a301d90130a2018619073cf5190717f500f5021a73c5da0a02010301",
+      "ur": "ur:qr-hardware-call/oeadaeaotaahbzoyadlytaahcmotadtaaddyoeadlncfatfnykcfatchykaeykaocyjksktnbkaoadaxadhpwzehgs",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/1852'/1815'/0'",
+                "sourceFingerprint": "73c5da0a"
+              },
+              "curve": "ed25519",
+              "algorithm": "bip32Ed25519"
+            }
+          ]
+        }
+      },
+      "source": "Keystone JS (@keystonehq/bc-ur-registry 0.8.1) oracle bytes identical"
+    },
+    {
+      "name": "v1-chain-type-origin",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a4010002d90515a10181d90516a401d90130a2018a182cf51876f500f500f500f5021a73c5da0a02000300046441544f4d036b6c6561702077616c6c65740401",
+      "ur": "ur:qr-hardware-call/oxadaeaotaahbzoyadlytaahcmoxadtaaddyoeadlecsdwykcskoykaeykaeykaeykaocyjksktnbkaoaeaxaeaaiefpghgwgtaxjejzihhsjocxkthsjzjzihjyaaadknnycnlr",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/44'/118'/0'/0'/0'",
+                "sourceFingerprint": "73c5da0a"
+              },
+              "curve": "secp256k1",
+              "algorithm": "slip10",
+              "chainType": "ATOM"
+            }
+          ]
+        },
+        "origin": "leap wallet",
+        "version": 1
+      },
+      "source": "Keystone JS (@keystonehq/bc-ur-registry 0.8.1) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "rust-v0-explicit-version",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a3010002d90515a10182d90516a101d90130a10186182cf500f500f5d90516a201d90130a1018a182cf51901f5f500f500f500f502010400",
+      "ur": "ur:qr-hardware-call/otadaeaotaahbzoyadlftaahcmoyadtaaddyoyadlncsdwykaeykaeyktaahcmoeadtaaddyoyadlecsdwykcfadykykaeykaeykaeykaoadaaaeyteyldre",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/44'/0'/0'"
+              }
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'/0'/0'"
+              },
+              "curve": "ed25519"
+            }
+          ]
+        },
+        "version": 0
+      },
+      "source": "Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "vendor-js-schemas-v0",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a2010002d90515a10182d90516a301d90130a10186182cf500f500f502000300d90516a301d90130a1018a182cf51901f5f500f500f500f402010300",
+      "ur": "ur:qr-hardware-call/oeadaeaotaahbzoyadlftaahcmotadtaaddyoyadlncsdwykaeykaeykaoaeaxaetaahcmotadtaaddyoyadlecsdwykcfadykykaeykaeykaewkaoadaxaecnihhtjp",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/44'/0'/0'"
+              },
+              "curve": "secp256k1",
+              "algorithm": "slip10"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'/0'/0"
+              },
+              "curve": "ed25519",
+              "algorithm": "slip10"
+            }
+          ]
+        }
+      },
+      "source": "asserted literal: keystonehq/bc-ur-registry@ad02fb0995765a0dec8cfbd0d7bf6cdf75d50433 (JS 0.8.1) __tests__/extended/QRHardwareCall.test.ts"
+    },
+    {
+      "name": "vendor-js-v1-sol-schemas",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a4010002d90515a10183d90516a401d90130a10186182cf51901f5f501f5020103000463534f4cd90516a401d90130a1018a182cf51901f5f500f500f500f4020103000463534f4cd90516a401d90130a10186182cf51901f5f500f5020103000463534f4c036a5858582057616c6c65740401",
+      "ur": "ur:qr-hardware-call/oxadaeaotaahbzoyadlstaahcmoxadtaaddyoyadlncsdwykcfadykykadykaoadaxaeaaiagugwgstaahcmoxadtaaddyoyadlecsdwykcfadykykaeykaeykaewkaoadaxaeaaiagugwgstaahcmoxadtaaddyoyadlncsdwykcfadykykaeykaoadaxaeaaiagugwgsaximhdhdhdcxhghsjzjzihjyaaadfgdprppm",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/44'/501'/1'"
+              },
+              "curve": "ed25519",
+              "algorithm": "slip10",
+              "chainType": "SOL"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'/0'/0"
+              },
+              "curve": "ed25519",
+              "algorithm": "slip10",
+              "chainType": "SOL"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'"
+              },
+              "curve": "ed25519",
+              "algorithm": "slip10",
+              "chainType": "SOL"
+            }
+          ]
+        },
+        "origin": "XXX Wallet",
+        "version": 1
+      },
+      "source": "asserted literal: keystonehq/bc-ur-registry@ad02fb0995765a0dec8cfbd0d7bf6cdf75d50433 (JS 0.8.1) __tests__/extended/QRHardwareCall.test.ts"
+    },
+    {
+      "name": "vendor-js-v1-btc-sol",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a4010002d90515a10183d90516a401d90130a10186182cf500f500f5020003000463425443d90516a401d90130a1018a182cf51901f5f500f500f500f4020103000463534f4cd90516a401d90130a10186182cf51901f5f501f5020103000463534f4c036a5858582057616c6c65740401",
+      "ur": "ur:qr-hardware-call/oxadaeaotaahbzoyadlstaahcmoxadtaaddyoyadlncsdwykaeykaeykaoaeaxaeaaiafwghfxtaahcmoxadtaaddyoyadlecsdwykcfadykykaeykaeykaewkaoadaxaeaaiagugwgstaahcmoxadtaaddyoyadlncsdwykcfadykykadykaoadaxaeaaiagugwgsaximhdhdhdcxhghsjzjzihjyaaadcfvwihvl",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/44'/0'/0'"
+              },
+              "curve": "secp256k1",
+              "algorithm": "slip10",
+              "chainType": "BTC"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'/0'/0"
+              },
+              "curve": "ed25519",
+              "algorithm": "slip10",
+              "chainType": "SOL"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/1'"
+              },
+              "curve": "ed25519",
+              "algorithm": "slip10",
+              "chainType": "SOL"
+            }
+          ]
+        },
+        "origin": "XXX Wallet",
+        "version": 1
+      },
+      "source": "asserted literal: keystonehq/bc-ur-registry@ad02fb0995765a0dec8cfbd0d7bf6cdf75d50433 (JS 0.8.1) __tests__/extended/QRHardwareCall.test.ts"
+    },
+    {
+      "name": "vendor-rust-v0-schemas",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a3010002d90515a10182d90516a101d90130a10186182cf500f500f5d90516a201d90130a1018a182cf51901f5f500f500f500f502010400",
+      "ur": "ur:qr-hardware-call/otadaeaotaahbzoyadlftaahcmoyadtaaddyoyadlncsdwykaeykaeyktaahcmoeadtaaddyoyadlecsdwykcfadykykaeykaeykaeykaoadaaaeyteyldre",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/44'/0'/0'"
+              }
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'/0'/0'"
+              },
+              "curve": "ed25519"
+            }
+          ]
+        },
+        "version": 0
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/extend/qr_hardware_call.rs (ur-registry 1.0.9) test_encode"
+    },
+    {
+      "name": "vendor-rust-cardano",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a3010002d90515a10182d90516a301d90130a1018619073cf5190717f500f502010301d90516a301d90130a1018619073cf5190717f501f5020103010400",
+      "ur": "ur:qr-hardware-call/otadaeaotaahbzoyadlftaahcmotadtaaddyoyadlncfatfnykcfatchykaeykaoadaxadtaahcmotadtaaddyoyadlncfatfnykcfatchykadykaoadaxadaaaefrpkhpsf",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/1852'/1815'/0'"
+              },
+              "curve": "ed25519",
+              "algorithm": "bip32Ed25519"
+            },
+            {
+              "keyPath": {
+                "components": "m/1852'/1815'/1'"
+              },
+              "curve": "ed25519",
+              "algorithm": "bip32Ed25519"
+            }
+          ]
+        },
+        "version": 0
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/extend/qr_hardware_call.rs (ur-registry 1.0.9) test_encode2"
+    },
+    {
+      "name": "vendor-rust-cosmos-atom",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a4010002d90515a10181d90516a301d90130a1018a182cf51876f500f500f500f50200046441544f4d036b6c6561702077616c6c65740401",
+      "ur": "ur:qr-hardware-call/oxadaeaotaahbzoyadlytaahcmotadtaaddyoyadlecsdwykcskoykaeykaeykaeykaoaeaaiefpghgwgtaxjejzihhsjocxkthsjzjzihjyaaaddkylimee",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/44'/118'/0'/0'/0'"
+              },
+              "curve": "secp256k1",
+              "chainType": "ATOM"
+            }
+          ]
+        },
+        "origin": "leap wallet",
+        "version": 1
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/extend/qr_hardware_call.rs (ur-registry 1.0.9) test_encode_decode_cosmos_atom"
+    },
+    {
+      "name": "vendor-rust-leap-atom",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a4010002d90515a10184d90516a301d90130a10186182cf5183cf500f502000463455448d90516a301d90130a10186182cf51901f5f500f502010463534f4cd90516a301d90130a10186182cf51876f500f50200046441544f4dd90516a301d90130a1018a182cf51901f5f500f500f400f402010463534f4c036b4c6561702057616c6c65740401",
+      "ur": "ur:qr-hardware-call/oxadaeaotaahbzoyadlrtaahcmotadtaaddyoyadlncsdwykcsfnykaeykaoaeaaiafeghfdtaahcmotadtaaddyoyadlncsdwykcfadykykaeykaoadaaiagugwgstaahcmotadtaaddyoyadlncsdwykcskoykaeykaoaeaaiefpghgwgttaahcmotadtaaddyoyadlecsdwykcfadykykaeykaewkaewkaoadaaiagugwgsaxjegsihhsjocxhghsjzjzihjyaaadprmwjnad",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/44'/60'/0'"
+              },
+              "curve": "secp256k1",
+              "chainType": "ETH"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'"
+              },
+              "curve": "ed25519",
+              "chainType": "SOL"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/118'/0'"
+              },
+              "curve": "secp256k1",
+              "chainType": "ATOM"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'/0/0"
+              },
+              "curve": "ed25519",
+              "chainType": "SOL"
+            }
+          ]
+        },
+        "origin": "Leap Wallet",
+        "version": 1
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/extend/qr_hardware_call.rs (ur-registry 1.0.9) test_wrong_hardware_call"
+    },
+    {
+      "name": "vendor-rust-leap-eth-sol",
+      "urType": "qr-hardware-call",
+      "cborHex": "d904b1a4010002d90515a10184d90516a301d90130a10186182cf5183cf500f502000463455448d90516a301d90130a10186182cf51901f5f500f502010463534f4cd90516a301d90130a10186182cf51901f5f501f502000463534f4cd90516a301d90130a1018a182cf51901f5f500f500f400f402010463534f4c036b4c6561702057616c6c65740401",
+      "ur": "ur:qr-hardware-call/oxadaeaotaahbzoyadlrtaahcmotadtaaddyoyadlncsdwykcsfnykaeykaoaeaaiafeghfdtaahcmotadtaaddyoyadlncsdwykcfadykykaeykaoadaaiagugwgstaahcmotadtaaddyoyadlncsdwykcfadykykadykaoaeaaiagugwgstaahcmotadtaaddyoyadlecsdwykcfadykykaeykaewkaewkaoadaaiagugwgsaxjegsihhsjocxhghsjzjzihjyaaadfnfxcmfy",
+      "value": {
+        "params": {
+          "kind": "keyDerivation",
+          "schemas": [
+            {
+              "keyPath": {
+                "components": "m/44'/60'/0'"
+              },
+              "curve": "secp256k1",
+              "chainType": "ETH"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'"
+              },
+              "curve": "ed25519",
+              "chainType": "SOL"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/1'"
+              },
+              "curve": "secp256k1",
+              "chainType": "SOL"
+            },
+            {
+              "keyPath": {
+                "components": "m/44'/501'/0'/0/0"
+              },
+              "curve": "ed25519",
+              "chainType": "SOL"
+            }
+          ]
+        },
+        "origin": "Leap Wallet",
+        "version": 1
+      },
+      "source": "asserted literal: keystone-sdk-rust@7f4d2258c9e79770e9c105ee49d5849b6be1c206 libs/ur-registry/src/extend/qr_hardware_call.rs (ur-registry 1.0.9) test_qr_hardware_call"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schema": "interop-vector/v1",
+  "capability": "interop.btc-signature",
+  "source": {
+    "name": "interop btc-signature vectors: decode `inputCborHex` ?? `cborHex`, compare `value`, re-encode byte-identically to `cborHex`, emit `ur`",
+    "keystoneJs": "@keystonehq/bc-ur-registry-btc 0.1.1 (nested @keystonehq/bc-ur-registry 0.6.4)",
+    "keystoneRust": "ur-registry 1.0.9 (MIT) — oracle harness outside the repo"
+  },
+  "cases": [
+    {
+      "name": "btc-signature",
+      "urType": "btc-signature",
+      "cborHex": "d91fa6a301d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d0258411f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a03582102d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2",
+      "ur": "ur:btc-signature/otadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohdfpctbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbsbscycycycycycycycycycycycycycycycycycycycycycycycycycycycycycycycyaxhdclaotdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdtdspfhgybe",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signature": "1f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+        "publicKey": "02d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2"
+      },
+      "source": "Keystone JS (@keystonehq/bc-ur-registry-btc 0.1.1 (nested @keystonehq/bc-ur-registry 0.6.4)) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "btc-signature-header-20",
+      "urType": "btc-signature",
+      "cborHex": "d91fa6a301d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d025841205a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c035821037e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "ur": "ur:btc-signature/otadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohdfpcxhthththththththththththththththththththththththththththththththtfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnfnaxhdclaxkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbkbmueeisge",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signature": "205a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c",
+        "publicKey": "037e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+      },
+      "source": "Keystone JS (@keystonehq/bc-ur-registry-btc 0.1.1 (nested @keystonehq/bc-ur-registry 0.6.4)) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    }
+  ]
+}

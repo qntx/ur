@@ -19,9 +19,10 @@ use std::str::FromStr;
 
 use bcur::typed::Ur;
 use bcur_registry::interop::{
-    ChainId, EthDataType, EthSignRequest, EthSignature, MultiAccounts, MultiAccountsKey,
-    OneKeyTronSignRequest, RequestId, SolSignRequest, SolSignType, SolSignature, TronDataType,
-    TronSignRequest, TronSignature,
+    BtcDataType, BtcSignRequest, BtcSignature, ChainId, EthDataType, EthSignRequest, EthSignature,
+    KeyDerivationAlgorithm, KeyDerivationCurve, MultiAccounts, MultiAccountsKey,
+    OneKeyTronSignRequest, QrHardwareCall, QrHardwareCallParams, QrHardwareCallVersion, RequestId,
+    SolSignRequest, SolSignType, SolSignature, TronDataType, TronSignRequest, TronSignature,
 };
 use bcur_registry::{CoinInfo, CoinType, Keypath, PathComponent};
 use dcbor::{CBOR, CBORTaggedDecodable, CBORTaggedEncodable};
@@ -371,6 +372,100 @@ fn check_multi_accounts(actual: &MultiAccounts, value: &Value) {
     assert_eq!(opt_text(value, "version"), actual.version(), "version");
 }
 
+fn check_btc_request(actual: &BtcSignRequest, value: &Value) {
+    assert_eq!(
+        &unhex(value["requestId"].as_str().unwrap())[..],
+        actual.request_id().as_bytes(),
+        "request id"
+    );
+    assert_eq!(
+        unhex(value["signData"].as_str().unwrap()),
+        actual.sign_data(),
+        "sign data"
+    );
+    match value["dataType"].as_str().unwrap() {
+        "message" => assert_eq!(actual.data_type(), BtcDataType::Message, "data type"),
+        other => panic!("bad dataType {other}"),
+    }
+    let paths = value["derivationPaths"].as_array().unwrap();
+    assert_eq!(actual.derivation_paths().len(), paths.len(), "path count");
+    for (path, expected) in actual.derivation_paths().iter().zip(paths.iter()) {
+        check_path(path, expected);
+    }
+    match value.get("addresses") {
+        Some(list) => {
+            let expected: Vec<&str> = list
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_str().unwrap())
+                .collect();
+            let actual_addresses: Vec<&str> =
+                actual.addresses().iter().map(String::as_str).collect();
+            assert_eq!(actual_addresses, expected, "addresses");
+        }
+        None => assert!(actual.addresses().is_empty(), "addresses must be absent"),
+    }
+    assert_eq!(opt_text(value, "origin"), actual.origin(), "origin");
+}
+
+fn check_btc_signature(actual: &BtcSignature, value: &Value) {
+    assert_eq!(
+        &unhex(value["requestId"].as_str().unwrap())[..],
+        actual.request_id().as_bytes(),
+        "request id"
+    );
+    assert_eq!(
+        &unhex(value["signature"].as_str().unwrap())[..],
+        actual.signature(),
+        "signature"
+    );
+    assert_eq!(
+        &unhex(value["publicKey"].as_str().unwrap())[..],
+        actual.public_key(),
+        "public key"
+    );
+}
+
+fn check_qr_hardware_call(actual: &QrHardwareCall, value: &Value) {
+    let params = &value["params"];
+    assert_eq!(params["kind"].as_str().unwrap(), "keyDerivation", "kind");
+    let QrHardwareCallParams::KeyDerivation(call) = actual.params() else {
+        panic!("non-key-derivation params")
+    };
+    let schemas = params["schemas"].as_array().unwrap();
+    assert_eq!(call.schemas().len(), schemas.len(), "schema count");
+    for (schema, expected) in call.schemas().iter().zip(schemas.iter()) {
+        check_path(schema.key_path(), &expected["keyPath"]);
+        let curve = expected.get("curve").map(|c| match c.as_str().unwrap() {
+            "secp256k1" => KeyDerivationCurve::Secp256k1,
+            "ed25519" => KeyDerivationCurve::Ed25519,
+            other => panic!("bad curve {other}"),
+        });
+        assert_eq!(schema.curve(), curve, "curve");
+        let algorithm = expected
+            .get("algorithm")
+            .map(|a| match a.as_str().unwrap() {
+                "slip10" => KeyDerivationAlgorithm::Slip10,
+                "bip32Ed25519" => KeyDerivationAlgorithm::Bip32Ed25519,
+                other => panic!("bad algorithm {other}"),
+            });
+        assert_eq!(schema.algorithm(), algorithm, "algorithm");
+        assert_eq!(
+            opt_text(expected, "chainType"),
+            schema.chain_type(),
+            "chain type"
+        );
+    }
+    assert_eq!(opt_text(value, "origin"), actual.origin(), "origin");
+    let version = opt_u64(value, "version").map(|v| match v {
+        0 => QrHardwareCallVersion::V0,
+        1 => QrHardwareCallVersion::V1,
+        other => panic!("bad version {other}"),
+    });
+    assert_eq!(actual.version(), version, "version");
+}
+
 fn cbor_hex(case: &Value) -> &str {
     case["cborHex"].as_str().unwrap()
 }
@@ -409,6 +504,18 @@ fn reencoded(cbor: CBOR, ur_type: &str, codec: Option<&str>) -> (CBOR, String) {
             let v = MultiAccounts::try_from(cbor).unwrap();
             (v.tagged_cbor(), v.to_ur().unwrap().to_string())
         }
+        ("btc-sign-request", _) => {
+            let v = BtcSignRequest::try_from(cbor).unwrap();
+            (v.tagged_cbor(), v.to_ur().unwrap().to_string())
+        }
+        ("btc-signature", _) => {
+            let v = BtcSignature::try_from(cbor).unwrap();
+            (v.tagged_cbor(), v.to_ur().unwrap().to_string())
+        }
+        ("qr-hardware-call", _) => {
+            let v = QrHardwareCall::try_from(cbor).unwrap();
+            (v.tagged_cbor(), v.to_ur().unwrap().to_string())
+        }
         (t, _) => panic!("unhandled {t}"),
     }
 }
@@ -421,6 +528,9 @@ const FILES: &[(&str, &str)] = &[
     ("sol-signature", "sol-signature"),
     ("tron-sign-request", "tron-sign-request"),
     ("tron-signature", "tron-signature"),
+    ("btc-sign-request", "btc-sign-request"),
+    ("btc-signature", "btc-signature"),
+    ("qr-hardware-call", "qr-hardware-call"),
 ];
 
 #[test]
@@ -462,6 +572,18 @@ fn interop_vectors() {
                 "crypto-multi-accounts" => {
                     check_multi_accounts(&MultiAccounts::try_from(input.clone()).unwrap(), value);
                 }
+                "btc-sign-request" => {
+                    check_btc_request(&BtcSignRequest::try_from(input.clone()).unwrap(), value);
+                }
+                "btc-signature" => {
+                    check_btc_signature(&BtcSignature::try_from(input.clone()).unwrap(), value);
+                }
+                "qr-hardware-call" => {
+                    check_qr_hardware_call(
+                        &QrHardwareCall::try_from(input.clone()).unwrap(),
+                        value,
+                    );
+                }
                 _ => unreachable!(),
             }
             // Byte-identical re-encode with the named writer + UR round trip.
@@ -492,6 +614,9 @@ fn reencoded_cbor_back(ur: &Ur, ur_type: &str, codec: Option<&str>) -> CBOR {
         ("tron-sign-request", _) => TronSignRequest::from_ur(ur).unwrap().tagged_cbor(),
         ("tron-signature", _) => TronSignature::from_ur(ur).unwrap().tagged_cbor(),
         ("crypto-multi-accounts", _) => MultiAccounts::from_ur(ur).unwrap().tagged_cbor(),
+        ("btc-sign-request", _) => BtcSignRequest::from_ur(ur).unwrap().tagged_cbor(),
+        ("btc-signature", _) => BtcSignature::from_ur(ur).unwrap().tagged_cbor(),
+        ("qr-hardware-call", _) => QrHardwareCall::from_ur(ur).unwrap().tagged_cbor(),
         (t, _) => panic!("unhandled {t}"),
     }
 }
@@ -547,6 +672,9 @@ fn interop_invalid() {
             "onekey-tron-sign-request" => OneKeyTronSignRequest::from_untagged_cbor(cbor).is_err(),
             "tron-signature" => TronSignature::from_untagged_cbor(cbor).is_err(),
             "crypto-multi-accounts" => MultiAccounts::from_untagged_cbor(cbor).is_err(),
+            "btc-sign-request" => BtcSignRequest::from_untagged_cbor(cbor).is_err(),
+            "btc-signature" => BtcSignature::from_untagged_cbor(cbor).is_err(),
+            "qr-hardware-call" => QrHardwareCall::from_untagged_cbor(cbor).is_err(),
             other => panic!("no codec {other}"),
         }
     };

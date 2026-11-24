@@ -22,7 +22,7 @@ import type { ReceiveResult } from "../../packages/ur/src/index.ts";
 
 const MAX_U32 = 0xffffffff;
 const MAX_MESSAGE_LENGTH = 8192;
-const DEFAULT_SEED = 377401;
+export const DEFAULT_SEED = 377401;
 const DEFAULT_CASES = 200;
 const DEFAULT_OUT = "target/parity/differential.json";
 const UR_TYPES = ["bytes", "alpha", "beta", "psbt", "seed"] as const;
@@ -71,10 +71,13 @@ export type Cli = {
   out: string;
 };
 
-export function parseArgs(argv: ReadonlyArray<string>): Cli {
+export function parseArgs(
+  argv: ReadonlyArray<string>,
+  defaults?: { cases?: number; out?: string },
+): Cli {
   let seed = DEFAULT_SEED;
-  let cases = DEFAULT_CASES;
-  let out = DEFAULT_OUT;
+  let cases = defaults?.cases ?? DEFAULT_CASES;
+  let out = defaults?.out ?? DEFAULT_OUT;
   let i = 0;
   while (i < argv.length) {
     const arg = argv[i];

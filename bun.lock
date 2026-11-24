@@ -5,6 +5,7 @@
     "": {
       "name": "@qntx/ur-monorepo",
       "devDependencies": {
+        "@blockchaincommons/dcbor": "1.0.0-beta.5",
         "@qntx/oxfmt": "1.1.1",
         "@qntx/oxlint": "1.1.1",
         "@qntx/tsconfig": "1.0.1",
@@ -37,7 +38,7 @@
     },
     "packages/ur": {
       "name": "@qntx/ur",
-      "version": "3.0.0",
+      "version": "4.0.0",
       "dependencies": {
         "@noble/hashes": "^2.4.0",
       },
@@ -45,6 +46,7 @@
         "@arethetypeswrong/cli": "0.18.5",
         "@blockchaincommons/dcbor": "1.0.0-beta.5",
         "@keystonehq/bc-ur-registry": "0.8.1",
+        "@keystonehq/bc-ur-registry-btc": "0.1.1",
         "@keystonehq/bc-ur-registry-eth": "0.23.0",
         "@keystonehq/bc-ur-registry-sol": "0.9.5",
         "@keystonehq/bc-ur-registry-tron": "0.5.0",
@@ -99,6 +101,8 @@
     "@keystonehq/alias-sampling": ["@keystonehq/alias-sampling@0.1.2", "", {}, "sha512-5ukLB3bcgltgaFfQfYKYwHDUbwHicekYo53fSEa7xhVkAEqsA74kxdIwoBIURmGUtXe3EVIRm4SYlgcrt2Ri0w=="],
 
     "@keystonehq/bc-ur-registry": ["@keystonehq/bc-ur-registry@0.8.1", "", { "dependencies": { "@ngraveio/bc-ur": "^1.1.5", "bs58check": "^2.1.2", "tslib": "^2.3.0" } }, "sha512-HihSu8hJ3y1aCWZvV0uCTFN61X1/QLOXhAlXZgl2J1dxXVzFk0k7BCl1zYOaf26xFbTv9v9iCkBCMKI4ulGKYg=="],
+
+    "@keystonehq/bc-ur-registry-btc": ["@keystonehq/bc-ur-registry-btc@0.1.1", "", { "dependencies": { "@keystonehq/bc-ur-registry": "^0.6.4", "uuid": "^8.3.2" } }, "sha512-LdYqItY1Y/M6fWJNE6L0HYZbKL8CGVP6OigG7T/gJ+SWnOGgYXj3at02aV7b9qZ7iNwJPkNrqsIDN5eajQcZjQ=="],
 
     "@keystonehq/bc-ur-registry-eth": ["@keystonehq/bc-ur-registry-eth@0.23.0", "", { "dependencies": { "@ethereumjs/util": "^9.0.3", "@keystonehq/bc-ur-registry": "^0.7.0", "hdkey": "^2.0.1", "uuid": "^8.3.2" } }, "sha512-DyFIX4dioWlz9zZW4rA3DlvN0MsGOUUm/czuQWua5DtIW603CkrhrAHbh1rGkqDVN6OYlleiH88HzZ5whsaLSw=="],
 
@@ -787,6 +791,8 @@
     "@arethetypeswrong/core/typescript": ["typescript@5.6.1-rc", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-E3b2+1zEFu84jB0YQi9BORDjz9+jGbwwy1Zi3G0LUNw7a7cePUrHMRNy8aPh53nXpkFGVHSxIZo5vKTfYaFiBQ=="],
 
     "@jridgewell/trace-mapping/@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
+
+    "@keystonehq/bc-ur-registry-btc/@keystonehq/bc-ur-registry": ["@keystonehq/bc-ur-registry@0.6.4", "", { "dependencies": { "@ngraveio/bc-ur": "^1.1.5", "bs58check": "^2.1.2", "tslib": "^2.3.0" } }, "sha512-j8Uy44DuAkvYkbf0jMxRY3UizJfn8wsEQr7GS3miRF44vcq7k0/yemVkftbn3jQ+0JYaUXf5wY7lVpLhAeW5nQ=="],
 
     "@keystonehq/bc-ur-registry-eth/@keystonehq/bc-ur-registry": ["@keystonehq/bc-ur-registry@0.7.1", "", { "dependencies": { "@ngraveio/bc-ur": "^1.1.5", "bs58check": "^2.1.2", "tslib": "^2.3.0" } }, "sha512-6eVIjNt/P+BmuwcYccbPYVS85473SFNplkqWF/Vb3ePCzLX00tn0WZBO1FGpS4X4nfXtceTfvUeNvQKoTGtXrw=="],
 

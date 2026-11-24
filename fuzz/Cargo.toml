@@ -114,3 +114,24 @@ path  = "fuzz_targets/interop_tron_signature.rs"
 test  = false
 doc   = false
 bench = false
+
+[[bin]]
+name  = "interop_btc_sign_request"
+path  = "fuzz_targets/interop_btc_sign_request.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "interop_btc_signature"
+path  = "fuzz_targets/interop_btc_signature.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "interop_qr_hardware_call"
+path  = "fuzz_targets/interop_qr_hardware_call.rs"
+test  = false
+doc   = false
+bench = false

@@ -18,13 +18,14 @@
     "typecheck": "vp run -r typecheck && tsc --noEmit",
     "build": "vp run -r build",
     "test": "vp run -r test && vp test",
-    "test:parity": "bun scripts/parity/differential.ts && BCUR_DIFFERENTIAL=$PWD/target/parity/differential.json cargo test -p bcur --test differential -- --ignored",
-    "test:parity:random": "seed=$(bun -e 'console.log(Math.floor(Math.random() * 4294967296))') && echo \"parity seed: $seed\" && bun scripts/parity/differential.ts --seed $seed && BCUR_DIFFERENTIAL=$PWD/target/parity/differential.json cargo test -p bcur --test differential -- --ignored",
+    "test:parity": "bun scripts/parity/differential.ts && BCUR_DIFFERENTIAL=$PWD/target/parity/differential.json cargo test -p bcur --test differential -- --ignored && bun scripts/parity/interop-differential.ts && BCUR_INTEROP_DIFFERENTIAL=$PWD/target/parity/interop-differential.json cargo test -p bcur-registry --features interop --test interop_differential -- --ignored",
+    "test:parity:random": "seed=$(bun -e 'console.log(Math.floor(Math.random() * 4294967296))') && echo \"parity seed: $seed\" && bun scripts/parity/differential.ts --seed $seed && BCUR_DIFFERENTIAL=$PWD/target/parity/differential.json cargo test -p bcur --test differential -- --ignored && bun scripts/parity/interop-differential.ts --seed $seed && BCUR_INTEROP_DIFFERENTIAL=$PWD/target/parity/interop-differential.json cargo test -p bcur-registry --features interop --test interop_differential -- --ignored",
     "dev": "vp run @qntx/ur#build && vp run website#dev",
     "release": "bumpp",
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@blockchaincommons/dcbor": "1.0.0-beta.5",
     "@qntx/oxfmt": "1.1.1",
     "@qntx/oxlint": "1.1.1",
     "@qntx/tsconfig": "1.0.1",
