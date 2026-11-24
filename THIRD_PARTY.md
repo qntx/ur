@@ -560,7 +560,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## KeystoneHQ keystone-sdk-base (bc-ur-registry-* chain packages)
 
 - Repository: <https://github.com/KeystoneHQ/keystone-sdk-base>
-- npm packages used as dev-oracles: `@keystonehq/bc-ur-registry-eth` 0.23.0, `@keystonehq/bc-ur-registry-sol` 0.9.5, `@keystonehq/bc-ur-registry-tron` 0.5.0
+- npm packages used as dev-oracles: `@keystonehq/bc-ur-registry-eth` 0.23.0, `@keystonehq/bc-ur-registry-sol` 0.9.5, `@keystonehq/bc-ur-registry-tron` 0.5.0, `@keystonehq/bc-ur-registry-btc` 0.1.1
 - License: ISC
 - Used by:
   - `vectors/interop/*.json` — per-case `source` fields mark cases whose bytes equal the packages' `toCBOR()` output; `vendor-*` cases also adopt the packages' `__tests__` asserted UR literals

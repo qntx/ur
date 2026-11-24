@@ -672,6 +672,75 @@
       "vectors": ["vectors/interop/tron-signature.json", "vectors/interop/invalid.json"]
     },
     {
+      "id": "interop.btc-sign-request",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R6",
+      "ts": {
+        "module": "packages/ur/src/interop/index.ts",
+        "tests": [
+          "packages/ur/tests/interop/vectors.test.ts",
+          "packages/ur/tests/interop/invalid.test.ts",
+          "packages/ur/tests/interop/keystone-differential.test.ts",
+          "scripts/parity/interop-differential.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur-registry/src/interop/mod.rs",
+        "tests": [
+          "crates/bcur-registry/tests/interop.rs",
+          "crates/bcur-registry/tests/interop_differential.rs"
+        ]
+      },
+      "vectors": ["vectors/interop/btc-sign-request.json", "vectors/interop/invalid.json"]
+    },
+    {
+      "id": "interop.btc-signature",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R6",
+      "ts": {
+        "module": "packages/ur/src/interop/index.ts",
+        "tests": [
+          "packages/ur/tests/interop/vectors.test.ts",
+          "packages/ur/tests/interop/invalid.test.ts",
+          "packages/ur/tests/interop/keystone-differential.test.ts",
+          "scripts/parity/interop-differential.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur-registry/src/interop/mod.rs",
+        "tests": [
+          "crates/bcur-registry/tests/interop.rs",
+          "crates/bcur-registry/tests/interop_differential.rs"
+        ]
+      },
+      "vectors": ["vectors/interop/btc-signature.json", "vectors/interop/invalid.json"]
+    },
+    {
+      "id": "interop.qr-hardware-call",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R6",
+      "ts": {
+        "module": "packages/ur/src/interop/index.ts",
+        "tests": [
+          "packages/ur/tests/interop/vectors.test.ts",
+          "packages/ur/tests/interop/invalid.test.ts",
+          "packages/ur/tests/interop/keystone-differential.test.ts",
+          "scripts/parity/interop-differential.test.ts"
+        ]
+      },
+      "rust": {
+        "module": "crates/bcur-registry/src/interop/mod.rs",
+        "tests": [
+          "crates/bcur-registry/tests/interop.rs",
+          "crates/bcur-registry/tests/interop_differential.rs"
+        ]
+      },
+      "vectors": ["vectors/interop/qr-hardware-call.json", "vectors/interop/invalid.json"]
+    },
+    {
       "id": "bytewords.identifier",
       "tier": "A",
       "status": "stable",

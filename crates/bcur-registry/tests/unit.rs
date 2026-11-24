@@ -948,3 +948,113 @@ fn public_types_are_send_and_sync() {
     assert::<SskrHeader>();
     assert::<SskrShare>();
 }
+
+// interop: btc-* and qr-hardware-call (feature "interop")
+
+#[cfg(feature = "interop")]
+fn concrete_path() -> Keypath {
+    Keypath::new(
+        vec![PathComponent::Child(ChildNumber::Hardened(
+            Index::new(44).unwrap(),
+        ))],
+        None,
+        None,
+    )
+    .unwrap()
+}
+
+#[cfg(feature = "interop")]
+#[test]
+fn interop_btc_constructor_rejections() {
+    use bcur_registry::interop::{BtcDataType, BtcSignRequest, RequestId};
+
+    let request_id = RequestId::from([0x9b; 16]);
+    let empty = Vec::<u8>::new();
+    assert!(matches!(
+        BtcSignRequest::new(request_id, empty, BtcDataType::Message, concrete_path()),
+        Err(Error::InvalidLength {
+            field: "sign_data",
+            len: 0
+        })
+    ));
+    // A wildcard path is not concrete.
+    let wildcard = Keypath::new(
+        vec![PathComponent::Wildcard { hardened: false }],
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(matches!(
+        BtcSignRequest::new(request_id, vec![1_u8], BtcDataType::Message, wildcard),
+        Err(Error::OutOfRange {
+            field: "derivation_path"
+        })
+    ));
+    // Empty components (fingerprint only) are not concrete either.
+    let fp_only = Keypath::new(Vec::new(), Some(Fingerprint::from([0x73; 4])), None).unwrap();
+    assert!(matches!(
+        BtcSignRequest::new(request_id, vec![1_u8], BtcDataType::Message, fp_only),
+        Err(Error::OutOfRange {
+            field: "derivation_path"
+        })
+    ));
+
+    let request = BtcSignRequest::new(
+        request_id,
+        vec![1_u8],
+        BtcDataType::Message,
+        concrete_path(),
+    )
+    .unwrap();
+    assert!(matches!(
+        request.clone().with_address(""),
+        Err(Error::InvalidLength {
+            field: "address",
+            len: 0
+        })
+    ));
+    // "" clears the optional text fields.
+    assert!(request.clone().with_origin("").origin().is_none());
+    assert!(
+        request
+            .with_origin("wallet")
+            .with_origin("")
+            .origin()
+            .is_none()
+    );
+}
+
+#[cfg(feature = "interop")]
+#[test]
+fn interop_hardware_call_constructor_validation() {
+    use bcur_registry::interop::{
+        KeyDerivationCall, KeyDerivationSchema, QrHardwareCall, QrHardwareCallVersion,
+    };
+
+    let wildcard = Keypath::new(
+        vec![PathComponent::Wildcard { hardened: false }],
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(matches!(
+        KeyDerivationSchema::new(wildcard),
+        Err(Error::OutOfRange {
+            field: "derivation_path"
+        })
+    ));
+
+    let schema = KeyDerivationSchema::new(concrete_path())
+        .unwrap()
+        .with_chain_type("SOL")
+        .with_chain_type("");
+    assert!(schema.chain_type().is_none());
+
+    // Construction keeps schemas non-empty, so encode cannot produce an
+    // empty `1:` array; "" clears origin, version stays presence-preserving.
+    let call = QrHardwareCall::new(KeyDerivationCall::new(schema))
+        .with_origin("")
+        .with_version(QrHardwareCallVersion::V0);
+    assert!(call.origin().is_none());
+    assert_eq!(call.version(), Some(QrHardwareCallVersion::V0));
+}

@@ -23,21 +23,27 @@ let back = EthSignRequest::from_ur(&ur)?;
 
 ## Types
 
-| UR type                 | tag  | Writer type             | Notes                                    |
-| ----------------------- | ---- | ----------------------- | ---------------------------------------- |
-| `crypto-multi-accounts` | 1103 | `MultiAccounts`         | `MultiAccountsKey::{Secp256k1, Ed25519}` |
-| `eth-sign-request`      | 401  | `EthSignRequest`        | `EthDataType`, `ChainId`, `RequestId`    |
-| `eth-signature`         | 402  | `EthSignature`          |                                          |
-| `sol-sign-request`      | 1101 | `SolSignRequest`        | `SolSignType`                            |
-| `sol-signature`         | 1102 | `SolSignature`          |                                          |
-| `tron-sign-request`     | 5101 | `TronSignRequest`       | Keystone layout                          |
-| `tron-sign-request`     | 5201 | `OneKeyTronSignRequest` | OneKey layout (`TronDataType`)           |
-| `tron-signature`        | 5102 | `TronSignature`         |                                          |
+| UR type                 | tag  | Writer type             | Notes                                                                                         |
+| ----------------------- | ---- | ----------------------- | --------------------------------------------------------------------------------------------- |
+| `crypto-multi-accounts` | 1103 | `MultiAccounts`         | `MultiAccountsKey::{Secp256k1, Ed25519}`                                                      |
+| `btc-sign-request`      | 8101 | `BtcSignRequest`        | `BtcDataType`, `RequestId`                                                                    |
+| `btc-signature`         | 8102 | `BtcSignature`          | `RequestId`                                                                                   |
+| `qr-hardware-call`      | 1201 | `QrHardwareCall`        | `QrHardwareCallParams`, `QrHardwareCallVersion`, `KeyDerivation{Call,Schema,Curve,Algorithm}` |
+| `eth-sign-request`      | 401  | `EthSignRequest`        | `EthDataType`, `ChainId`, `RequestId`                                                         |
+| `eth-signature`         | 402  | `EthSignature`          |                                                                                               |
+| `sol-sign-request`      | 1101 | `SolSignRequest`        | `SolSignType`                                                                                 |
+| `sol-signature`         | 1102 | `SolSignature`          |                                                                                               |
+| `tron-sign-request`     | 5101 | `TronSignRequest`       | Keystone layout                                                                               |
+| `tron-sign-request`     | 5201 | `OneKeyTronSignRequest` | OneKey layout (`TronDataType`)                                                                |
+| `tron-signature`        | 5102 | `TronSignature`         |                                                                                               |
 
 All maps are closed — an unknown key, wrong CBOR major type, or missing required key is a registry `Error`. `RequestId` wraps a 16-byte UUID (`#6.37`); derivation paths are `Keypath`s with at least one concrete `index` component (read accepts tag 40304 too); optional text fields normalize `""` to absent on both directions.
 
 ## Per-type invariants
 
+- **BtcSignRequest** — `new(RequestId, sign_data, data_type, derivation_path)`, `with_derivation_path`, `with_address`, `with_origin`. Unlike the rest of the family the request id is **required** (both vendor encoders always write key 1; the JS reader dereferences it unconditionally). `BtcDataType` is `Message` only (wire 1). `sign_data`, the path list, and every address must be non-empty.
+- **BtcSignature** — `new(RequestId, [u8; 65], [u8; 33])`; the signature is the compact header ‖ r ‖ s and the public key is compressed — lengths are checked, header/prefix semantics are not.
+- **QrHardwareCall** — `new(params)`, `with_origin`, `with_version(QrHardwareCallVersion)`. Only `QrHardwareCallParams::KeyDerivation` (call type 0, params `#6.1301`) is representable; call type 1 (derive-context-hash, params `#6.1303`) is rejected on decode. `KeyDerivationCall::new(first_schema)` keeps the schema list non-empty; `KeyDerivationSchema::new(key_path)` with `with_curve`/`with_algorithm`/`with_chain_type`. `version`, `curve`, and `algorithm` are **presence-preserving** `Option`s — `None` is not the same as `V0`/`Secp256k1`/`Slip10` (the JS dialect omits `version` unless V1; the Rust dialect always writes it).
 - **EthSignRequest** — `new(sign_data, data_type, derivation_path)`, `with_request_id`, `with_chain_id(ChainId)`, `with_address([u8; 20])`, `with_origin`. `ChainId::new` rejects `0` and values above `2^53-1` (`Error::OutOfRange`) — vendors sometimes emit a non-canonical float for `2^53`, which is rejected on decode.
 - **EthSignature::new** — `signature` is `r || s || v`, 65–72 bytes.
 - **SolSignRequest** — `new(sign_data, derivation_path, sign_type)`; `sign_type` covers transaction/message plus the OneKey off-chain dialects (wire 3/4). `with_address` takes non-empty opaque bytes.
@@ -47,3 +53,5 @@ All maps are closed — an unknown key, wrong CBOR major type, or missing requir
 - **MultiAccounts** — `new(Fingerprint, first_key)`, `with_key`, `with_device`, `with_device_id`, `with_version`. `MultiAccountsKey::Secp256k1` wraps a public `DerivedKey` (`TryFrom` rejects private/master); `Ed25519` wraps `Ed25519Key::new([u8; 32])`. OneKey's `4: h''` empty chain-code field reads as absent and is never written.
 
 Tags 401/402 collide numerically with BCR script-expression tags; they are UR-type tags here, never embedded in interop bodies, so `interop` registers no global tags.
+
+Keystone 3 Pro firmware applies two policies **on top of** the wire form (the codecs do not enforce them): it signs/displays only the first derivation path of a `btc-sign-request` and requires that path's source fingerprint to equal the device master fingerprint, and it accepts at most 24 `qr-hardware-call` schemas whose paths must start with `m/44'/0'`, `m/49'`, `m/84'`, `m/86'`, or one of a fixed list of `m/44'/coin-type'` prefixes (`rust/rust_c/src/wallet/mod.rs`).

@@ -1,0 +1,80 @@
+{
+  "schema": "interop-vector/v1",
+  "capability": "interop.btc-sign-request",
+  "source": {
+    "name": "interop btc-sign-request vectors: decode `inputCborHex` ?? `cborHex`, compare `value`, re-encode byte-identically to `cborHex`, emit `ur`",
+    "keystoneJs": "@keystonehq/bc-ur-registry-btc 0.1.1 (nested @keystonehq/bc-ur-registry 0.6.4)",
+    "keystoneRust": "ur-registry 1.0.9 (MIT) — oracle harness outside the repo"
+  },
+  "cases": [
+    {
+      "name": "btc-message-single-path",
+      "urType": "btc-sign-request",
+      "cborHex": "d91fa5a501d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d025348656c6c6f2063727970746f20776f726c642103010481d90130a3018a1854f500f500f500f400f4021a73c5da0a0305066b514e54582057616c6c6574",
+      "ur": "ur:btc-sign-request/onadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaogufdihjzjzjlcxiajpkkjojyjlcxktjljpjzieclaxadaalytaaddyotadlecsghykaeykaeykaewkaewkaocyjksktnbkaxahamjegyglghhdcxhghsjzjzihjyyayahglb",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "48656c6c6f2063727970746f20776f726c6421",
+        "dataType": "message",
+        "derivationPaths": [
+          {
+            "components": "m/84'/0'/0'/0/0",
+            "sourceFingerprint": "73c5da0a",
+            "depth": 5
+          }
+        ],
+        "origin": "QNTX Wallet"
+      },
+      "source": "Keystone JS (@keystonehq/bc-ur-registry-btc 0.1.1 (nested @keystonehq/bc-ur-registry 0.6.4)) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "btc-message-multi-path-addresses",
+      "urType": "btc-sign-request",
+      "cborHex": "d91fa5a501d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d0256425443206d756c74692d70617468206d65737361676503010482d90130a3018a182cf500f500f500f400f4021a73c5da0a0305d90130a2018a1856f500f500f500f401f4021a73c5da0a0582782a62633171617230737272723778666b7679356c3634336c79646e77397265353967747a7a7766356d64717822314d6a69797575706a574b3559653133663842415076676279355742755158794a78",
+      "ur": "ur:btc-sign-request/onadtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaohffwghfxcxjnkpjzjyindpjohsjyiscxjnihjkjkhsioihaxadaalftaaddyotadlecsdwykaeykaeykaewkaewkaocyjksktnbkaxahtaaddyoeadlecshfykaeykaeykaewkadwkaocyjksktnbkahlfksdridiaehjshsjpdyjkjpjpjpemksiyjekokkecjzeneeeojzkkiejtktesjpihecesiojyknknktiyecjniejskscpehgtiminkkkpkpjoimhggrechkiheheoiyetfwfpgdkoioidkkechgfwkpgyhdkkgeksfrcwdkkt",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "425443206d756c74692d70617468206d657373616765",
+        "dataType": "message",
+        "derivationPaths": [
+          {
+            "components": "m/44'/0'/0'/0/0",
+            "sourceFingerprint": "73c5da0a",
+            "depth": 5
+          },
+          {
+            "components": "m/86'/0'/0'/0/1",
+            "sourceFingerprint": "73c5da0a"
+          }
+        ],
+        "addresses": [
+          "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+          "1MjiyuupjWK5Ye13f8BAPvgby5WBuQXyJx"
+        ]
+      },
+      "source": "Keystone JS (@keystonehq/bc-ur-registry-btc 0.1.1 (nested @keystonehq/bc-ur-registry 0.6.4)) and Rust (ur-registry 1.0.9) oracle bytes identical; Rust harness outside the repo"
+    },
+    {
+      "name": "vendor-btc-wallet-message",
+      "urType": "btc-sign-request",
+      "cborHex": "d91fa5a601d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d025348656c6c6f2063727970746f20776f726c642103010481d90130a2018a182cf500f500f500f400f4021a7823080405817822314d6a69797575706a574b3559653133663842415076676279355742755158794a78066a6274632077616c6c6574",
+      "ur": "ur:btc-sign-request/oladtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaogufdihjzjzjlcxiajpkkjojyjlcxktjljpjzieclaxadaalytaaddyoeadlecsdwykaeykaeykaewkaewkaocykscnayaaahlykscpehgtiminkkkpkpjoimhggrechkiheheoiyetfwfpgdkoioidkkechgfwkpgyhdkkgeksamimidjyiacxkthsjzjzihjypffpsbdy",
+      "value": {
+        "requestId": "9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
+        "signData": "48656c6c6f2063727970746f20776f726c6421",
+        "dataType": "message",
+        "derivationPaths": [
+          {
+            "components": "m/44'/0'/0'/0/0",
+            "sourceFingerprint": "78230804"
+          }
+        ],
+        "addresses": [
+          "1MjiyuupjWK5Ye13f8BAPvgby5WBuQXyJx"
+        ],
+        "origin": "btc wallet"
+      },
+      "source": "asserted literal: keystone-sdk-base@029aeedb2602611cf85ca177320a0c92cf70a13c packages/ur-registry-btc/__test__/BtcSignRequest.test.ts"
+    }
+  ]
+}

@@ -19,7 +19,8 @@ include = ["src/**/*", "README.md"]
 all-features = true
 
 [features]
-# Vendor-interop codecs (`eth-*`, `sol-*`, `tron-*`, `crypto-multi-accounts`).
+# Vendor-interop codecs (`eth-*`, `sol-*`, `tron-*`, `btc-*`,
+# `crypto-multi-accounts`, `qr-hardware-call`).
 interop = []
 
 [dependencies]

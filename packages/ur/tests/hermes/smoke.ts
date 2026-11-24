@@ -7,7 +7,12 @@ import {
   parseUr,
   parseUrType,
 } from "../../src/index.ts";
-import { cryptoMultiAccountsCodec, ethSignRequestCodec } from "../../src/interop/index.ts";
+import {
+  btcSignRequestCodec,
+  cryptoMultiAccountsCodec,
+  ethSignRequestCodec,
+  qrHardwareCallCodec,
+} from "../../src/interop/index.ts";
 import type { Keypath } from "../../src/registry/index.ts";
 import {
   Ur,
@@ -193,4 +198,28 @@ export function main(): void {
   const maKey = must(ma.keys[0]);
   eq(maKey.curve, "ed25519", "multi-accounts ed25519 curve");
   eq(maKey.key.keyData.length, 32, "multi-accounts ed25519 key length");
+
+  // Interop path: vendor btc-sign-request UR literal decodes and re-encodes
+  // to the identical UR (keystone-sdk-base BtcSignRequest.test.ts).
+  const btcLiteral =
+    "ur:btc-sign-request/oladtpdagdndcawmgtfrkigrpmndutdnbtkgfssbjnaogufdihjzjzjlcxiajpkkjojyjlcxktjljpjzieclaxadaalytaaddyoeadlecsdwykaeykaeykaewkaewkaocykscnayaaahlykscpehgtiminkkkpkpjoimhggrechkiheheoiyetfwfpgdkoioidkkechgfwkpgyhdkkgeksamimidjyiacxkthsjzjzihjypffpsbdy";
+  const btcReq = fromUr(Ur.parse(btcLiteral), btcSignRequestCodec);
+  eq(btcReq.dataType, "message", "btc dataType");
+  eq(btcReq.origin, "btc wallet", "btc origin");
+  eq(btcReq.derivationPaths.length, 1, "btc path count");
+  eq(toUr(btcReq, btcSignRequestCodec).toString(), btcLiteral, "btc-sign-request ur round trip");
+
+  // Interop path: vendor qr-hardware-call UR literal round trip
+  // (bc-ur-registry 0.8.1 QRHardwareCall.test.ts).
+  const hwLiteral =
+    "ur:qr-hardware-call/oeadaeaotaahbzoyadlftaahcmotadtaaddyoyadlncsdwykaeykaeykaoaeaxaetaahcmotadtaaddyoyadlecsdwykcfadykykaeykaeykaewkaoadaxaecnihhtjp";
+  const hwCallDecoded = fromUr(Ur.parse(hwLiteral), qrHardwareCallCodec);
+  eq(hwCallDecoded.params.kind, "keyDerivation", "hw call kind");
+  eq(hwCallDecoded.params.schemas.length, 2, "hw schema count");
+  eq(hwCallDecoded.version, undefined, "hw version absent");
+  eq(
+    toUr(hwCallDecoded, qrHardwareCallCodec).toString(),
+    hwLiteral,
+    "qr-hardware-call ur round trip",
+  );
 }

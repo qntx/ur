@@ -2,10 +2,13 @@ import { decodeCbor, hexToBytes } from "@blockchaincommons/dcbor";
 import { expect, test } from "vite-plus/test";
 
 import {
+  btcSignRequestCodec,
+  btcSignatureCodec,
   cryptoMultiAccountsCodec,
   ethSignRequestCodec,
   ethSignatureCodec,
   oneKeyTronSignRequestCodec,
+  qrHardwareCallCodec,
   solSignRequestCodec,
   solSignatureCodec,
   tronSignRequestCodec,
@@ -32,6 +35,9 @@ const CODECS: Record<string, UrCodec<unknown>> = {
   "onekey-tron-sign-request": oneKeyTronSignRequestCodec,
   "tron-signature": tronSignatureCodec,
   "crypto-multi-accounts": cryptoMultiAccountsCodec,
+  "btc-sign-request": btcSignRequestCodec,
+  "btc-signature": btcSignatureCodec,
+  "qr-hardware-call": qrHardwareCallCodec,
 };
 
 function mustCodec(name: string): UrCodec<unknown> {

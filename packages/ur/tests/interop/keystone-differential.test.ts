@@ -17,8 +17,11 @@ import {
 import { expect, test } from "vite-plus/test";
 
 import {
+  btcSignRequestCodec,
+  btcSignatureCodec,
   ethSignRequestCodec,
   ethSignatureCodec,
+  qrHardwareCallCodec,
   tronSignRequestCodec,
 } from "../../src/interop/index.ts";
 import { fromTagged, toTagged } from "../../src/typed/index.ts";
@@ -30,6 +33,75 @@ const require = createRequire(import.meta.url);
 const tronOracle = require("@keystonehq/bc-ur-registry-tron") as {
   DataType: { transaction: number; personalMessage: number; typedMessage: number };
   TronSignRequest: new (args: Record<string, unknown>) => { toCBOR: () => Buffer };
+};
+
+const btcOracle = require("@keystonehq/bc-ur-registry-btc") as {
+  DataType: { message: number };
+  BtcSignRequest: (new (args: Record<string, unknown>) => {
+    toCBOR: () => Buffer;
+    getRequestId: () => Buffer;
+    getSignData: () => Buffer;
+    getDataype: () => number;
+    getDerivationPaths: () => string[];
+    getAddress: () => string[] | undefined;
+    getOrigin: () => string | undefined;
+  }) & {
+    fromCBOR: (payload: Buffer) => {
+      getRequestId: () => Buffer;
+      getSignData: () => Buffer;
+      getDataype: () => number;
+      getDerivationPaths: () => string[];
+      getAddress: () => string[] | undefined;
+      getOrigin: () => string | undefined;
+    };
+  };
+  BtcSignature: (new (
+    signature: Buffer,
+    requestId: Buffer,
+    publicKey: Buffer,
+  ) => { toCBOR: () => Buffer }) & {
+    fromCBOR: (payload: Buffer) => {
+      getRequestId: () => Buffer;
+      getSignature: () => Buffer;
+      getPublicKey: () => Buffer;
+    };
+  };
+};
+
+const hwOracle = require("@keystonehq/bc-ur-registry") as {
+  QRHardwareCall: (new (
+    callType: number,
+    params: unknown,
+    origin?: string,
+    version?: number,
+  ) => { toCBOR: () => Buffer }) & {
+    fromCBOR: (payload: Buffer) => {
+      getType: () => number;
+      getOrigin: () => string | undefined;
+      getVersion: () => number | undefined;
+      getParams: () => {
+        getSchemas: () => Array<{
+          getKeypath: () => { getPath: () => string };
+          getCurve: () => number;
+          getAlgo: () => number;
+          getChainType: () => string | undefined;
+        }>;
+      };
+    };
+  };
+  QRHardwareCallType: { KeyDerivation: number };
+  QRHardwareCallVersion: { V0: number; V1: number };
+  KeyDerivation: new (schemas: unknown[]) => unknown;
+  Curve: { secp256k1: number; ed25519: number };
+  DerivationAlgorithm: { slip10: number; bip32ed25519: number };
+  KeyDerivationSchema: new (
+    keypath: unknown,
+    curve?: number,
+    algo?: number,
+    chainType?: string,
+  ) => unknown;
+  CryptoKeypath: new (parts: unknown[], fp?: Buffer, depth?: number) => unknown;
+  PathComponent: new (args: { index: number; hardened: boolean }) => unknown;
 };
 
 type BaseRegistry = {
@@ -46,6 +118,7 @@ function nestedBase(pkg: string): BaseRegistry {
 
 const ethReg = nestedBase("@keystonehq/bc-ur-registry-eth");
 const tronReg = nestedBase("@keystonehq/bc-ur-registry-tron");
+const btcReg = nestedBase("@keystonehq/bc-ur-registry-btc");
 
 const REQUEST_ID = hexToBytes("9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d");
 const XFP_HEX = "73c5da0a";
@@ -186,4 +259,201 @@ test("keystone JS large chainId encoding probe", () => {
     // key 4's encoded integer immediately precedes the key-5 keypath.
     expect(hex).toContain(`${key4}05d90130`);
   }
+});
+
+const btcRequest = {
+  requestId: REQUEST_ID,
+  signData: hexToBytes("48656c6c6f2063727970746f20776f726c6421"),
+  dataType: "message" as const,
+  derivationPaths: [
+    {
+      components: [
+        { kind: "index" as const, index: 44, hardened: true },
+        { kind: "index" as const, index: 0, hardened: true },
+        { kind: "index" as const, index: 0, hardened: true },
+        { kind: "index" as const, index: 0, hardened: false },
+        { kind: "index" as const, index: 0, hardened: false },
+      ],
+      sourceFingerprint: 0x73c5da0a,
+      depth: 5,
+    },
+  ],
+  addresses: ["1MjiyuupjWK5Ye13f8BAPvgby5WBuQXyJx"],
+  origin: "btc wallet",
+};
+
+test("keystone JS btc-sign-request bytes equal ours and cross-decode", () => {
+  const vendor = new btcOracle.BtcSignRequest({
+    requestId: Buffer.from(REQUEST_ID),
+    signData: Buffer.from(btcRequest.signData),
+    dataType: btcOracle.DataType.message,
+    derivationPaths: [kPath(btcReg, "m/44'/0'/0'/0/0")],
+    addresses: [...btcRequest.addresses],
+    origin: "btc wallet",
+  });
+  const ours = btcSignRequestCodec.encode(btcRequest);
+  expect(bytesToHex(encodeCbor(ours))).toBe(vendorBody(vendor));
+  // The vendor's untagged body decodes through our codec and re-encodes identically.
+  const vendorHex = vendorBody(vendor);
+  const decoded = btcSignRequestCodec.decode(decodeCbor(hexToBytes(vendorHex)));
+  expect(decoded.dataType).toBe("message");
+  expect(bytesToHex(encodeCbor(btcSignRequestCodec.encode(decoded)))).toBe(vendorHex);
+});
+
+test("btc-sign-request: our bytes decode in the vendor reader", () => {
+  const ourTagged = bytesToHex(encodeCbor(toTagged(btcRequest, btcSignRequestCodec)));
+  const vendorDecoded = btcOracle.BtcSignRequest.fromCBOR(Buffer.from(ourTagged.slice(6), "hex"));
+  expect(vendorDecoded.getRequestId()).toStrictEqual(Buffer.from(REQUEST_ID));
+  expect(vendorDecoded.getSignData()).toStrictEqual(Buffer.from(btcRequest.signData));
+  expect(vendorDecoded.getDataype()).toBe(btcOracle.DataType.message);
+  expect(vendorDecoded.getDerivationPaths()).toStrictEqual(["44'/0'/0'/0/0"]);
+  expect(vendorDecoded.getAddress()).toStrictEqual(["1MjiyuupjWK5Ye13f8BAPvgby5WBuQXyJx"]);
+  expect(vendorDecoded.getOrigin()).toBe("btc wallet");
+});
+
+const btcSignature = {
+  requestId: REQUEST_ID,
+  signature: hexToBytes(`1f${"0f".repeat(32)}${"1a".repeat(32)}`),
+  publicKey: hexToBytes(`02${"d2".repeat(32)}`),
+};
+
+test("keystone JS btc-signature bytes equal ours and cross-decode", () => {
+  const vendor = new btcOracle.BtcSignature(
+    Buffer.from(btcSignature.signature),
+    Buffer.from(btcSignature.requestId),
+    Buffer.from(btcSignature.publicKey),
+  );
+  const ours = btcSignatureCodec.encode(btcSignature);
+  expect(bytesToHex(encodeCbor(ours))).toBe(vendorBody(vendor));
+  const vendorHex = vendorBody(vendor);
+  const decoded = btcSignatureCodec.decode(decodeCbor(hexToBytes(vendorHex)));
+  expect(decoded.signature).toStrictEqual(btcSignature.signature);
+  expect(bytesToHex(encodeCbor(btcSignatureCodec.encode(decoded)))).toBe(vendorHex);
+});
+
+test("btc-signature: our bytes decode in the vendor reader", () => {
+  const ourTagged = bytesToHex(encodeCbor(toTagged(btcSignature, btcSignatureCodec)));
+  const vendorDecoded = btcOracle.BtcSignature.fromCBOR(Buffer.from(ourTagged.slice(6), "hex"));
+  expect(vendorDecoded.getRequestId()).toStrictEqual(Buffer.from(REQUEST_ID));
+  expect(vendorDecoded.getSignature()).toStrictEqual(Buffer.from(btcSignature.signature));
+  expect(vendorDecoded.getPublicKey()).toStrictEqual(Buffer.from(btcSignature.publicKey));
+});
+
+const hwCall = {
+  params: {
+    kind: "keyDerivation" as const,
+    schemas: [
+      {
+        keyPath: {
+          components: [
+            { kind: "index" as const, index: 44, hardened: true },
+            { kind: "index" as const, index: 118, hardened: true },
+            { kind: "index" as const, index: 0, hardened: true },
+          ],
+        },
+        curve: "secp256k1" as const,
+        algorithm: "slip10" as const,
+        chainType: "ATOM",
+      },
+    ],
+  },
+  origin: "leap wallet",
+  version: 1 as const,
+};
+
+test("keystone JS qr-hardware-call bytes equal ours and cross-decode", () => {
+  const vendor = new hwOracle.QRHardwareCall(
+    hwOracle.QRHardwareCallType.KeyDerivation,
+    new hwOracle.KeyDerivation([
+      new hwOracle.KeyDerivationSchema(
+        new hwOracle.CryptoKeypath([
+          new hwOracle.PathComponent({ index: 44, hardened: true }),
+          new hwOracle.PathComponent({ index: 118, hardened: true }),
+          new hwOracle.PathComponent({ index: 0, hardened: true }),
+        ]),
+        hwOracle.Curve.secp256k1,
+        hwOracle.DerivationAlgorithm.slip10,
+        "ATOM",
+      ),
+    ]),
+    "leap wallet",
+    hwOracle.QRHardwareCallVersion.V1,
+  );
+  const ours = qrHardwareCallCodec.encode(hwCall);
+  expect(bytesToHex(encodeCbor(ours))).toBe(vendorBody(vendor));
+  const vendorHex = vendorBody(vendor);
+  const decoded = qrHardwareCallCodec.decode(decodeCbor(hexToBytes(vendorHex)));
+  expect(decoded.params.kind).toBe("keyDerivation");
+  expect(decoded.version).toBe(1);
+  expect(bytesToHex(encodeCbor(qrHardwareCallCodec.encode(decoded)))).toBe(vendorHex);
+});
+
+test("qr-hardware-call: our bytes decode in the vendor reader", () => {
+  const ourTagged = bytesToHex(encodeCbor(toTagged(hwCall, qrHardwareCallCodec)));
+  const vendorDecoded = hwOracle.QRHardwareCall.fromCBOR(Buffer.from(ourTagged.slice(6), "hex"));
+  expect(vendorDecoded.getType()).toBe(hwOracle.QRHardwareCallType.KeyDerivation);
+  expect(vendorDecoded.getOrigin()).toBe("leap wallet");
+  expect(vendorDecoded.getVersion()).toBe(hwOracle.QRHardwareCallVersion.V1);
+  const schemas = vendorDecoded.getParams().getSchemas();
+  expect(schemas).toHaveLength(1);
+  const [schema] = schemas;
+  expect(schema?.getKeypath().getPath()).toBe("44'/118'/0'");
+  expect(schema?.getCurve()).toBe(hwOracle.Curve.secp256k1);
+  expect(schema?.getAlgo()).toBe(hwOracle.DerivationAlgorithm.slip10);
+  expect(schema?.getChainType()).toBe("ATOM");
+});
+
+const encodeCode = (fn: () => unknown): string | undefined => {
+  try {
+    fn();
+    return undefined;
+  } catch (error) {
+    return (error as { code?: string }).code;
+  }
+};
+
+test("btc-sign-request encoder rejects out-of-contract values", () => {
+  expect(
+    encodeCode(() => btcSignRequestCodec.encode({ ...btcRequest, requestId: new Uint8Array(15) })),
+  ).toBe("OutOfRange");
+  expect(
+    encodeCode(() => btcSignRequestCodec.encode({ ...btcRequest, signData: new Uint8Array(0) })),
+  ).toBe("OutOfRange");
+  expect(encodeCode(() => btcSignRequestCodec.encode({ ...btcRequest, derivationPaths: [] }))).toBe(
+    "OutOfRange",
+  );
+  expect(encodeCode(() => btcSignRequestCodec.encode({ ...btcRequest, addresses: [] }))).toBe(
+    "OutOfRange",
+  );
+});
+
+test("btc-signature encoder rejects wrong lengths", () => {
+  expect(
+    encodeCode(() => btcSignatureCodec.encode({ ...btcSignature, signature: new Uint8Array(64) })),
+  ).toBe("OutOfRange");
+  expect(
+    encodeCode(() => btcSignatureCodec.encode({ ...btcSignature, publicKey: new Uint8Array(32) })),
+  ).toBe("OutOfRange");
+});
+
+test("qr-hardware-call encoder rejects out-of-contract values", () => {
+  expect(encodeCode(() => qrHardwareCallCodec.encode({ ...hwCall, version: 2 as never }))).toBe(
+    "OutOfRange",
+  );
+  expect(
+    encodeCode(() =>
+      qrHardwareCallCodec.encode({
+        ...hwCall,
+        params: { kind: "deriveContextHash" as never, schemas: hwCall.params.schemas },
+      }),
+    ),
+  ).toBe("WrongType");
+  expect(
+    encodeCode(() =>
+      qrHardwareCallCodec.encode({
+        ...hwCall,
+        params: { kind: "keyDerivation" as const, schemas: [] },
+      }),
+    ),
+  ).toBe("OutOfRange");
 });

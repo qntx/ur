@@ -2,19 +2,25 @@ import { bytesToHex, decodeCbor, encodeCbor, hexToBytes } from "@blockchaincommo
 import { expect, test } from "vite-plus/test";
 
 import {
+  btcSignRequestCodec,
+  btcSignatureCodec,
   cryptoMultiAccountsCodec,
   ethSignRequestCodec,
   ethSignatureCodec,
   oneKeyTronSignRequestCodec,
+  qrHardwareCallCodec,
   solSignRequestCodec,
   solSignatureCodec,
   tronSignRequestCodec,
   tronSignatureCodec,
 } from "../../src/interop/index.ts";
 import type {
+  BtcSignRequest,
+  BtcSignature,
   EthSignRequest,
   EthSignature,
   MultiAccounts,
+  QrHardwareCall,
   SolSignRequest,
   SolSignature,
   TronSignRequest,
@@ -53,6 +59,9 @@ const FILES = [
   "interop/sol-signature.json",
   "interop/tron-sign-request.json",
   "interop/tron-signature.json",
+  "interop/btc-sign-request.json",
+  "interop/btc-signature.json",
+  "interop/qr-hardware-call.json",
 ] as const;
 
 const CASES: ReadonlyArray<Case & { file: string; input: string; codecName: string }> =
@@ -74,6 +83,9 @@ const CODECS: Record<string, UrCodec<unknown>> = {
   "onekey-tron-sign-request": oneKeyTronSignRequestCodec,
   "tron-signature": tronSignatureCodec,
   "crypto-multi-accounts": cryptoMultiAccountsCodec,
+  "btc-sign-request": btcSignRequestCodec,
+  "btc-signature": btcSignatureCodec,
+  "qr-hardware-call": qrHardwareCallCodec,
 };
 
 function mustCase(
@@ -200,6 +212,41 @@ function valueOf(urType: string, decoded: unknown): Record<string, unknown> {
         ...(r.version === undefined ? {} : { version: r.version }),
       };
     }
+    case "btc-sign-request": {
+      const r = decoded as BtcSignRequest;
+      return {
+        requestId: bytesToHex(r.requestId),
+        signData: bytesToHex(r.signData),
+        dataType: r.dataType,
+        derivationPaths: r.derivationPaths.map(pathValue),
+        ...(r.addresses === undefined ? {} : { addresses: [...r.addresses] }),
+        ...(r.origin === undefined ? {} : { origin: r.origin }),
+      };
+    }
+    case "btc-signature": {
+      const r = decoded as BtcSignature;
+      return {
+        requestId: bytesToHex(r.requestId),
+        signature: bytesToHex(r.signature),
+        publicKey: bytesToHex(r.publicKey),
+      };
+    }
+    case "qr-hardware-call": {
+      const r = decoded as QrHardwareCall;
+      return {
+        params: {
+          kind: r.params.kind,
+          schemas: r.params.schemas.map((s) => ({
+            keyPath: pathValue(s.keyPath),
+            ...(s.curve === undefined ? {} : { curve: s.curve }),
+            ...(s.algorithm === undefined ? {} : { algorithm: s.algorithm }),
+            ...(s.chainType === undefined ? {} : { chainType: s.chainType }),
+          })),
+        },
+        ...(r.origin === undefined ? {} : { origin: r.origin }),
+        ...(r.version === undefined ? {} : { version: r.version }),
+      };
+    }
     default:
       throw new Error(`unhandled urType ${urType}`);
   }
@@ -264,7 +311,7 @@ function canonicalCase(file: string): (typeof CASES)[number] {
   return c;
 }
 
-// Each codec owns exactly one tag, so the canonical seven coexist in one
+// Each codec owns exactly one tag, so the canonical ten coexist in one
 // codecMap; the OneKey writer's tag name collides with the Keystone one and
 // belongs in its own map.
 test("interop codecMap builds and dispatches each type", () => {
@@ -276,8 +323,11 @@ test("interop codecMap builds and dispatches each type", () => {
     solSignatureCodec,
     tronSignRequestCodec,
     tronSignatureCodec,
+    btcSignRequestCodec,
+    btcSignatureCodec,
+    qrHardwareCallCodec,
   ]);
-  expect(map.size).toBe(7);
+  expect(map.size).toBe(10);
   for (const file of FILES) {
     const c = canonicalCase(file);
     const decoded = fromUrWith(Ur.parse(c.ur), map);
