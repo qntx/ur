@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 4.1.0 - 2026-11-25
+
 ### Added
 
 - `@qntx/ur`: three new `@qntx/ur/interop` codecs for the Keystone BTC / wallet-connect dialects — `btcSignRequestCodec` (tag 8101, `dataType` `"message"`, required `#6.37` request id, non-empty `derivationPaths`/`signData`), `btcSignatureCodec` (tag 8102, exactly 65-byte compact signature + 33-byte compressed key), and `qrHardwareCallCodec` (tag 1201, key-derivation calls over `#6.1301`/`#6.1302` embedded tags with presence-preserving `version`/`curve`/`algorithm`; the Babylon derive-context-hash call type is rejected). Validated byte-identically against `@keystonehq/bc-ur-registry-btc`, `@keystonehq/bc-ur-registry` 0.8.1, and the Keystone Rust `ur-registry` 1.0.9 crate.
