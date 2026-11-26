@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 4.2.0 - 2026-11-26
+
 ### Added
 
 - `@qntx/ur`: `CBOR_MAX_DEPTH` (64) on `@qntx/ur/typed` and the `UrLimit` value `"cborDepth"`.
