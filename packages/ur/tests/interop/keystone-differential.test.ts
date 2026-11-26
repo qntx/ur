@@ -24,6 +24,7 @@ import {
   qrHardwareCallCodec,
   tronSignRequestCodec,
 } from "../../src/interop/index.ts";
+import type { QrHardwareCall } from "../../src/interop/index.ts";
 import { fromTagged, toTagged } from "../../src/typed/index.ts";
 
 const require = createRequire(import.meta.url);
@@ -339,26 +340,26 @@ test("btc-signature: our bytes decode in the vendor reader", () => {
   expect(vendorDecoded.getPublicKey()).toStrictEqual(Buffer.from(btcSignature.publicKey));
 });
 
-const hwCall = {
+const hwCall: QrHardwareCall = {
   params: {
-    kind: "keyDerivation" as const,
+    kind: "keyDerivation",
     schemas: [
       {
         keyPath: {
           components: [
-            { kind: "index" as const, index: 44, hardened: true },
-            { kind: "index" as const, index: 118, hardened: true },
-            { kind: "index" as const, index: 0, hardened: true },
+            { kind: "index", index: 44, hardened: true },
+            { kind: "index", index: 118, hardened: true },
+            { kind: "index", index: 0, hardened: true },
           ],
         },
-        curve: "secp256k1" as const,
-        algorithm: "slip10" as const,
+        curve: "secp256k1",
+        algorithm: "slip10",
         chainType: "ATOM",
       },
     ],
   },
   origin: "leap wallet",
-  version: 1 as const,
+  version: 1,
 };
 
 test("keystone JS qr-hardware-call bytes equal ours and cross-decode", () => {
