@@ -6,6 +6,8 @@ use bcur_registry::v1::{
 use dcbor::{CBOR, CBORTaggedEncodable};
 use libfuzzer_sys::fuzz_target;
 
+bcur_fuzz::dcbor_asan_options!();
+
 fn check<T>(cbor: &CBOR)
 where
     T: TryFrom<CBOR> + CBORTaggedEncodable,
