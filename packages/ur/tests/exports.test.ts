@@ -105,6 +105,7 @@ test("root runtime exports are exactly the documented L0-L3 surface", () => {
 test("typed runtime exports are exactly the documented L4 surface", () => {
   expect(names(typed)).toStrictEqual(
     [
+      "CBOR_MAX_DEPTH",
       "DEFAULT_LIMITS",
       "Ur",
       "UrError",

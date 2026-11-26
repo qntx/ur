@@ -41,6 +41,7 @@ const fn limit_name(limit: Limit) -> &'static str {
         Limit::FragmentCount => "fragmentCount",
         Limit::FragmentLength => "fragmentLength",
         Limit::UriLength => "uriLength",
+        Limit::CborDepth => "cborDepth",
         _ => "unknown",
     }
 }

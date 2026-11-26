@@ -4,6 +4,7 @@ import type { Cbor, CborInput } from "@blockchaincommons/dcbor";
 import { fail } from "../error.ts";
 import { UrEncoder, encodeUr, parseUr, parseUrType, toQrString } from "../ur/index.ts";
 import type { DecodedUr, UrEncoderOptions, UrType } from "../ur/index.ts";
+import { exceedsCborDepth } from "./depth.ts";
 
 function mapCborDecode<T>(run: () => T): T {
   try {
@@ -46,10 +47,16 @@ export class Ur {
     );
   }
 
-  /** Wrap already-encoded dCBOR bytes. */
+  /**
+   * Wrap already-encoded dCBOR bytes. Nesting deeper than `CBOR_MAX_DEPTH` (64) is `ResourceLimit`
+   * (`cborDepth`), checked before decoding; non-dCBOR is `CborDecode`.
+   */
   static fromCborData(type: UrType | string, data: Uint8Array): Ur {
     // copy: caller mutation must not change the stored bstr
     const bytes = new Uint8Array(data);
+    if (exceedsCborDepth(bytes)) {
+      fail({ code: "ResourceLimit", limit: "cborDepth" });
+    }
     const value = mapCborDecode(() => decodeCbor(bytes));
     return new Ur(parseUrType(type), value);
   }

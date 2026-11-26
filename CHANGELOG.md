@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- `@qntx/ur`: `CBOR_MAX_DEPTH` (64) on `@qntx/ur/typed` and the `UrLimit` value `"cborDepth"`.
+- `bcur`: `typed::CBOR_MAX_DEPTH` (64) and `Limit::CborDepth` (`Display`: `CBOR nesting depth`).
+
+### Changed
+
+- The typed entry points enforce a CBOR nesting limit before decoding: `Ur.fromCborData`, `Ur.parse`, and `Ur.fromDecoded` (TypeScript) and `Ur::from_cbor_data`, `Ur::from_str`, and `Ur::try_from(ur::Decoded)` (Rust) reject a payload whose arrays, maps, and tags nest deeper than 64 levels with `ResourceLimit` (`cborDepth` / `Limit::CborDepth`) instead of decoding it. Depth 64 and below is unchanged, as is the `CborDecode` result for malformed input within the limit. Shared vectors: `vectors/typed/cbor-depth.json`.
+
 ## 4.1.0 - 2026-11-25
 
 ### Added

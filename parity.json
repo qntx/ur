@@ -183,6 +183,21 @@
       "vectors": ["vectors/typed/multi-tag.json"]
     },
     {
+      "id": "typed.cbor-depth",
+      "tier": "A",
+      "status": "stable",
+      "milestone": "R7",
+      "ts": {
+        "module": "packages/ur/src/typed/depth.ts",
+        "tests": ["packages/ur/tests/typed-cbor-depth.test.ts"]
+      },
+      "rust": {
+        "module": "crates/bcur/src/typed/depth.rs",
+        "tests": ["crates/bcur/tests/cbor_depth.rs"]
+      },
+      "vectors": ["vectors/typed/cbor-depth.json"]
+    },
+    {
       "id": "limits.defaults",
       "tier": "A",
       "status": "stable",

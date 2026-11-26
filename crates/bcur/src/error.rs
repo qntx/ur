@@ -18,6 +18,8 @@ pub enum Limit {
     FragmentLength,
     /// UR string length (`max_uri_length`).
     UriLength,
+    /// Nesting depth of serialized dCBOR (`typed::CBOR_MAX_DEPTH`).
+    CborDepth,
 }
 
 impl core::fmt::Display for Limit {
@@ -27,6 +29,7 @@ impl core::fmt::Display for Limit {
             Self::FragmentCount => "fragment count",
             Self::FragmentLength => "fragment length",
             Self::UriLength => "URI length",
+            Self::CborDepth => "CBOR nesting depth",
         })
     }
 }

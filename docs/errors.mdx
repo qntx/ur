@@ -45,7 +45,7 @@ try {
 } catch (error) {
   if (error instanceof UrError) {
     if (error.info.code === "ResourceLimit") {
-      error.info.limit; // "messageLength" | "fragmentCount" | "fragmentLength" | "uriLength"
+      error.info.limit; // "messageLength" | "fragmentCount" | "fragmentLength" | "uriLength" | "cborDepth"
     }
     if (error.info.code === "UnexpectedType") {
       error.info.expected; // accepted UrType[]

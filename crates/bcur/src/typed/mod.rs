@@ -11,9 +11,11 @@
 //! assert_eq!(ur.to_string(), "ur:test/lsadaoaxjygonesw");
 //! ```
 
+mod depth;
 mod traits;
 mod ur_value;
 
+pub use depth::CBOR_MAX_DEPTH;
 pub use traits::{UrDecodable, UrEncodable};
 pub use ur_value::Ur;
 

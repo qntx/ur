@@ -11,7 +11,8 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 
 [dependencies.bcur]
-path = "../crates/bcur"
+path     = "../crates/bcur"
+features = ["dcbor"]
 
 [dependencies.bcur-registry]
 path     = "../crates/bcur-registry"
@@ -132,6 +133,13 @@ bench = false
 [[bin]]
 name  = "interop_qr_hardware_call"
 path  = "fuzz_targets/interop_qr_hardware_call.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "typed_cbor_depth"
+path  = "fuzz_targets/typed_cbor_depth.rs"
 test  = false
 doc   = false
 bench = false

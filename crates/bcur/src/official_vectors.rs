@@ -585,6 +585,7 @@ const fn limit_name(limit: crate::Limit) -> &'static str {
         crate::Limit::FragmentCount => "fragmentCount",
         crate::Limit::FragmentLength => "fragmentLength",
         crate::Limit::UriLength => "uriLength",
+        crate::Limit::CborDepth => "cborDepth",
     }
 }
 

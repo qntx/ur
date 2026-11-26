@@ -5,11 +5,12 @@ use std::str::FromStr;
 
 use dcbor::CBOR;
 
+use super::depth::exceeds_max_depth;
 use super::map_cbor;
 use crate::error::ErrorKind;
 use crate::fountain::EncoderOptions;
 use crate::ur::{self, ParsedUr};
-use crate::{DecoderLimits, Error, Result, UrType};
+use crate::{DecoderLimits, Error, Limit, Result, UrType};
 
 /// A Uniform Resource whose payload is deterministic CBOR.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,8 +33,14 @@ impl Ur {
     ///
     /// # Errors
     ///
-    /// [`ErrorKind::CborDecode`] if `data` is not deterministic CBOR.
+    /// [`ErrorKind::ResourceLimit`] with [`Limit::CborDepth`] if `data` nests
+    /// arrays, maps, or tags deeper than [`super::CBOR_MAX_DEPTH`] (checked
+    /// before decoding); [`ErrorKind::CborDecode`] if `data` is not
+    /// deterministic CBOR.
     pub fn from_cbor_data(ur_type: UrType, data: &[u8]) -> Result<Self> {
+        if exceeds_max_depth(data) {
+            return Err(Error::resource_limit(Limit::CborDepth));
+        }
         let cbor = map_cbor(CBOR::try_from_data(data), ErrorKind::CborDecode)?;
         Ok(Self::new(ur_type, cbor))
     }
@@ -96,8 +103,8 @@ impl FromStr for Ur {
     /// # Errors
     ///
     /// Transport parse/decode errors, [`ErrorKind::NotSinglePart`] for
-    /// multi-part URIs, or [`ErrorKind::CborDecode`] if the payload is not
-    /// dCBOR.
+    /// multi-part URIs, or the [`Self::from_cbor_data`] errors for the
+    /// payload.
     fn from_str(s: &str) -> Result<Self> {
         match ur::parse(s, &DecoderLimits::default())? {
             ParsedUr::Single { ur_type, message } => Self::from_cbor_data(ur_type, &message),
@@ -113,7 +120,7 @@ impl TryFrom<ur::Decoded> for Ur {
     ///
     /// # Errors
     ///
-    /// [`ErrorKind::CborDecode`] when the payload is not deterministic CBOR.
+    /// The [`Self::from_cbor_data`] errors for the payload.
     fn try_from(decoded: ur::Decoded) -> Result<Self> {
         let (ur_type, message) = decoded.into_parts();
         Self::from_cbor_data(ur_type, &message)
