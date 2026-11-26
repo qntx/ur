@@ -50,6 +50,7 @@ untrusted structured data; signing and key use are host policy.
 | PSBT not actually a PSBT                       | Medium               | Magic-byte prefix `70736274ff` only. No input/output parse                                                               |
 | SSKR share claimed as full seed                | Medium               | Type token `sskr` ≠ `seed`. No combine in this package                                                                   |
 | Envelope recursion                             | Medium               | `ENVELOPE_MAX_DEPTH = 64`. Depths 0..=64 accepted (65 frames); 65 is `OutOfRange`                                        |
+| dCBOR nesting depth                            | Medium               | `CBOR_MAX_DEPTH = 64`, checked before decoding. Depths 0..=64 accepted; 65 is `ResourceLimit` (`cborDepth`)              |
 | Zero-copy alias of decoder or caller buffer    | Medium               | `copyBytes` on decode; `copyBuf` on encode                                                                               |
 | Invalid CRC                                    | Low                  | Bytewords CRC + message CRC on fountain join                                                                             |
 | Application payload treated as trusted         | High (host)          | L4 `CborDecode`/`CborType` for typed hosts; L5 objects still untrusted; L3 recovered bytes still untrusted               |

@@ -25,7 +25,12 @@ export type UrErrorCode =
   | "Internal";
 
 /** Decoder budget names carried by `ResourceLimit` errors. */
-export type UrLimit = "messageLength" | "fragmentCount" | "fragmentLength" | "uriLength";
+export type UrLimit =
+  | "messageLength"
+  | "fragmentCount"
+  | "fragmentLength"
+  | "uriLength"
+  | "cborDepth";
 
 /** Per-code error detail; `switch (info.code)` narrows the payload. */
 export type UrErrorInfo =

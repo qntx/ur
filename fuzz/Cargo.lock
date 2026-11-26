@@ -28,6 +28,7 @@ name = "bcur"
 version = "4.1.0"
 dependencies = [
  "crc",
+ "dcbor",
  "rand_xoshiro",
  "sha2",
 ]

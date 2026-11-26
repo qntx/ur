@@ -1,4 +1,5 @@
 export { Ur } from "./ur.ts";
+export { CBOR_MAX_DEPTH } from "./depth.ts";
 export {
   type CodecMap,
   type CodecValue,

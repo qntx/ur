@@ -24,7 +24,7 @@ use std::str::FromStr;
 use bcur::Ur;
 
 let ur = Ur::from_str("ur:test/lsadaoaxjygonesw")?; // single-part only; NotSinglePart on frames
-let rebuilt = Ur::from_cbor_data(ur_type, &data)?;  // CborDecode if not dCBOR
+let rebuilt = Ur::from_cbor_data(ur_type, &data)?;  // ResourceLimit(CborDepth) past depth 64; CborDecode if not dCBOR
 let typed: Ur = decoded.try_into()?;                // TryFrom<ur::Decoded> after a decode session
 ```
 

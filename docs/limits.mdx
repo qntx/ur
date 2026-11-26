@@ -27,4 +27,8 @@ use bcur::DecoderLimits;
 let decoder = Decoder::new(DecoderLimits::default().with_max_message_length(4096));
 ```
 
+## CBOR nesting depth
+
+The typed entry points — TypeScript `Ur.fromCborData`, `Ur.parse`, and `Ur.fromDecoded`; Rust `Ur::from_cbor_data`, `Ur::from_str`, and `Ur::try_from(ur::Decoded)` — bound the nesting depth of the dCBOR payload before decoding it. Every array, map, and tag counts as one level, empty containers included: depths up to `CBOR_MAX_DEPTH` = 64 (`@qntx/ur/typed` / `bcur::typed`) are accepted, and a deeper payload is `ResourceLimit` with limit `cborDepth` / `Limit::CborDepth`. The bound is fixed, not a `DecoderLimits` field; the deepest registry object in the shared vectors nests 11 levels.
+
 Per-session memory is bounded by `K · fragmentLength` bytes of fragment data — at most `maxMessageLength + fragmentLength`, since `K` fragments overshoot the message by less than one fragment — plus `K · ⌈K/8⌉` bytes of elimination bit masks (500,000 bytes at `K = 2000`), about 1.5 MiB at the defaults.

@@ -24,6 +24,7 @@ for: they pin behavior, not the implementations' bugs.
 | `ur/decoder-frames.json`     | L3 `UrDecoder` per-frame status streams (generated)             |
 | `ur/published-singles.txt`   | Three published single-part UR goldens                          |
 | `typed/test-array.json`      | Typed-layer `[1, 2, 3]` UR golden (L4 test array)               |
+| `typed/cbor-depth.json`      | Typed-entry CBOR nesting limit (64): boundaries per container kind, over-deep and malformed-head cases as repeated hex segments, deepest official registry body |
 | `limits/defaults.json`       | `DecoderLimits` default values                                  |
 | `ur-rs/multipart-20.txt`     | ur-rs `test_ur_encoder` 20-URI table (Wolf/256, max frag 30)    |
 | `ur-rs/choose-fragments.txt` | ur-rs `test_choose_fragments` sorted indexes, seq 1..=30        |

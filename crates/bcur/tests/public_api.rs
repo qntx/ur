@@ -147,6 +147,7 @@ const _: fn(&EncoderOptions) -> usize = EncoderOptions::min_fragment_len;
 const _: fn(&EncoderOptions) -> u32 = EncoderOptions::first_sequence;
 const _: fn(&Limit, &mut core::fmt::Formatter<'_>) -> core::fmt::Result =
     <Limit as core::fmt::Display>::fmt;
+const _: Limit = Limit::CborDepth;
 const _: fn() = assert_send_sync::<DecoderLimits>;
 const _: fn() = assert_send_sync::<EncoderOptions>;
 const _: fn() = assert_send_sync::<Error>;
@@ -176,6 +177,7 @@ mod l4 {
     use bcur::ur::{self, Encoder};
     use bcur::{Result, Ur, UrDecodable, UrEncodable, UrType};
 
+    const _: usize = bcur::typed::CBOR_MAX_DEPTH;
     const _: fn(UrType, CBOR) -> Ur = ur_new::<CBOR>;
 
     fn ur_new<C: Into<CBOR>>(ur_type: UrType, cbor: C) -> Ur {

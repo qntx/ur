@@ -17,7 +17,7 @@ ur.toQrString(); // uppercase form for QR alphanumeric mode
 ur.toCborData(); // dCBOR bytes
 
 Ur.parse("ur:test/lsadaoaxjygonesw"); // single-part only; NotSinglePart on a fountain frame
-Ur.fromCborData("test", ur.toCborData()); // wrap encoded dCBOR; CborDecode if not dCBOR
+Ur.fromCborData("test", ur.toCborData()); // wrap encoded dCBOR; ResourceLimit(cborDepth) past depth 64; CborDecode if not dCBOR
 Ur.fromDecoded(decoded); // wrap a completed UrDecoder result ({ type, message })
 ```
 
